@@ -40,6 +40,7 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: 'Not found' });
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+    if (url.pathname === '/api/config') return json(res, 200, manager.runtime.publicConfig);
     if (url.pathname === '/api/runs') return json(res, 200, [...manager.runs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     if (parts[0] === 'api' && parts[1] === 'runs' && parts.length === 3) return json(res, 200, manager.get(parts[2]));
     if (parts[0] === 'api' && parts[1] === 'runs' && parts[3] === 'download' && parts.length === 4) {
@@ -56,4 +57,4 @@ const server = createServer(async (req, res) => {
     json(res, 404, { error: 'Not found' });
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }
 });
-server.listen(port, '127.0.0.1', () => console.log(`Game builder: ${origin} (scripted demo, no API key)`));
+server.listen(port, '127.0.0.1', () => console.log(`Game builder: ${origin} (${manager.runtime.mode === 'openai' ? 'OpenAI mode; API usage is billed' : 'scripted demo; no API calls'})`));

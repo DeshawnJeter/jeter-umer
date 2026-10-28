@@ -1,6 +1,6 @@
 # Game Workshop
 
-A local, no-key demonstration of a hub-and-spoke game builder. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser star-collector game for human review.
+A local hub-and-spoke game builder with a no-key demo and an opt-in OpenAI provider. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser star-collector game for human review.
 
 ## Run
 
@@ -18,9 +18,11 @@ npm test
 npm run check
 ```
 
+For real model workers/checkers, privately set a fresh `OPENAI_API_KEY` in the server environment and run `npm run start:openai`. See [docs/openai-provider.md](docs/openai-provider.md) for model overrides, limits and optional explicit environment-file loading. The dashboard clearly labels billed OpenAI mode. Normal tests strip real credentials and never make paid calls.
+
 ## What this version does
 
-- Runs six deterministic specialist/checker pairs with isolated persisted artifacts.
+- Runs six specialist/checker pairs with isolated persisted artifacts, using scripted demo workers or separate OpenAI model calls.
 - Routes tasks by role and runs ready specialists with a concurrency limit of three.
 - Retries failed proposals, preserves checker evidence, and stops at a global step budget.
 - Saves human difficulty answers, supports pause/resume/cancel, and restores interrupted runs as paused.
@@ -34,9 +36,9 @@ npm run check
 
 ## Boundaries
 
-**This is scripted demo mode, not an AI coding system yet.** It never calls OpenAI, reads an API key, or generates arbitrary JavaScript. The free-text brief is retained as context; the scripted agents use the explicit title, difficulty, and music settings. The reusable Phaser template supplies the game code.
+**Demo mode is free of API calls. OpenAI mode uses real models for bounded game configuration and static review.** Neither mode executes arbitrary model-generated JavaScript. The reusable Phaser template supplies the game code. Demo workers use explicit settings; real workers receive the brief and relevant task context as untrusted data.
 
-Specialist checkers perform contract and domain checks. Integration checks are static. They do not claim to automatically play the game or judge creative quality. Human playtesting supplies the behavioral approval. A later model adapter can replace workers while retaining task contracts, independent checkers, and limits. Prompt files are loaded and audited, but scripted workers do not interpret natural-language instructions. Tool allowlists constrain the harness interface; trusted JavaScript worker modules are not OS-isolated.
+OpenAI checkers reason independently about supplied artifacts, then deterministic role checks still run. Integration checks are static. They do not claim to automatically play the game or judge creative quality. Human playtesting supplies the behavioral approval. Prompt files are loaded and audited; only real model workers interpret them. Tool allowlists constrain the harness interface, and the API provider exposes no file/shell tools. Trusted JavaScript worker modules are not OS-isolated.
 
 Runtime state lives in ignored `.local/runs/`. The existing `.env/` directory stays ignored. Do not commit secrets. This server binds only to loopback and is a development tool without multi-user authentication. Do not expose it publicly.
 
@@ -46,4 +48,4 @@ See [docs/branch-plan.md](docs/branch-plan.md). Each feature branch starts from 
 
 The prompt/human-loop update uses new scoped branches based on the working `codex/basic-integration` prerequisite, which already descends from development. `codex/prompt-loop-integration` assembles these new branches. See [docs/prompt-system.md](docs/prompt-system.md) for configuration and boundaries.
 
-Phaser and Tone.js retain their original licenses in downloaded builds. Their libraries are free to use under their respective MIT terms. AI services and hosting, if added later, have separate costs.
+Phaser and Tone.js retain their original licenses in downloaded builds. Their libraries are free to use under their respective MIT terms. Live API usage and hosting have separate costs.

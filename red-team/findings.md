@@ -18,7 +18,7 @@ Fix: `codex/adversarial-tests` rejects whitespace-ambiguous options, invalid rec
 
 ## Untested model/human cases
 
-MODEL-01 through MODEL-05 require an authorized model adapter. HUMAN-01 requires actual playtesting/listening. They remain not_tested. No claim of prompt-injection resistance or creative-quality review follows from the scripted checks.
+MODEL-01 through MODEL-05 require explicitly authorized model-connected test execution. An application model provider exists, but this local runner does not exercise it. HUMAN-01 requires actual playtesting/listening. They remain not_tested. No claim of prompt-injection resistance or creative-quality review follows from the scripted checks.
 
 ## Known trust limitations
 

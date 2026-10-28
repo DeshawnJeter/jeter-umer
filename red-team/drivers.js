@@ -6,13 +6,14 @@ import { normalizeQuestion } from '../shared/contracts/questions.js';
 import { runPair } from '../apps/server/src/runners/harness.js';
 import { Store } from '../apps/server/src/storage/store.js';
 import { Manager } from '../apps/server/src/orchestrator/manager.js';
+import { createRuntime } from '../apps/server/src/providers/runtime.js';
 
 const project = JSON.parse(await readFile(new URL('./fixtures/synthetic-project.json', import.meta.url), 'utf8'));
 const fresh = () => mkdtemp(join(tmpdir(), 'game-redteam-'));
 const passReport = { verdict: 'pass', findings: [], evidence: ['Inspected synthetic gameplay settings'] };
 async function rejected(operation) { try { await operation(); return { rejected: false, message: 'Accepted' }; } catch (error) { return { rejected: true, message: error.message }; } }
 async function pair(overrides = {}) { return runPair({ role: 'gameplay', brief: clone(project.brief), directory: await fresh(), worker: async () => ({ artifact: clone(project.gameplay) }), checker: async () => clone(passReport), ...overrides }); }
-async function planned(brief = project.brief) { const manager = new Manager(new Store(await fresh())); await manager.initialize(); const run = await manager.create(clone(brief)); await manager.jobs.get(run.id); return { manager, run }; }
+async function planned(brief = project.brief) { const manager = new Manager(new Store(await fresh()), { runtime: createRuntime({ env: { GAME_BUILDER_PROVIDER: 'demo' } }) }); await manager.initialize(); const run = await manager.create(clone(brief)); await manager.jobs.get(run.id); return { manager, run }; }
 
 export const drivers = Object.freeze({
   artifactFields: async payload => {

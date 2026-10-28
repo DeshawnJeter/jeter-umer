@@ -3,21 +3,23 @@ import { resolve } from 'node:path';
 import { Store } from '../storage/store.js';
 import { runPair } from '../runners/harness.js';
 import { fingerprint, loadSystemManifest } from '../runners/instructions.js';
-import { route } from '../router/index.js';
 import { ROLES, SPECIALISTS, clone, validateBrief } from '../../../../shared/contracts/index.js';
 import { makeTask } from '../../../../shared/contracts/tasks.js';
 import { combineQuestion, validateAnswer } from '../../../../shared/contracts/questions.js';
 import { policy, assertTransition, terminalStates } from '../../../../shared/policies/index.js';
 import { buildGame, hashBuild } from '../integration/build.js';
 import { validateGame, HUMAN_CHECKS } from '../validation/index.js';
+import { createRuntime } from '../providers/runtime.js';
+import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../providers/usage.js';
 
 export class Manager {
-  constructor(store = new Store(), { router = route } = {}) {
-    this.store = store; this.router = router; this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();
+  constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
+    this.store = store; this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
       run.decisions ??= {}; run.tasks ??= {}; run.planApproval ??= null; run.planHash ??= null;
+      if (run.providerUsage) recoverUsage(run.providerUsage);
       if (run.version !== 2 && !terminalStates.has(run.status)) {
         run.status = 'paused'; run.generation++; run.results = {}; run.agents = {}; run.questions = []; run.build = null; run.validation = null;
         run.events.push({ at: new Date().toISOString(), message: 'Upgraded unfinished run. Resume to rebuild with checked prompts and human plan approval.' });
@@ -34,15 +36,32 @@ export class Manager {
   async event(run, message) { run.events.push({ at: new Date().toISOString(), message }); await this.save(run); }
   transition(run, next) { assertTransition(run.status, next); run.status = next; }
   get(id) { const run = this.runs.get(id); if (!run) throw new Error('Run not found'); return run; }
+  async manifest() {
+    const instructions = await loadSystemManifest();
+    return { ...instructions, runtime: clone(this.runtime.publicConfig), hash: fingerprint({ instructions: instructions.hash, runtime: this.runtime.publicConfig }) };
+  }
+  assertRuntime(run) {
+    if (run.mode !== this.runtime.mode || (run.providerConfig && fingerprint(run.providerConfig) !== fingerprint(this.runtime.publicConfig))) throw new Error('Restart with this run’s provider/model configuration, or create a new run. Providers never switch silently.');
+  }
+  async reserveCall(run, estimate) {
+    if (run.status !== 'running') { const error = new Error('Run suspended'); error.suspended = true; throw error; }
+    try { reserveUsage(run.providerUsage, run.providerConfig, estimate); }
+    catch (error) {
+      if (error.budgetExhausted) { this.transition(run, 'stopped'); this.controllers.get(run.id)?.abort(); await this.event(run, error.message); error.suspended = true; }
+      throw error;
+    }
+    await this.save(run);
+  }
   async create(brief) {
-    const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: 'scripted-demo', brief: validateBrief(brief), instructions: await loadSystemManifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
+    const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
     this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
     if (this.jobs.has(run.id)) return;
+    this.controllers.set(run.id, new AbortController());
     const job = Promise.resolve().then(() => this.drive(run)).catch(async error => {
       if (!terminalStates.has(run.status)) { run.status = 'failed'; run.error = error.message; await this.event(run, error.message); }
-    }).finally(() => this.jobs.delete(run.id));
+    }).finally(() => { this.jobs.delete(run.id); this.controllers.delete(run.id); });
     this.jobs.set(run.id, job);
   }
   async checkpoint(run) {
@@ -67,11 +86,16 @@ export class Manager {
   }
   async execute(run, role) {
     if (run.results[role] || this.blocked(run, role)) return;
-    const handlers = await this.router(role);
+    const handlers = this.router ? await this.router(role) : await this.runtime.route(role, {
+      signal: this.controllers.get(run.id)?.signal,
+      reserve: estimate => this.reserveCall(run, estimate),
+      finish: async (usage, estimate) => { finishUsage(run.providerUsage, usage, estimate); await this.save(run); }
+    });
     const task = makeTask(role, run.generation);
     if (role !== 'planner') task.dependencies = [run.tasks.planner.id, 'human:plan-approval'];
     run.tasks[role] = { ...task, status: 'running' };
-    const result = await runPair({ role, task, brief: run.brief, context: { ...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions) }, ...handlers,
+    const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
@@ -85,7 +109,8 @@ export class Manager {
   async drive(run) {
     try {
       if (run.status !== 'running') return;
-      const instructions = await loadSystemManifest();
+      this.assertRuntime(run);
+      const instructions = await this.manifest();
       if (run.instructions && run.instructions.hash !== instructions.hash) {
         this.invalidate(run, ROLES); run.questions = [];
         await this.event(run, 'Instructions or profiles changed. Prior results and approvals require fresh checks.');
@@ -123,16 +148,17 @@ export class Manager {
   }
   async applyAction(id, action, data) {
     const run = this.get(id);
-    if (action === 'cancel') { this.transition(run, 'cancelled'); await this.event(run, 'Human cancelled the run'); return run; }
-    if (action === 'pause') { this.transition(run, 'paused'); await this.event(run, 'Human paused the run'); return run; }
+    if (action === 'cancel') { this.transition(run, 'cancelled'); this.controllers.get(id)?.abort(); await this.event(run, 'Human cancelled the run'); return run; }
+    if (action === 'pause') { this.transition(run, 'paused'); this.controllers.get(id)?.abort(); await this.event(run, 'Human paused the run'); return run; }
     await this.jobs.get(id);
+    this.assertRuntime(run);
     if (action === 'resume') {
       if (run.status !== 'paused') throw new Error('Only paused runs can resume');
       this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
     }
     if (action === 'approve_plan') {
       if (run.status !== 'awaiting_plan' || !run.planHash || data.planHash !== run.planHash) throw new Error('Approve the current checked plan');
-      if ((await loadSystemManifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
+      if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       run.planApproval = { hash: run.planHash, at: new Date().toISOString(), source: 'human' };
       this.transition(run, 'running'); await this.event(run, 'Human approved the checked plan'); this.launch(run); return run;
     }
@@ -159,7 +185,7 @@ export class Manager {
     }
     if (action === 'approve') {
       if (run.status !== 'awaiting_review' || !run.planApproval || run.planApproval.hash !== run.planHash || run.questions.some(question => question.blocking) || !run.validation?.passed || data.sha256 !== run.build?.sha256 || HUMAN_CHECKS.some(key => data.checks?.[key] !== true)) throw new Error('Playtest every required item and approve the current build');
-      if ((await loadSystemManifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
+      if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if (await hashBuild(resolve(this.store.folder(id), 'builds', String(run.build.generation))) !== run.build.sha256) throw new Error('Build changed since validation. Rebuild before approval.');
       run.approval = { sha256: run.build.sha256, checks: clone(data.checks), at: new Date().toISOString(), source: 'human-attestation' };
       this.transition(run, 'complete'); await this.event(run, 'Human approved this exact build after playtesting'); return run;

@@ -22,7 +22,7 @@ export async function runSuite(cases, { executors = drivers } = {}) {
   for (const entry of cases) {
     const base = { id: entry.id, name: entry.name, surface: entry.surface, automation: entry.automation, expected: entry.expected };
     if (entry.automation !== 'local') {
-      results.push({ ...base, status: 'not_tested', observed: { reason: entry.automation === 'model-required' ? 'No model adapter or paid calls are enabled.' : 'No human listening or playtest was performed by this runner.' }, evidence: [], limits: ['This case must not be counted as a successful defense.'] }); continue;
+      results.push({ ...base, status: 'not_tested', observed: { reason: entry.automation === 'model-required' ? 'This local-only runner does not execute paid model calls.' : 'No human listening or playtest was performed by this runner.' }, evidence: [], limits: ['This case must not be counted as a successful defense.'] }); continue;
     }
     try {
       if (!Object.hasOwn(executors, entry.driver)) throw new Error('Authorized executor unavailable');
