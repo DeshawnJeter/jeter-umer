@@ -15,7 +15,12 @@ import { validateGame, HUMAN_CHECKS } from '../apps/server/src/validation/index.
 const brief = { prompt: 'Collect stars in space', title: 'Test Game', difficulty: 'beginner', music: false };
 const temp = () => mkdtemp(join(tmpdir(), 'game-builder-test-'));
 async function manager() { const instance = new Manager(new Store(await temp())); await instance.initialize(); return instance; }
-async function settle(m, id) { const job = m.jobs.get(id); if (job) await job; return m.get(id); }
+async function settle(m, id) {
+  const job = m.jobs.get(id); if (job) await job; const run = m.get(id);
+  // Simulate explicit human plan approval in these baseline integration tests.
+  if (run.status === 'awaiting_plan') { await m.act(id, 'approve_plan', { planHash: run.planHash }); await m.jobs.get(id); }
+  return run;
+}
 
 test('contracts reject malformed game data and unsupported difficulty', () => {
   for (const role of ROLES) assert.deepEqual(validateArtifact(role, defaults[role]), []);
@@ -56,7 +61,7 @@ test('whole-game validation rejects cross-agent inconsistency', () => {
 test('human context resumes the loop and exact-build approval is required', async () => {
   const m = await manager(); const run = await m.create({ ...brief, difficulty: '' }); await settle(m, run.id);
   assert.equal(run.status, 'awaiting_human'); assert.equal(run.build, null);
-  await m.act(run.id, 'answer', { answer: 'beginner' }); await settle(m, run.id);
+  await m.act(run.id, 'answer', { questionId: run.questions[0].id, answer: 'beginner' }); await settle(m, run.id);
   assert.equal(run.status, 'awaiting_review'); assert.equal(Object.keys(run.results).length, 6);
   assert.equal(run.validation.passed, true); assert.equal(run.answers.length, 1);
   await assert.rejects(m.act(run.id, 'approve', { sha256: run.build.sha256, checks: {} }), /Playtest/);

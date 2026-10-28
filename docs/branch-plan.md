@@ -19,3 +19,18 @@ Every feature branch starts at the same `origin/development` base. Branches are 
 15. `codex/verification`: cross-feature tests and operating guide. Requires the assembled system.
 
 `codex/basic-integration` assembles all these changes for testing. It does not change development. The demo uses deterministic scripts and declarative game configurations; no API key, AI reasoning, or arbitrary AI-generated code execution is included.
+
+## Prompt and human-loop update
+
+These new branches share the tested `codex/basic-integration` prerequisite, which descends from development. Earlier branches and development remain unchanged. Their diffs against that prerequisite contain only their scoped changes.
+
+1. `codex/master-prompts`: orchestrator and shared instructions.
+2. `codex/agent-profiles`: per-role/checker configuration and role prompt contracts.
+3. `codex/application-skills`: project-owned skill library and allowlisted loader.
+4. `codex/human-question-contracts`: validated question/answer formats and optional story-context setting.
+5. `codex/context-harness`: task contracts, complete instruction envelopes, narrow tool interfaces, context limits and audits. Requires 1–4.
+6. `codex/human-context-loop`: task blocking, shared decisions, plan approval, instruction provenance and example specialist questions. Requires 1–5.
+7. `codex/human-review-dashboard`: plan review and choice/free-text question forms. Requires 6.
+8. `codex/prompt-loop-verification`: updated regressions and operating documentation. Requires the assembled changes.
+
+`codex/prompt-loop-integration` combines the new changes for running and review. None of these branches enables paid API calls.
