@@ -17,7 +17,10 @@ async function serve(res, base, relative, preview = false) {
   const file = resolve(base, relative); const root = resolve(base);
   if (!file.startsWith(root + sep) || relative.split(/[\\/]/).some(part => part.startsWith('.'))) { json(res, 404, { error: 'Not found' }); return; }
   if (!(await stat(file)).isFile()) throw new Error('Not a file');
-  res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(preview ? { 'Access-Control-Allow-Origin': '*', 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; object-src 'none'; base-uri 'none'" } : {}) }); res.end(await readFile(file));
+  // The preview keeps an opaque sandbox origin. Explicit local asset origins let
+  // its modules/config load without granting allow-same-origin to generated games.
+  const assetOrigins = `${origin} http://localhost:${port}`;
+  res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(preview ? { 'Access-Control-Allow-Origin': '*', 'Content-Security-Policy': `default-src 'none'; script-src ${assetOrigins} 'unsafe-inline'; style-src ${assetOrigins} 'unsafe-inline'; connect-src ${assetOrigins}; img-src ${assetOrigins} data: blob:; media-src ${assetOrigins} blob:; object-src 'none'; base-uri 'none'` } : {}) }); res.end(await readFile(file));
 }
 async function archive(folder) {
   const { zipSync } = await import('fflate'); const files = {};
