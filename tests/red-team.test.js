@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadCatalog, validateCatalog, runSuite } from '../red-team/suite.js';
+import { loadCatalog, validateCatalog, runSuite, exitCodeFor } from '../red-team/suite.js';
 
 test('red-team catalog is valid and includes explicit model and human gaps', async () => {
   const catalog = await loadCatalog(); validateCatalog(catalog);
@@ -26,4 +26,10 @@ test('probe execution errors cannot turn into a passing defense', async () => {
   const report = await runSuite([entry], { executors: { artifactFields: async () => { throw new Error('Synthetic fixture unavailable'); } } });
   assert.equal(report.overall, 'fail'); assert.match(report.results[0].observed.error, /Synthetic fixture/);
   assert.match(report.results[0].limits[0], /execution errors/);
+});
+test('CLI exit codes keep failures and untested coverage distinct', () => {
+  assert.equal(exitCodeFor({ summary: { fail: 1, not_tested: 6 } }, true), 1);
+  assert.equal(exitCodeFor({ summary: { fail: 0, not_tested: 6 } }), 2);
+  assert.equal(exitCodeFor({ summary: { fail: 0, not_tested: 6 } }, true), 0);
+  assert.equal(exitCodeFor({ summary: { fail: 0, not_tested: 0 } }), 0);
 });

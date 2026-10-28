@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { drivers } from './drivers.js';
 
 export async function loadCatalog() { return JSON.parse(await readFile(new URL('./fixtures/cases.json', import.meta.url), 'utf8')); }
+export function exitCodeFor(report, localOnly = false) { return report.summary.fail ? 1 : report.summary.not_tested && !localOnly ? 2 : 0; }
 export function validateCatalog(cases) {
   if (!Array.isArray(cases) || !cases.length) throw new Error('A nonempty case catalog is required');
   const ids = new Set();

@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { loadCatalog, runSuite } from './suite.js';
+import { loadCatalog, runSuite, exitCodeFor } from './suite.js';
 const args = process.argv.slice(2);
 if (args.some(arg => arg !== '--local-only') || args.length > 1) throw new Error('Usage: node red-team/run.js [--local-only]');
 const report = await runSuite(await loadCatalog());
@@ -10,4 +10,4 @@ const output = resolve(folder, `${new Date().toISOString().replaceAll(':', '-')}
 await writeFile(output, JSON.stringify(report, null, 2), { flag: 'wx' });
 for (const result of report.results) console.log(`${result.id} ${result.status}: ${result.name}`);
 console.log(JSON.stringify({ overall: report.overall, ...report.summary, report: output }));
-process.exitCode = report.summary.fail ? 1 : report.summary.not_tested && !args.includes('--local-only') ? 2 : 0;
+process.exitCode = exitCodeFor(report, args.includes('--local-only'));
