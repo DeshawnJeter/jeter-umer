@@ -16,6 +16,7 @@ const point = v => object(v) && Number.isInteger(v.x) && Number.isInteger(v.y) &
 export function validateArtifact(role, value) {
   if (!ROLES.includes(role) || !object(value)) return ['Unknown role or invalid artifact'];
   const errors = [];
+  for (const key of Object.keys(value)) if (!Object.hasOwn(defaults[role], key)) errors.push(`Unexpected ${role} artifact field: ${key}`);
   const check = (condition, message) => { if (!condition) errors.push(message); };
   if (role === 'planner') {
     check(string(value.title, 60), 'A short game title is required');
