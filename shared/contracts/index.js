@@ -1,3 +1,4 @@
+import { genreOf } from '../game-types.js';
 export const ROLES = ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio'];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
@@ -42,5 +43,5 @@ export function validateBrief(brief) {
   if (!object(brief) || !string(brief.prompt, 2000)) throw new Error('Describe the game in 1–2000 characters');
   if (!['', 'beginner', 'experienced'].includes(brief.difficulty ?? '')) throw new Error('Invalid difficulty');
   if (brief.title !== undefined && !string(brief.title, 60)) throw new Error('Title must be 1–60 characters');
-  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
+  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
 }
