@@ -1,4 +1,5 @@
 import { genreOf } from '../../shared/game-types.js';
+import {advancedProfile} from '../../shared/advanced-games.js';
 function platformReachability(level, walls, findings) {
   const key = p => `${p.x},${p.y}`;
   for (let x = 0; x < 15; x++) if (!walls.has(`${x},9`)) { findings.push('Platform levels require an unbroken floor on row 9'); break; }
@@ -28,7 +29,7 @@ export function inspectLevel(level, genre = 'collector') {
   const occupied = [level.spawn, level.exit, ...level.stars].map(key);
   if (new Set(occupied).size !== occupied.length) findings.push('Spawn, exit, and stars must occupy distinct cells');
   if (occupied.some(p => walls.has(p))) findings.push('Required objects cannot overlap walls');
-  if (genre === 'platformer') return platformReachability(level, walls, findings);
+  if (genre === 'platformer'||advancedProfile(genre)?.platform) return platformReachability(level, walls, findings);
   const visited = new Set([key(level.spawn)]); const queue = [level.spawn];
   for (let i = 0; i < queue.length; i++) {
     const p = queue[i];

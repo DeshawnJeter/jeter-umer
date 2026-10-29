@@ -3,7 +3,7 @@ export function newCampaign(difficulty='beginner'){
   return {party:[{name:'Scout',hp:12,maxHp:12,mp:0,maxMp:0},{name:'Mage',hp:8,maxHp:8,mp:6,maxMp:6}],potions:3,xp:0,level:1,encounters:0,difficulty};
 }
 export function beginBattle(campaign,index=0){
-  const boss=index>=2;return {campaign,actor:0,target:0,round:0,phase:'player',enemies:Array.from({length:boss?1:index===1?2:1},(_,i)=>({name:boss?'Sentinel':i?'Wisp':'Drone',hp:boss?16:6,maxHp:boss?16:6})),message:'Choose an action and target.'};
+  const boss=index>=2;return {campaign,actor:Math.max(0,campaign.party.findIndex(p=>p.hp>0)),target:0,round:0,phase:'player',enemies:Array.from({length:boss?1:index===1?2:1},(_,i)=>({name:boss?'Sentinel':i?'Wisp':'Drone',hp:boss?16:6,maxHp:boss?16:6})),message:'Choose an action and target.'};
 }
 export function battleAction(battle,action,target=battle.target){
   if(battle.phase!=='player')return false;

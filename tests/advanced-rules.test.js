@@ -14,6 +14,7 @@ test('RPG campaign progression, potions, loss and encounter rewards are bounded'
   assert.equal(c.level,2);assert.equal(c.encounters,3);assert.equal(c.xp,30);
   const doomed=newCampaign('experienced');doomed.party.forEach(p=>p.hp=1);b=beginBattle(doomed,2);for(let i=0;i<5&&b.phase==='player';i++)battleAction(b,'guard');assert.equal(b.phase,'lost');
 });
+test('a surviving party member can act in the next encounter after the leader falls',()=>{const c=newCampaign();c.party[0].hp=0;const b=beginBattle(c,1);assert.equal(b.actor,1);assert.equal(battleAction(b,'attack'),true);});
 test('stealth visibility respects range, facing and blocking walls',()=>{
   const from={x:24,y:24},to={x:168,y:24};assert.equal(canSee(from,to,new Set()),true);assert.equal(canSee(from,to,new Set(['1,0'])),false);assert.equal(canSee(from,{x:-48,y:24},new Set()),false);assert.equal(canSee(from,{x:600,y:24},new Set()),false);
 });
