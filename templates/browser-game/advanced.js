@@ -12,7 +12,7 @@ export async function startAdvancedGame(config,genre){
   $('#title').textContent=config.ui.title;document.title=config.ui.title;$('#genre').textContent=rules.name;$('#message').textContent=config.story.intro;
   const panel=document.createElement('section');panel.id='mode-panel';panel.setAttribute('aria-label','Game actions');$('#game').before(panel);
   const ctx={config,genre,profile,state,audio,held,panel,keys:()=>ui,
-    end(phase){if(state.phase!=='playing')return;state.phase=phase;scene.physics.pause();audio.tone(phase==='won'?config.audio.winFrequency:140);audio.setPlaying(false);$('#message').textContent=config.story[phase==='won'?'victory':'defeat'];render();},
+    end(phase){if(state.phase!=='playing')return;state.phase=phase;scene.physics.pause();mode?.onEnd?.(phase);audio.tone(phase==='won'?config.audio.winFrequency:140);audio.setPlaying(false);$('#message').textContent=config.story[phase==='won'?'victory':'defeat'];render();},
     focus(){ $('#game').focus(); },
     note(text){$('#message').textContent=text;},
     button(label,callback,parent=panel){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{if(state.phase==='playing'){callback();ctx.focus();render();}};parent.append(b);return b;},
