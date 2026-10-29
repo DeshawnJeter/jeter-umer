@@ -4,12 +4,14 @@ import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
 import { createArt, drawBackdrop } from './art.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from './score.js';
 import {advancedProfile} from './advanced-games.js';
+import {assembly} from './assembly.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
 const response = await fetch('config.json');
 if (!response.ok) throw new Error('Game configuration unavailable');
 const config = await response.json(), genre = genreOf(config.genre), rules = GAME_TYPES[genre];
+if(assembly.runtime!==genre)throw Error('Game assembly/runtime mismatch');
 if(advancedProfile(genre)){const {startAdvancedGame}=await import('./advanced.js');await startAdvancedGame(config,genre);}else{
 const audio = new GameAudio(config.audio);
 const title = document.querySelector('#title'), message = document.querySelector('#message'), status = document.querySelector('#status');

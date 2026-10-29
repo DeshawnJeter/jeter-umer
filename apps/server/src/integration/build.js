@@ -3,9 +3,11 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ART_MANIFEST } from '../../../../shared/art-catalog.js';
 import { composeScore } from '../../../../shared/music.js';
+import {compileAssembly} from './assembly.js';
 export async function buildGame(folder, config) {
   await mkdir(folder, { recursive: true });
   await cp(resolve('templates/browser-game'), folder, { recursive: true });
+  await writeFile(resolve(folder,'assembly.js'),compileAssembly(config));
   await cp(resolve('shared/game-types.js'), resolve(folder, 'rules.js'));
   await cp(resolve('shared/art-catalog.js'), resolve(folder, 'art-catalog.js'));
   await cp(resolve('shared/music.js'), resolve(folder, 'score.js'));

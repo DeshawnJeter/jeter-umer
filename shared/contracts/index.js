@@ -12,8 +12,9 @@ export const defaults = {
   ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30', theme: 'space', hud: hudFor() },
   story: { intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
   audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880, score: composeScore() },
-  ...Object.fromEntries(Object.keys(EXTENSION_SPECS).map(role=>[role,extensionDefaults(role)]))
 };
+// Legacy config clones contain core fields; new specialist results are explicit.
+for(const role of Object.keys(EXTENSION_SPECS))Object.defineProperty(defaults,role,{value:extensionDefaults(role),enumerable:false});
 export const clone = value => structuredClone(value);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 const string = (v, max = 180) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
