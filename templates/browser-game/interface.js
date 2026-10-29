@@ -21,8 +21,8 @@ export class PlayerInterface {
     for (const key of ['volume','musicVolume','sfxVolume']) {
       $(`#${key}`).oninput = event => { this.settings[key] = Number(event.target.value); this.apply(true); };
     }
-    for (const key of ['musicMuted','sfxMuted']) $(`#${key}`).onchange = event => { this.settings[key] = event.target.checked; this.apply(true); };
-    $('#mute').onclick = () => { this.settings.muted = !this.settings.muted; this.apply(true); };
+    for (const key of ['muted','musicMuted','sfxMuted']) $(`#${key}`).onchange = event => { this.settings[key] = event.target.checked; this.apply(true); };
+    $('#mute').onclick = () => this.toggleMute();
     $('#reset-controls').onclick = () => { this.settings.bindings = defaultSettings().bindings; this.capture = null; $('#binding-error').textContent = ''; this.apply(true); this.controls(); };
     $('#pause-menu').addEventListener('close', () => { if (this.previousPhase !== null) this.resume(); });
     addEventListener('keydown', event => this.keydown(event));
@@ -34,12 +34,16 @@ export class PlayerInterface {
     const { volume, muted, musicVolume, sfxVolume, musicMuted, sfxMuted } = this.settings;
     Object.assign(this.audio, { volume, muted, musicVolume, sfxVolume, musicMuted, sfxMuted }); this.audio.update();
     for (const key of ['volume','musicVolume','sfxVolume']) { $(`#${key}`).value = this.settings[key]; $(`#${key}-value`).textContent = `${Math.round(this.settings[key] / (key === 'volume' ? 0.3 : 1) * 100)}%`; }
-    for (const key of ['musicMuted','sfxMuted']) $(`#${key}`).checked = this.settings[key];
+    for (const key of ['muted','musicMuted','sfxMuted']) $(`#${key}`).checked = this.settings[key];
     $('#mute').textContent = muted ? 'Unmute all' : 'Mute all'; $('#mute').setAttribute('aria-pressed', String(muted));
     const saved = save ? savePreferences(this.settings, this.storage) : this.storage !== 'session';
     $('#settings-status').textContent = saved ? 'Preferences saved on this device.' : 'Preferences apply to this session; device storage is unavailable.';
   }
-  controls() {
+  toggleMute() {
+    this.settings.muted = !this.settings.muted; this.apply(true);
+    if (this.state.phase === 'playing') $('#game').focus();
+  }
+  controls(focusAction) {
     $('#bindings').replaceChildren();
     const actions = this.genre === 'platformer' ? ['left','right','jump'] : ['left','right','up','down'];
     for (const action of actions) {
@@ -51,14 +55,16 @@ export class PlayerInterface {
     }
     const hint = actions.map(action => `${action}: ${this.settings.bindings[action].map(keyLabel).join(' / ')}`).join(' · ');
     $('#instructions').textContent = `${hint}. Escape pauses. ${this.config.planner.objective}`;
+    if (focusAction) $('#bindings').querySelector(`[aria-label="Change ${focusAction} control"]`)?.focus();
   }
   keydown(event) {
     if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
     if (this.capture) {
       event.preventDefault();
-      if (event.code === 'Escape') { this.capture = null; $('#binding-error').textContent = ''; this.controls(); return; }
+      const action = this.capture;
+      if (event.code === 'Escape') { this.capture = null; $('#binding-error').textContent = ''; this.controls(action); return; }
       if (!KEY_CODES.includes(event.code)) { $('#binding-error').textContent = 'Use a letter, number, arrow key or Space.'; return; }
-      try { this.settings = remap(this.settings, this.capture, event.code); this.capture = null; this.apply(true); $('#binding-error').textContent = 'Control updated.'; this.controls(); } catch (error) { $('#binding-error').textContent = error.message; }
+      try { this.settings = remap(this.settings, action, event.code); this.capture = null; this.apply(true); $('#binding-error').textContent = 'Control updated.'; this.controls(action); } catch (error) { $('#binding-error').textContent = error.message; }
       return;
     }
     if (event.code === 'Escape' && !event.repeat) { event.preventDefault(); if (this.previousPhase !== null) this.resume(); else this.pause(); return; }

@@ -74,3 +74,18 @@ test('pause/resume preserves round phase, clears input, and restart cannot resur
     state.phase='lost';ui.pause();ui.restart();assert.equal(restarts,1);assert.equal(state.phase,'ready');assert.equal(el('#pause-menu').open,false);assert.equal(playing.at(-1),false);
   } finally { if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument; }
 });
+
+test('mute returns keyboard focus to gameplay and remapping/cancel returns focus to its action', async () => {
+  const folder=await mkdtemp(join(tmpdir(),'controls-export-'));await buildGame(folder,clone(defaults));
+  const {PlayerInterface}=await import(pathToFileURL(join(folder,'interface.js')).href);
+  const previousDocument=globalThis.document;let focused=null;
+  globalThis.document={querySelector:selector=>({focus(){focused=selector;},textContent:''})};
+  try {
+    const ui=new PlayerInterface({state:{phase:'playing'},held:new Set()});ui.settings=defaultSettings();ui.apply=()=>{};
+    ui.toggleMute();assert.equal(ui.settings.muted,true);assert.equal(focused,'#game');
+    ui.state.phase='paused';focused=null;ui.toggleMute();assert.equal(focused,null);
+    const focusActions=[];ui.controls=action=>focusActions.push(action);
+    ui.capture='right';ui.keydown({code:'KeyL',preventDefault(){}});assert.equal(ui.capture,null);assert.deepEqual(ui.settings.bindings.right,['KeyL']);assert.deepEqual(focusActions,['right']);
+    ui.capture='left';ui.keydown({code:'Escape',preventDefault(){}});assert.equal(ui.capture,null);assert.deepEqual(focusActions,['right','left']);assert.deepEqual(ui.settings.bindings.left,defaultSettings().bindings.left);
+  } finally { if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument; }
+});

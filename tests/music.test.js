@@ -71,12 +71,20 @@ test('music-off mode never starts Tone or allocates its instruments', async () =
 
 test('music and SFX gains and mutes are independent and safely bounded', async () => {
   const GameAudio=await audioClass(),fake=fakeAudio(),audio=new GameAudio({...clone(defaults.audio),music:true},fake.dependencies);
-  await audio.start(); audio.musicVolume=0.4; audio.sfxVolume=0.7; audio.update();
+  await audio.start(); audio.setPlaying(true); audio.musicVolume=0.4; audio.sfxVolume=0.7; audio.update();
   assert.equal(audio.gain.gain.value,audio.volume*0.7); assert.equal(audio.musicGain.gain.value,audio.volume*0.55*0.4);
   audio.musicMuted=true;audio.update();assert.equal(audio.musicGain.gain.value,0);assert.ok(audio.gain.gain.value>0);
   audio.musicMuted=false;audio.sfxMuted=true;audio.update();assert.equal(audio.gain.gain.value,0);assert.ok(audio.musicGain.gain.value>0);
   audio.sfxMuted=false;audio.musicVolume=Infinity;audio.sfxVolume=-1;audio.update();assert.equal(audio.gain.gain.value,0);assert.equal(audio.musicGain.gain.value,0);
   audio.dispose();
+});
+
+test('pausing silences ringing music voices even when levels change, then restores the mix', async () => {
+  const GameAudio=await audioClass(),fake=fakeAudio(),audio=new GameAudio({...clone(defaults.audio),music:true},fake.dependencies);
+  await audio.start();audio.setPlaying(true);assert.ok(audio.musicGain.gain.value>0);
+  audio.setPlaying(false);assert.equal(audio.musicGain.gain.value,0);assert.equal(fake.transport.state,'stopped');
+  audio.musicVolume=0.4;audio.update();assert.equal(audio.musicGain.gain.value,0);
+  audio.setPlaying(true);assert.equal(audio.musicGain.gain.value,audio.volume*0.55*0.4);audio.dispose();
 });
 test('disposing during an asynchronous start prevents late instrument creation', async () => {
   let release;const gate=new Promise(resolve=>{release=resolve;});

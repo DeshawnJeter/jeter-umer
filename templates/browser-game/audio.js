@@ -52,6 +52,7 @@ export class GameAudio {
   setPlaying(playing) {
     if (this.disposed || !this.started) return;
     this.playing = !!playing;
+    this.update();
     if (!this.transport) return;
     if (this.playing && this.transport.state !== 'started') this.transport.start();
     if (!this.playing && this.transport.state !== 'stopped') this.transport.stop();
@@ -61,7 +62,7 @@ export class GameAudio {
     this.musicVolume = Number.isFinite(this.musicVolume) ? Math.max(0, Math.min(1, this.musicVolume)) : 0;
     this.sfxVolume = Number.isFinite(this.sfxVolume) ? Math.max(0, Math.min(1, this.sfxVolume)) : 0;
     if (this.gain) this.gain.gain.value = this.muted || this.sfxMuted ? 0 : this.volume * this.sfxVolume;
-    if (this.musicGain) this.musicGain.gain.rampTo(this.muted || this.musicMuted ? 0 : this.volume * 0.55 * this.musicVolume, 0.05);
+    if (this.musicGain) this.musicGain.gain.rampTo(!this.playing || this.muted || this.musicMuted ? 0 : this.volume * 0.55 * this.musicVolume, 0.05);
   }
   tone(frequency) {
     if (!this.context || this.muted || this.sfxMuted || this.sfxVolume === 0 || this.disposed || !Number.isFinite(frequency) || frequency < 100 || frequency > 2000) return;
