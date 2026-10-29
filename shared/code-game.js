@@ -13,7 +13,14 @@ export const DEFAULT_SCENARIOS=JSON.stringify([{name:'win',steps:[{dt:0.1,input:
 export const components=Object.freeze({clamp:(v,min,max)=>Math.max(min,Math.min(max,v)),damage(actor,amount){actor.health=Math.max(0,actor.health-Math.max(0,amount));return actor.health;},give(inventory,item,count=1){if(!/^[a-z]{1,24}$/.test(item)||!Number.isInteger(count)||count<0||count>100)throw Error('Invalid item');inventory[item]=Math.min(100,(inventory[item]||0)+count);},move(actor,dx,dy,speed,dt){actor.x=Math.max(0,Math.min(720,actor.x+dx*speed*dt));actor.y=Math.max(0,Math.min(480,actor.y+dy*speed*dt));},distance:(a,b)=>Math.hypot(a.x-b.x,a.y-b.y)});
 export class SnapshotContractError extends Error {}
 export function inspectSnapshot(value){
-  if(!value||!['ready','playing','won','lost'].includes(value.phase)||!Number.isFinite(value.health)||value.health<0||value.health>100||!Number.isFinite(value.maxHealth)||value.maxHealth<1||value.maxHealth>100||value.health>value.maxHealth||!Number.isFinite(value.score)||value.score<0||value.score>100000||typeof value.objective!=='string'||value.objective.length>180||!Array.isArray(value.nodes)||value.nodes.length>64)throw new SnapshotContractError('inspect() must return a valid phase, initialized finite health/maxHealth/score, objective <=180 characters and at most 64 render nodes including decorations. Initialize all resources before Start.');
+  const invalid=message=>{throw new SnapshotContractError(message);};
+  if(!value||!['ready','playing','won','lost'].includes(value.phase))invalid('inspect().phase must be ready, playing, won or lost.');
+  if(!Number.isFinite(value.maxHealth)||value.maxHealth<1||value.maxHealth>100)invalid('Initialize inspect().maxHealth to a finite value from 1 to 100 before Start.');
+  if(!Number.isFinite(value.health)||value.health<0||value.health>value.maxHealth)invalid('Initialize inspect().health before Start; keep it between 0 and maxHealth.');
+  if(!Number.isFinite(value.score)||value.score<0||value.score>100000)invalid('Initialize inspect().score before Start; keep it between 0 and 100000.');
+  if(typeof value.objective!=='string'||value.objective.length>180)invalid('inspect().objective must be a string of at most 180 characters.');
+  if(!Array.isArray(value.nodes))invalid('Initialize inspect().nodes as an array before Start.');
+  if(value.nodes.length>64)invalid('inspect().nodes contains '+value.nodes.length+' nodes; at most 64 are allowed, including every path and background decoration. Reduce decoration node counts.');
   const nodes=value.nodes.map(n=>{if(!n||![n.x,n.y,n.size].every(Number.isFinite)||n.x<0||n.x>720||n.y<0||n.y>480||n.size<2||n.size>80||!/^#[0-9a-f]{6}$/i.test(n.color)||typeof n.label!=='string'||n.label.length>40)throw new SnapshotContractError('Each render node needs bounded coordinates, size 2–80, #RRGGBB color and label <=40 characters.');return {x:n.x,y:n.y,size:n.size,color:n.color,label:n.label};});
   return {phase:value.phase,health:value.health,maxHealth:value.maxHealth,score:value.score,objective:value.objective,nodes};
 }
