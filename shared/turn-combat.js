@@ -1,6 +1,6 @@
 // Deterministic, bounded RPG rules shared with exported games and tests.
 export function newCampaign(difficulty='beginner',options={}){
-  return {party:[{name:'Scout',hp:12,maxHp:12,mp:0,maxMp:0},{name:'Mage',hp:8,maxHp:8,mp:6,maxMp:6}],potions:3,xp:0,level:1,encounters:0,difficulty,rules:{attackPower:3,spellPower:6,spellCost:2,enemyDamage:difficulty==='experienced'?3:2,...options.combat}};
+  return {party:[{name:'Scout',hp:12,maxHp:12,mp:0,maxMp:0},{name:'Mage',hp:8,maxHp:8,mp:6,maxMp:6}],potions:options.progression?.startingPotions??3,xp:0,level:1,encounters:0,difficulty,rules:{attackPower:3,spellPower:6,spellCost:2,enemyDamage:difficulty==='experienced'?3:2,...options.combat,potionHealing:6,xpPerEncounter:10,levelTwoAt:20,levelHeal:4,...options.progression}};
 }
 export function beginBattle(campaign,index=0){
   const boss=index>=2;return {campaign,actor:Math.max(0,campaign.party.findIndex(p=>p.hp>0)),target:0,round:0,phase:'player',enemies:Array.from({length:boss?1:index===1?2:1},(_,i)=>({name:boss?'Sentinel':i?'Wisp':'Drone',hp:boss?16:6,maxHp:boss?16:6})),message:'Choose an action and target.'};
@@ -19,11 +19,11 @@ export function battleAction(battle,action,target=battle.target){
   }else if(action==='potion'){
     if(c.potions<=0){battle.message='No potions remain.';return false;}
     if(actor.hp===actor.maxHp){battle.message='This character is already healthy.';return false;}
-    c.potions--;actor.hp=Math.min(actor.maxHp,actor.hp+6);battle.message=`${actor.name} recovers health.`;
+    c.potions--;actor.hp=Math.min(actor.maxHp,actor.hp+c.rules.potionHealing);battle.message=`${actor.name} recovers health.`;
   }else if(action==='guard'){guarded=true;battle.message=`${actor.name} guards.`;}else return false;
   if(battle.enemies.every(e=>e.hp<=0)){
-    battle.phase='won';c.xp+=10;c.encounters++;
-    if(c.xp>=20&&c.level===1){c.level=2;for(const member of c.party){member.maxHp+=2;member.hp=Math.min(member.maxHp,member.hp+4);member.mp=Math.min(member.maxMp,member.mp+2);}battle.message+=' Party reaches level 2!';}
+    battle.phase='won';c.xp+=c.rules.xpPerEncounter;c.encounters++;
+    if(c.xp>=c.rules.levelTwoAt&&c.level===1){c.level=2;for(const member of c.party){member.maxHp+=2;member.hp=Math.min(member.maxHp,member.hp+c.rules.levelHeal);member.mp=Math.min(member.maxMp,member.mp+2);}battle.message+=' Party reaches level 2!';}
     return true;
   }
   // One enemy response per player turn, with a visible deterministic target.
