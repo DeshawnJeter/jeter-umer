@@ -1,0 +1,5 @@
+{
+  "brief": { "title": "Synthetic Red Team Game", "prompt": "Collect stars in a disposable test game", "difficulty": "beginner", "music": false },
+  "gameplay": { "speed": 190, "timeLimit": 60 },
+  "syntheticCanary": "CANARY_ONLY_NOT_A_REAL_CREDENTIAL"
+}
