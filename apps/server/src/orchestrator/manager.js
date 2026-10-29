@@ -11,6 +11,7 @@ import { buildGame, hashBuild } from '../integration/build.js';
 import { validateGame, HUMAN_CHECKS } from '../validation/index.js';
 import { createRuntime } from '../providers/runtime.js';
 import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../providers/usage.js';
+import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests} from '../memory/project.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
@@ -19,6 +20,8 @@ export class Manager {
   async initialize() {
     for (const run of await this.store.list()) {
       run.decisions ??= {}; run.tasks ??= {}; run.planApproval ??= null; run.planHash ??= null;
+      ensureMemory(run);
+      for(const role of ROLES)if(run.results?.[role]&&!run.memory.artifacts[role])acceptMemory(run,role,run.results[role],role==='planner'?[]:['planner']);
       if (run.providerUsage) recoverUsage(run.providerUsage);
       if (run.version !== 2 && !terminalStates.has(run.status)) {
         run.status = 'paused'; run.generation++; run.results = {}; run.agents = {}; run.questions = []; run.build = null; run.validation = null;
@@ -54,7 +57,7 @@ export class Manager {
   }
   async create(brief) {
     const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
-    this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
+    ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
     if (this.jobs.has(run.id)) return;
@@ -75,11 +78,11 @@ export class Manager {
     const existing = run.questions.find(item => item.key === question.key);
     if (existing) combineQuestion(existing, question);
     else run.questions.push({ ...clone(question), id: randomUUID(), generation: run.generation });
-    if (question.blocking) for (const role of question.affectedRoles) { delete run.results[role]; if (run.tasks[role]) run.tasks[role].status = 'blocked'; }
+    if (question.blocking) for (const role of invalidateMemory(run,question.affectedRoles,'Blocking human context required')) { delete run.results[role]; if (run.tasks[role]) run.tasks[role].status = 'blocked'; }
     await this.event(run, `${question.requesters[0].role} needs human context: ${question.text}`);
   }
   invalidate(run, roles) {
-    const affected = roles.includes('planner') ? ROLES : roles;
+    const affected = invalidateMemory(run,roles.includes('planner') ? ROLES : roles);
     for (const role of affected) { delete run.results[role]; delete run.agents[role]; delete run.tasks[role]; }
     run.generation++; run.build = null; run.validation = null; delete run.approval;
     if (affected.includes('planner')) { run.planHash = null; run.planApproval = null; if(run.brief.inputMode==='prompt')run.briefResolution=null; }
@@ -105,16 +108,17 @@ export class Manager {
     if (role !== 'planner') task.dependencies = [run.tasks.planner.id, 'human:plan-approval'];
     run.tasks[role] = { ...task, status: 'running' };
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
+    const memoryDependencies=role==='planner'?[]:['planner'];
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
-      onEvent: async event => { run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
+      onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
     if (result.status === 'needs_human') {
       await this.addQuestion(run, result.question); run.agents[role].stage = 'awaiting_human'; run.tasks[role].status = 'blocked'; await this.save(run); return;
     }
     for (const question of result.questions || []) await this.addQuestion(run, question);
     if (this.blocked(run, role)) { run.tasks[role].status = 'blocked'; return; }
-    run.results[role] = result; run.tasks[role].status = 'accepted'; await this.save(run);
+    run.results[role] = result;acceptMemory(run,role,result,memoryDependencies); run.tasks[role].status = 'accepted'; await this.save(run);
   }
   async drive(run) {
     try {
@@ -149,6 +153,7 @@ export class Manager {
       await this.checkpoint(run);
       const config = { ...Object.fromEntries(Object.entries(run.results).map(([role, result]) => [role, result.artifact])), genre: run.brief.genre ?? 'collector' };
       run.validation = validateGame(config);
+      recordTests(run,'static-integration',run.validation);
       if (!run.validation.passed) throw new Error(`Integration failed: ${run.validation.findings.join('; ')}`);
       await this.event(run, 'Static integration checks passed. Building playable preview.');
       const folder = resolve(this.store.folder(run.id), 'builds', String(run.generation));
@@ -177,6 +182,7 @@ export class Manager {
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if(run.briefResolution?.proposal.unsupportedRequests.length&&data.acceptUnsupported!==true)throw new Error('Acknowledge the unsupported requests before approving the supported plan, or edit the prompt/settings.');
       run.planApproval = { hash: run.planHash, at: new Date().toISOString(), source: 'human', ...(run.briefResolution?.proposal.unsupportedRequests.length?{unsupportedAcknowledged:true}:{}) };
+      approveSpecification(run);
       this.transition(run, 'running'); await this.event(run, 'Human approved the checked plan'); this.launch(run); return run;
     }
     if (action === 'answer') {
@@ -187,6 +193,7 @@ export class Manager {
       if (question.key === 'brief.difficulty') { if (!['beginner', 'experienced'].includes(answer)) throw new Error('Invalid difficulty'); run.brief.difficulty = answer; }
       run.decisions[question.key] = answer;
       run.answers.push({ question: clone(question), answer, at: new Date().toISOString() });
+      recordDecision(run,question.key,answer,question);
       run.questions = run.questions.filter(item => item.id !== question.id);
       this.invalidate(run, question.affectedRoles);
       this.transition(run, 'running'); await this.event(run, 'Human answer saved. Only affected contributions require fresh work.'); this.launch(run); return run;
