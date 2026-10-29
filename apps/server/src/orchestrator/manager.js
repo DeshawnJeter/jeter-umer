@@ -100,7 +100,12 @@ export class Manager {
     return {
       signal: this.controllers.get(run.id)?.signal,
       reserve: estimate => this.reserveCall(run, estimate),
-      finish: async (usage, estimate) => { finishUsage(run.providerUsage, usage, estimate); await this.save(run); },
+      finish: async (usage, estimate) => {
+        finishUsage(run.providerUsage, usage, estimate);
+        run.roleUsage??={};const counters=run.roleUsage[role]??={calls:0,inputTokens:0,outputTokens:0,totalTokens:0,unknownUsageCalls:0};counters.calls++;
+        if(usage){counters.inputTokens+=usage.inputTokens;counters.outputTokens+=usage.outputTokens;counters.totalTokens+=usage.totalTokens;}else counters.unknownUsageCalls++;
+        await this.save(run);
+      },
       onAttempt: async audit => {
         run.modelResponses ??= [];
         run.modelResponses.push({ ...audit, generation:run.generation, at:new Date().toISOString() });
@@ -240,6 +245,7 @@ export class Manager {
       if (Object.hasOwn(run.decisions, 'brief.difficulty')) run.decisions['brief.difficulty'] = updated.difficulty;
       // Failed builds need fresh integration/QA even when settings did not change.
       this.invalidate(run, affected.length?affected:['implementation','integration','qa']);
+      run.revisionScope={generation:run.generation,reusedRoles:activeRoles(run.brief.genre).filter(role=>run.results[role]),rerunRoles:activeRoles(run.brief.genre).filter(role=>!run.results[role])};
       run.planHash=null;run.planApproval=null;run.memory.specification=null;
       this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Unchanged checked contributions are retained; plan and build approvals require renewal.'); this.launch(run); return run;
     }

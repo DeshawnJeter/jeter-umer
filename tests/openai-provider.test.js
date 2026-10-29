@@ -80,6 +80,7 @@ test('all active worker/checker pairs use separate model requests with auditable
   await manager.act(run.id, 'approve_plan', { planHash: run.planHash }); await idle(manager, run);
   assert.equal(run.status, 'awaiting_review'); assert.equal(run.mode, 'openai'); assert.equal(mock.calls.length, activeRoles(run.brief.genre).length*2);
   for (const role of activeRoles(run.brief.genre)) { const calls = mock.calls.filter(call => call.role === role); assert.equal(calls.length, 2); assert.equal(calls[0].body.model, 'synthetic-worker'); assert.equal(calls[1].body.model, 'synthetic-checker'); assert.deepEqual(run.results[role].report.reviewSources, ['openai', 'deterministic']); }
+  for(const role of activeRoles(run.brief.genre)){assert.equal(run.roleUsage[role].calls,2);assert.equal(run.roleUsage[role].totalTokens,300);assert.equal(run.roleUsage[role].unknownUsageCalls,0);}
   assert.equal(run.providerUsage.calls, activeRoles(run.brief.genre).length*2); assert.equal(run.providerUsage.totalTokens, activeRoles(run.brief.genre).length*300); assert.equal(run.providerUsage.reservedTokens, 0);
   const persisted = await readFile(join(manager.store.folder(run.id), 'state.json'), 'utf8'); assert.ok(!persisted.includes(token));
   const audit = JSON.parse(await readFile(join(manager.store.folder(run.id), 'workspaces/generation-0/gameplay/attempt-1-checker.json'), 'utf8'));

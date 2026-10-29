@@ -77,12 +77,14 @@ function render(run) {
   $('#controls').replaceChildren();
   const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
   for (const [label, command] of buttons) { const button = element('button', label, 'secondary'); button.onclick = () => perform(() => action(command)); $('#controls').append(button); }
+  $('#run-status').textContent += run.revisionScope ? ` · reused ${run.revisionScope.reusedRoles.length} checked contributions` : '';
   renderPlan(run); renderQuestions(run);
   $('#agents').replaceChildren();
   const selectedRoles=run.requiredRoles||['planner','gameplay','levels','ui','story','audio'];
   for (const role of selectedRoles) {
     const agent = run.agents[role], result = run.results[role]; const box = element('div', undefined, `agent ${result ? 'accepted' : ''}`);
     box.append(element('strong', role), element('p', agent ? `${agent.stage} · attempt ${agent.attempt}` : 'Waiting for dependencies'));
+    if (run.roleUsage?.[role]) box.append(element('small', `${run.roleUsage[role].calls} model requests · ${run.roleUsage[role].totalTokens} reported tokens${run.roleUsage[role].unknownUsageCalls?' · some usage unreported':''}`));
     if (result) { box.append(element('small', 'Independent checker: pass')); const details = element('details'); details.append(element('summary', 'Evidence'), element('p', result.report.evidence.join('. '))); box.append(details); }
     $('#agents').append(box);
   }
