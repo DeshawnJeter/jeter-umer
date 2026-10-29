@@ -61,3 +61,12 @@ test('interrupted repairs resume from checked findings without regenerating reje
  const result=await runPair({...options,worker:async request=>{resumedCalls++;assert.equal(request.attempt,2);assert.equal(request.context.previousSource,broken);assert.ok(request.findings[0]);return {artifact:{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},summary:'Repaired fixture'};}});
  assert.equal(result.status,'accepted');assert.equal(firstCalls,2);assert.equal(resumedCalls,1);
 });
+
+test('all lifecycle and replay findings reach the same repair before model acceptance',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'coding-combined-findings-'));let calls=0,checked=0,verified=0;
+ const result=await runPair({role:'coding',brief:{title:'Combined',genre:'custom',difficulty:'beginner'},directory,
+ worker:async request=>{if(++calls===2)assert.deepEqual(request.findings,['Start must immediately play','Replay exceeds 300 frames']);return {artifact:{source:DEFAULT_SOURCE,scenarios:calls===1?'[]':DEFAULT_SCENARIOS},summary:'Fixture'};},
+ verifyProposal:async()=>++verified===1?{passed:false,tests:[{passed:false,error:'Start must immediately play'},{passed:false,error:'Replay exceeds 300 frames'}]}:{passed:true,tests:[{passed:true}]},
+ checker:async()=>{checked++;return {verdict:'pass',findings:[],evidence:['Independent fixture check']};}});
+ assert.equal(result.status,'accepted');assert.equal(calls,2);assert.equal(verified,2);assert.equal(checked,1);
+});

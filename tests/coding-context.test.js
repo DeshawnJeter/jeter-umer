@@ -38,3 +38,8 @@ test('large repairs omit optional tool schemas rather than cutting source or ins
  const focused=buildRequest(config,'coding','worker',{...request,limits:{maxContextChars:first.serialized.length-100}});
  assert.equal(focused.body.tools,undefined);assert.equal(JSON.parse(focused.body.input[0].content[0].text).context.previousSource,request.context.previousSource);assert.ok(focused.body.instructions.includes(request.instructions));
 });
+
+test('model instructions include an executable lifecycle reference and expanded replay arithmetic',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'});
+ assert.match(bundle.instructions,/Start button calls game.start\(\) with NO arguments/);assert.match(bundle.instructions,/phase='playing'/);assert.match(bundle.instructions,/247 idle frames is 250/);assert.match(bundle.instructions,/Restart creates a NEW instance/);
+});

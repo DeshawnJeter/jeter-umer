@@ -55,9 +55,9 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     }
     const artifact = result.artifact; const errors = validateArtifact(role, artifact);
     if(role==='coding'&&typeof artifact?.source==='string'&&artifact.source.length<=6000)await workspace.stage(artifact.source);
-    if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact);errors.push(...sourceReport.findings);}
+    if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact,{sourceOnly:!!verifyProposal});errors.push(...sourceReport.findings);}
     let codeExecution;
-    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed)errors.push(codeExecution.error||'Code replay checks failed');}
+    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed){const failures=(codeExecution.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);errors.push(...(failures.length?failures:[codeExecution.error||'Code replay checks failed']));}}
     const checkerRequest = { ...checkerBundle, ...clone(input), ...(codeExecution?{codeExecution}:{}), artifact: clone(artifact), attempt, limits: { maxContextChars: profile.checker.maxContextChars, maxOutputChars: profile.checker.maxOutputChars } };
     const checkerSize = assertRequestFits(checkerRequest, profile.checker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'checking', attempt });
