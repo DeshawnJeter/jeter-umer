@@ -52,6 +52,8 @@ The audio specialist can compose calm, adventure or arcade scores as validated m
 
 The feature pull requests are stacked for review, all targeting development: merge the existing OpenAI provider (#13), validation fixes (#14), game types (#15), artwork (#16), Windows state recovery (#17), then composed music. Each new branch contains its feature commit on the preceding tested prerequisite. Development remains unchanged until those requests are reviewed and merged.
 
+Use merge commits to preserve this stack’s ancestry. If you squash a prerequisite instead, rebase the remaining branches onto the updated development branch before merging them; this avoids duplicate prerequisite diffs and add/add conflicts.
+
 ## Branches
 
 See [docs/branch-plan.md](docs/branch-plan.md). Each feature branch starts from development and contains one scoped slice. The integration branch assembles dependencies for a runnable demo. Development remains unchanged until reviewed changes merge.
