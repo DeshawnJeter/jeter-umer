@@ -19,14 +19,14 @@ export function sideCombat(scene,ctx,{stageBosses=false,exploration=false}={}){
     if(!exploration&&(stageBosses||room===2)){const point=spawnAt(room,570),hp=stageBosses?6+room*2:12;const boss=enemies.create(point.x,point.y,'enemy').setScale(1.8);Object.assign(boss,{hp,maxHp:hp,boss:true,type:'boss',brain:newEnemyBrain('boss'),home:point.x,direction:1,room,label:scene.add.text(point.x-40,point.y-55,'BOSS',{fontSize:'12px',color:'#ffffff'})});boss.setGravityY(1000).setCollideWorldBounds(true);if(stageBosses){const gate=scene.physics.add.staticImage(room*720+700,384,'wall').setDisplaySize(24,96).refreshBody();scene.physics.add.collider(player,gate);gates[room]=gate;}}
   }
   scene.physics.add.collider(enemies,walls);
-  function damage(){if(state.phase!=='playing'||time-lastHit<1.2)return;lastHit=time;state.health=Math.max(0,state.health-1);ctx.audio.tone(140);if(!state.health)ctx.end('lost');}
+  function damage(){if(state.phase!=='playing'||time-lastHit<1.2)return;lastHit=time;state.health=Math.max(0,state.health-1);ctx.emit?.('damage_taken',{x:player.x,y:player.y,amount:1});ctx.audio.tone(140);if(!state.health)ctx.end('lost');}
   scene.physics.add.overlap(player,hostile,(_,bullet)=>{bullet.destroy();damage();});
   scene.physics.add.collider(shots,walls,bullet=>bullet.destroy());scene.physics.add.collider(hostile,walls,bullet=>bullet.destroy());
-  scene.physics.add.overlap(shots,enemies,(bullet,enemy)=>{if(!bullet.active||!enemy.active)return;enemy.hp-=bullet.damage;bullet.destroy();if(enemy.hp<=0){if(enemy.boss){bosses++;gates[enemy.room]?.destroy();ctx.note('Boss defeated. Gate opened.');}enemy.label?.destroy?.();enemy.destroy();ctx.audio.tone(660);}});
+  scene.physics.add.overlap(shots,enemies,(bullet,enemy)=>{if(!bullet.active||!enemy.active)return;enemy.hp-=bullet.damage;ctx.emit?.('enemy_hit',{x:enemy.x,y:enemy.y,amount:bullet.damage});bullet.destroy();if(enemy.hp<=0){ctx.emit?.('enemy_defeated',{x:enemy.x,y:enemy.y});if(enemy.boss){bosses++;gates[enemy.room]?.destroy();ctx.note('Boss defeated. Gate opened.');}enemy.label?.destroy?.();enemy.destroy();ctx.audio.tone(660);}});
   function fire(power=false){
     if(state.phase!=='playing'||time-lastShot<(power?0.45:0.2)||shots.countActive()>=24)return;
     if(power){if(state.mana<2){ctx.note('Need 2 weapon energy for a powered shot.');return;}state.mana-=2;}
-    lastShot=time;const up=!exploration&&ctx.genre==='run_gun'&&keys().isDown('up'),down=!exploration&&ctx.genre==='run_gun'&&keys().isDown('down');
+    lastShot=time;ctx.emit?.(power?'spell_cast':'player_shot',{x:player.x,y:player.y});const up=!exploration&&ctx.genre==='run_gun'&&keys().isDown('up'),down=!exploration&&ctx.genre==='run_gun'&&keys().isDown('down');
     const bullet=shots.create(player.x+facing*20,player.y-2,'star').setScale(power?0.7:0.35);bullet.body.setAllowGravity(false);bullet.setVelocity(up||down?0:facing*480,up?-480:down?480:0);Object.assign(bullet,{born:time,damage:power?3:1});ctx.audio.tone(power?440:260);
   }
   for(let room=0;room<3;room++)for(const point of config.levels.stars){const item=scene.physics.add.staticImage(room*720+center(point.x),center(point.y),'star');scene.physics.add.overlap(player,item,()=>{if(state.phase!=='playing'||!item.active)return;item.destroy();state.health=Math.min(state.maxHealth,state.health+1);state.mana=Math.min(state.maxMana,state.mana+2);ctx.audio.tone(config.audio.pickupFrequency);});}
