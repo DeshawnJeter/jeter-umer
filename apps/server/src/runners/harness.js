@@ -1,5 +1,5 @@
 import {codeWorkspace} from './code-workspace.js';
-import {pendingProposal} from './proposal-cache.js';
+import {pendingProposal,reviewedRepair} from './proposal-cache.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ROLES, clone, validateArtifact } from '../../../../shared/contracts/index.js';
@@ -34,7 +34,9 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
   const folder = resolve(directory, role); await mkdir(folder, { recursive: true });
   const workspace=role==='coding'?codeWorkspace(folder):null;
   const questions = []; let findings = [];
-  for (let attempt = 1; attempt <= profile.maxAttempts; attempt++) {
+  const prior=role==='coding'?await reviewedRepair(folder,{...workerBundle,...clone(input),findings:[],attempt:1,limits:{maxContextChars:profile.worker.maxContextChars,maxOutputChars:profile.worker.maxOutputChars}},profile.maxAttempts):null;
+  if(prior)findings=prior.findings;
+  for (let attempt = prior?.attempt??1; attempt <= profile.maxAttempts; attempt++) {
     const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt, limits: { maxContextChars: profile.worker.maxContextChars, maxOutputChars: profile.worker.maxOutputChars } };
     if(workspace&&attempt>1)workerRequest.context.previousSource=await workspace.read();
     const workerSize = assertRequestFits(workerRequest, profile.worker.maxContextChars);

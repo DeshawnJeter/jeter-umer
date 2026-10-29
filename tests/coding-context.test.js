@@ -30,3 +30,11 @@ test('UI checker retains prompt, complete plan, HUD and decisions without duplic
  const body=buildRequest(config,'ui','checker',{instructions:'fixture',brief,context:{plan,decisions,memory:{dependencies:[{role:'planner',hash:'plan-hash',artifact:plan,history:'duplicated history'}]}},artifact:{title:'Tower'}}).body;
  const data=JSON.parse(body.input[0].content[0].text);assert.deepEqual(data.context.plan,plan);assert.equal(data.brief.prompt,brief.prompt);assert.deepEqual(data.context.decisions,decisions);assert.ok(data.hudReference);assert.equal(data.context.memory.dependencies.planner,'plan-hash');assert.equal(data.artifactReference,undefined);
 });
+
+test('large repairs omit optional tool schemas rather than cutting source or instructions',()=>{
+ const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_REPAIR_CONTEXT'}).publicConfig;
+ const request={brief:{genre:'custom',prompt:'Preserve all requirements'},instructions:'Complete instructions',context:{previousSource:'x'.repeat(6000)},tools:{inspect_components(){},read_source(){},search_source(){},apply_source_patch(){},run_rule_checks(){}},findings:['Repair the start contract']};
+ const first=buildRequest(config,'coding','worker',request);assert.ok(first.body.tools);
+ const focused=buildRequest(config,'coding','worker',{...request,limits:{maxContextChars:first.serialized.length-100}});
+ assert.equal(focused.body.tools,undefined);assert.equal(JSON.parse(focused.body.input[0].content[0].text).context.previousSource,request.context.previousSource);assert.ok(focused.body.instructions.includes(request.instructions));
+});

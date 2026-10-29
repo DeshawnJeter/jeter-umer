@@ -53,3 +53,11 @@ test('syntax-rejected proposals become the actual repair draft and survive an ex
  const handlers=await runtime.route('coding',{}),result=await runPair({role:'coding',brief:{title:'Repair fixture',genre:'custom',difficulty:'beginner',prompt:'Fixture'},directory,...handlers});
  assert.equal(result.status,'accepted');assert.equal(result.artifact.source,DEFAULT_SOURCE);assert.equal(checkerCalls,1);assert.equal(workers,3);
 });
+
+test('interrupted repairs resume from checked findings without regenerating rejected work',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'coding-resume-')),broken='export function createGame(api){';let firstCalls=0,resumedCalls=0;
+ const options={role:'coding',brief:{title:'Resume',genre:'custom',difficulty:'beginner',prompt:'Fixture'},execution:{provider:'openai'},directory,checker:async()=>({verdict:'pass',findings:[],evidence:['Independent fixture review']})};
+ await assert.rejects(runPair({...options,worker:async()=>{if(++firstCalls===2)throw Error('fixture interruption');return {artifact:{source:broken,scenarios:DEFAULT_SCENARIOS},summary:'Broken fixture'};}}),/fixture interruption/);
+ const result=await runPair({...options,worker:async request=>{resumedCalls++;assert.equal(request.attempt,2);assert.equal(request.context.previousSource,broken);assert.ok(request.findings[0]);return {artifact:{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},summary:'Repaired fixture'};}});
+ assert.equal(result.status,'accepted');assert.equal(firstCalls,2);assert.equal(resumedCalls,1);
+});
