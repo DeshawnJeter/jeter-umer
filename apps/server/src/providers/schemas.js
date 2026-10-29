@@ -5,6 +5,7 @@ import { ModelOutputError } from './output-errors.js';
 import { validateResolution } from '../../../../shared/prompt-brief.js';
 import {GAME_TYPES} from '../../../../shared/game-types.js';
 import {HUD_STATS} from '../../../../shared/player-ui.js';
+import {EXTENSION_SPECS} from '../../../../shared/specialists.js';
 const string = { type: 'string' }, number = { type: 'number' }, boolean = { type: 'boolean' };
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const array = items => ({ type: 'array', items });
@@ -33,6 +34,7 @@ const artifacts = {
   audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: Object.keys(MUSIC_STYLES) }, instrument: { type:'string', enum:Object.keys(MUSIC_INSTRUMENTS) }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
 };
 export const questionSchema = object({ key: string, text: string, reason: string, options: array(string), recommended: string, blocking: boolean, affectedRoles: array({ type: 'string', enum: ROLES }), maxLength: { type: 'integer' } });
+for(const [role,spec]of Object.entries(EXTENSION_SPECS))artifacts[role]=object(Object.fromEntries(Object.entries(spec.fields).map(([key,rule])=>[key,rule.type==='array'?array({type:'string',enum:rule.enum}):{type:rule.type,...(rule.enum?{enum:rule.enum}:{})}])));
 export function responseSchema(role, stage) {
   if (!ROLES.includes(role) || !['worker', 'checker'].includes(stage)) throw new Error('Invalid model role or stage');
   return stage === 'worker'

@@ -2,7 +2,8 @@ import { hudFor, validateHud } from '../player-ui.js';
 import { genreOf } from '../game-types.js';
 import { themeOf } from '../art-catalog.js';
 import { musicStyleOf, instrumentOf, composeScore, validateScore } from '../music.js';
-export const ROLES = ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio'];
+import {CORE_ROLES,EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../specialists.js';
+export const ROLES = [...CORE_ROLES,...Object.keys(EXTENSION_SPECS)];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
   planner: { title: 'Star Collector', objective: 'Collect every star and reach the exit.', difficulty: 'beginner' },
@@ -10,7 +11,8 @@ export const defaults = {
   levels: { spawn: { x: 1, y: 1 }, exit: { x: 13, y: 8 }, stars: [{ x: 3, y: 2 }, { x: 8, y: 3 }, { x: 11, y: 6 }], walls: [{ x: 5, y: 4 }, { x: 6, y: 4 }, { x: 7, y: 4 }] },
   ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30', theme: 'space', hud: hudFor() },
   story: { intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
-  audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880, score: composeScore() }
+  audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880, score: composeScore() },
+  ...Object.fromEntries(Object.keys(EXTENSION_SPECS).map(role=>[role,extensionDefaults(role)]))
 };
 export const clone = value => structuredClone(value);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -19,6 +21,7 @@ const number = (v, min, max) => Number.isFinite(v) && v >= min && v <= max;
 const point = v => object(v) && Number.isInteger(v.x) && Number.isInteger(v.y) && number(v.x, 0, 14) && number(v.y, 0, 9);
 export function validateArtifact(role, value) {
   if (!ROLES.includes(role) || !object(value)) return ['Unknown role or invalid artifact'];
+  if(Object.hasOwn(EXTENSION_SPECS,role))return extensionErrors(role,value);
   const errors = [];
   for (const key of Object.keys(value)) if (!Object.hasOwn(defaults[role], key)) errors.push(`Unexpected ${role} artifact field: ${key}`);
   const check = (condition, message) => { if (!condition) errors.push(message); };
