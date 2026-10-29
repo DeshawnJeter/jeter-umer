@@ -46,9 +46,10 @@ test('exported RPG refreshes remapped battle labels without spending resources a
   const previousDocument=globalThis.document;globalThis.document={createElement:tag=>new Element(tag)};
   try{
     const panel=new Element('section'),state={phase:'playing'},tones=[],ui={settings:defaultSettings()};
-    const scene={add:{image(){return {setScale(){return this;},setDepth(){return this;},destroy(){}};}}};
+    const graphic={setDepth(){return this;},fillStyle(){return this;},fillRect(){return this;},fillTriangle(){return this;},fillCircle(){return this;},lineStyle(){return this;},lineBetween(){return this;},destroy(){}};
+    const scene={add:{graphics(){return graphic;},image(){return {setScale(){return this;},setDepth(){return this;},destroy(){}};}}};
     const ctx={state,config:clone(defaults),panel,keys:()=>ui,audio:{tone:note=>tones.push(note)},end:phase=>{state.phase=phase;},button(label,callback){const b=new Element('button');b.textContent=label;b.onclick=()=>{if(state.phase==='playing'&&!b.disabled)callback();};panel.append(b);return b;}};
-    const mode=rpgMode(scene,ctx,{frontView:true});mode.start();
+    const mode=rpgMode(scene,ctx,{frontView:true});mode.start();assert.equal(state.presentation,'battle');
     const labels=()=>panel.children.filter(node=>node.tag==='button').map(node=>node.textContent);
     const click=label=>{const button=panel.children.find(node=>node.textContent===label);assert.ok(button,label);assert.equal(button.disabled,false,label);button.onclick();};
     assert.ok(labels().includes('Attack (J)'));const before=structuredClone(state);
@@ -59,5 +60,6 @@ test('exported RPG refreshes remapped battle labels without spending resources a
     click('Spell · 2 MP (I)');assert.equal(state.mana,4);assert.equal(state.score,1);assert.equal(tones.length,2);
     mode.action('attack');assert.equal(state.score,1);assert.equal(tones.length,2);
     assert.ok(panel.children.some(node=>node.textContent==='Party level 1 · XP 10 · Potions 3'));
+    click('Next encounter');assert.equal(state.presentation,'battle');assert.equal(state.mana,4);
   }finally{if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument;}
 });
