@@ -2,6 +2,23 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import {newCampaign,beginBattle,battleAction} from '../shared/turn-combat.js';
 import {canSee,encodeCheckpoint,decodeCheckpoint} from '../shared/advanced-games.js';
 import {defaultSettings,upgradeSettings,validSettings} from '../shared/player-ui.js';
+import {hudFor,validateHud} from '../shared/player-ui.js';
+import {demoResolve,unsupportedIn} from '../shared/prompt-brief.js';
+import {resolutionSchema} from '../apps/server/src/providers/schemas.js';
+
+test('advanced prompts select enabled styles, enforce matching HUDs and disclose unsupported hybrids',()=>{
+  for(const genre of ['rpg','front_battle','stealth','run_gun','jump_shooter','metroidvania']){
+    assert.equal(demoResolve(`Game type: ${genre}; Title: Test; Difficulty: beginner;`).genre,genre);
+    assert.ok(resolutionSchema.properties.genre.enum.includes(genre));
+    assert.deepEqual(validateHud(hudFor(genre),genre),[]);
+    assert.ok(validateHud(hudFor('collector'),genre).length);
+    assert.ok(unsupportedIn('Add crafting and multiplayer',genre).length===2);
+  }
+  assert.deepEqual(unsupportedIn('Turn-based RPG with inventory and bosses','rpg'),[]);
+  assert.deepEqual(unsupportedIn('Stealth with patrols and hiding','stealth'),[]);
+  assert.ok(unsupportedIn('Stealth with turn-based RPG battles','stealth').length);
+  assert.ok(unsupportedIn('Front-view battles with first-person exploration','front_battle').length);
+});
 test('RPG turns spend MP/items only on valid actions and do not resurrect defeated enemies',()=>{
   const c=newCampaign(),b=beginBattle(c);const before=structuredClone(b);assert.equal(battleAction(b,'spell'),false);assert.deepEqual(c,before.campaign);
   assert.equal(battleAction(b,'attack',99),false);assert.equal(b.round,0);

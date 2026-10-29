@@ -1,7 +1,7 @@
 import './preferences.js';
 const $ = selector => document.querySelector(selector);
 let selected = null, current = null, previewUrl = '', questionSignature = '', planSignature = '', busy = false, providerMode = 'scripted-demo';
-const checkLabels = { movement: 'Movement, collisions and any jumping work', collectAndWin: 'The selected game objective and win condition work', timeoutAndRestart: 'The timer, loss condition and restart work', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };
+const checkLabels = { movement: 'Applicable movement, collisions, jumping or battle targeting work', collectAndWin: 'The selected game mechanics, resources, objective and win condition work', timeoutAndRestart: 'Loss, restart, checkpoints and any timer work where applicable', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };
 async function api(path, data) { const res = await fetch(path, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!res.ok) throw new Error(result.error); return result; }
 function element(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
 function choiceLabel(selector,value) { return [...$(selector).options].find(option=>option.value===value)?.textContent || value; }

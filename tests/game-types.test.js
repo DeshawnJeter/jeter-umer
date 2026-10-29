@@ -43,6 +43,11 @@ test('every genre traverses all six checked roles and delivers rules with a hash
     const folder = join(root, run.id, 'builds', '0');
     const config = JSON.parse(await readFile(join(folder, 'config.json'), 'utf8')); assert.equal(config.genre, genre);
     assert.match(await readFile(join(folder, 'rules.js'), 'utf8'), /roundOutcome/);
+    if (!['collector','maze','platformer','survival'].includes(genre)) {
+      const runtime = await readFile(join(folder, 'genres', `${genre}.js`), 'utf8');
+      assert.match(runtime, /createMode/, 'A registered game style must ship its playable runtime');
+      for (const name of ['advanced.js','advanced-games.js','extra-game-types.js','turn-combat.js','genres/side-combat.js','genres/rpg-core.js']) assert.ok((await readFile(join(folder,name))).length, name);
+    }
     const before = await hashBuild(folder); await writeFile(join(folder, 'additional-asset.txt'), 'Changed asset');
     assert.notEqual(await hashBuild(folder), before, 'Additional delivered assets must invalidate approval');
   }
