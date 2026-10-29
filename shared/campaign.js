@@ -6,7 +6,13 @@ export function createExpedition({difficulty='beginner',combat,progression,rooms
   const maps=Array.from({length:rooms},(_,index)=>{
     const y=randomized?2+Math.floor(random()*5):2+index%5;
     // Keep a connected perimeter and a clear path through the encounter.
-    return {spawn:{x:1,y:1},exit:{x:13,y:8},stars:[{x:7,y}],walls:[{x:4,y:6},{x:5,y:6},{x:9,y:3+index%3}],reward:randomized?1+Math.floor(random()*2):1,enemy: index===rooms-1?2:0};
+    const walls=randomized?[]:[{x:4,y:6},{x:5,y:6},{x:9,y:3+index%3}];
+    if(randomized)for(let n=0;n<24;n++){
+      const p={x:2+Math.floor(random()*11),y:2+Math.floor(random()*6)};
+      if(p.x===7||walls.some(w=>w.x===p.x&&w.y===p.y))continue;
+      walls.push(p);
+    }
+    return {spawn:{x:1,y:1},exit:{x:13,y:8},stars:[{x:7,y}],walls,reward:randomized?1+Math.floor(random()*2):1,enemy:index===rooms-1?2:0,enemyName:randomized?['Mossling','Crystal Wisp','Cave Drone'][Math.floor(random()*3)]:'Drone'};
   });
   return {version:1,seed,randomized,room:0,maps,party:newCampaign(difficulty,{combat,progression}),cleared:[],phase:'exploring'};
 }

@@ -47,11 +47,11 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
       report.tests.push({name:'projectile trails and applicable weapon energy',passed:true});await click('Restart');await click('Start game');
     }
     const rules=lifecycleFor(config.genre),initial=await state();
-    if(['rpg','front_battle','campaign'].includes(config.genre)){
-      if(['rpg','campaign'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
+    if(['rpg','front_battle','campaign','roguelike'].includes(config.genre)){
+      if(['rpg','campaign','roguelike'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
       assert(await page.getByRole('button',{name:'Guard / next party member',exact:true}).count(),'No reachable battle controls');
       await click('Guard / next party member');const beforeSpell=await state(),cost=config.combat?.spellCost??2;await click(`Spell · ${cost} MP (K)`);const afterSpell=await state();assert(afterSpell.mana===beforeSpell.mana-cost,'Spell did not spend the configured MP');assert((afterSpell.events||[]).some(event=>event.type==='spell_cast'),'Spell did not publish its presentation event');report.tests.push({name:'spell resource and VFX event',passed:true});
-      await click('Restart');await click('Start game');if(['rpg','campaign'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
+      await click('Restart');await click('Start game');if(['rpg','campaign','roguelike'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
       for(let i=0;i<100&&(await state()).phase==='playing';i++){await click('Guard / next party member');}
     }else if(config.genre==='stealth'){
       const before=await state();await advance(1800);const after=await state();collect(after);
