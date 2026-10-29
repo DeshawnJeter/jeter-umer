@@ -52,7 +52,10 @@ export function sideCombat(scene,ctx,{stageBosses=false,exploration=false}={}){
       }
     }
     state.enemyStates=enemies.getChildren().map(enemy=>({x:Math.round(enemy.x),y:Math.round(enemy.y),type:enemy.type,mode:enemy.brain.mode,phase:enemy.brain.phase,hp:enemy.hp}));
-    for(const group of [shots,hostile])for(const bullet of group.getChildren())if(time-bullet.born>2||bullet.x<0||bullet.x>width||bullet.y<0||bullet.y>480)bullet.destroy();
+    for(const group of [shots,hostile])for(const bullet of group.getChildren()){
+      if(time-bullet.born>2||bullet.x<0||bullet.x>width||bullet.y<0||bullet.y>480)bullet.destroy();
+      else if(group===shots&&time-(bullet.trailAt??bullet.born)>0.1){bullet.trailAt=time;ctx.emit?.('player_shot',{x:bullet.x,y:bullet.y});}
+    }
     if(!exploration)state.objective=`Bosses ${bosses}/${stageBosses?3:1} · reach final portal`;
     map.textContent=exploration?`Map: room ${currentRoom+1} / 3`:`Sector ${currentRoom+1}/3 · ${stageBosses?'Powered shot costs 2 energy':'Aim up/down while firing'} · enemies ${enemies.countActive()}`;
   }};
