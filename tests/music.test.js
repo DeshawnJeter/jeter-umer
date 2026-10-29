@@ -4,7 +4,7 @@ import { mkdtemp, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { composeScore, validateScore, musicStyleOf, MUSIC_STYLES } from '../shared/music.js';
+import { composeScore, validateScore, musicStyleOf, instrumentOf, MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../shared/music.js';
 import { clone, defaults, validateArtifact, validateBrief } from '../shared/contracts/index.js';
 import { work } from '../agents/audio/agent.js';
 import { check } from '../agents/audio/checker.js';
@@ -35,7 +35,8 @@ function fakeAudio({ gate } = {}) {
     createGain(){return {gain:{value:0,setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){},disconnect(){}};}
     resume(){return Promise.resolve();} close(){stats.closes++;return Promise.resolve();}
   }
-  return {stats,transport,dependencies:{AudioContextCtor:Context,Tone:{Gain:Node,Limiter:Node,Synth:Node,MembraneSynth:Node,Sequence,start:async()=>{stats.toneStarts++;await gate;},getTransport:()=>transport}}};
+  class FMVoice extends Node { constructor(options){super(options);this.fm=true;} }
+  return {stats,transport,dependencies:{AudioContextCtor:Context,Tone:{Gain:Node,Limiter:Node,Synth:Node,FMSynth:FMVoice,MembraneSynth:Node,Sequence,start:async()=>{stats.toneStarts++;await gate;},getTransport:()=>transport}}};
 }
 test('all musical styles compose bounded audible parts and preserve explicit choices', async () => {
   for (const style of Object.keys(MUSIC_STYLES)) {
@@ -71,4 +72,32 @@ test('disposing during an asynchronous start prevents late instrument creation',
   let release;const gate=new Promise(resolve=>{release=resolve;});
   const GameAudio=await audioClass(),fake=fakeAudio({gate}),audio=new GameAudio({...clone(defaults.audio),music:true},fake.dependencies);
   const pending=audio.start();await new Promise(resolve=>setImmediate(resolve));audio.dispose();release();await assert.rejects(pending,/disposed/);assert.equal(fake.stats.nodes.length,0);assert.equal(fake.stats.closes,1);
+});
+test('all style/instrument combinations preserve selection and use bounded owned voices', async () => {
+  const GameAudio=await audioClass();
+  for(const style of Object.keys(MUSIC_STYLES)) for(const instrument of Object.keys(MUSIC_INSTRUMENTS)) {
+    const brief={title:'Instrument test',music:true,musicStyle:style,musicInstrument:instrument};
+    const {artifact}=await work({brief});assert.deepEqual(validateScore(artifact.score),[]);assert.equal(artifact.score.instrument,instrument);
+    assert.equal((await check({brief,artifact})).verdict,'pass');
+    assert.equal((await check({brief,artifact:{...artifact,score:{...artifact.score,instrument:instrument==='bell'?'piano':'bell'}}})).verdict,'fail');
+    const fake=fakeAudio(),audio=new GameAudio(artifact,fake.dependencies);await audio.start();audio.setPlaying(true);
+    assert.equal(!!audio.lead.fm,MUSIC_INSTRUMENTS[instrument].engine==='fm');assert.ok(audio.lead.options.volume<=-15);
+    fake.stats.sequences[0].callback(1,'C4');assert.equal(fake.stats.notes.length,1);
+    audio.dispose();assert.ok(fake.stats.nodes.every(node=>node.disposed));assert.ok(fake.stats.sequences.every(seq=>seq.disposed));
+  }
+});
+test('instrument boundaries reject paths, prototypes, node parameters and unresolved auto scores', async () => {
+  for(const instrument of ['constructor','__proto__','../../.env','https://example.invalid/sample']) {
+    assert.throws(()=>instrumentOf(instrument));assert.throws(()=>validateBrief({prompt:'Explore',musicInstrument:instrument}));
+    assert.ok(validateScore({...composeScore(),instrument}).length);
+  }
+  for(const instrument of [null,{},'auto'])assert.ok(validateScore({...composeScore(),instrument}).length);
+  assert.ok(validateScore({...composeScore(),nodeOptions:{volume:100}}).length);
+  const GameAudio=await audioClass(),fake=fakeAudio();
+  assert.throws(()=>new GameAudio({...defaults.audio,score:{...composeScore(),instrument:'../code'}},fake.dependencies));assert.equal(fake.stats.contexts,0);
+});
+test('legacy scores lacking an instrument remain playable as the original synth', async () => {
+  const score=composeScore();delete score.instrument;assert.deepEqual(validateScore(score),[]);
+  const GameAudio=await audioClass(),fake=fakeAudio(),audio=new GameAudio({...clone(defaults.audio),score,music:true},fake.dependencies);
+  await audio.start();assert.equal(audio.inspect().instrument,'synth');assert.equal(!!audio.lead.fm,false);audio.dispose();
 });

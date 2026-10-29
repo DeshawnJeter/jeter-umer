@@ -1,10 +1,11 @@
-import { composeScore, validateScore } from './score.js';
+import { composeScore, validateScore, instrumentOf, MUSIC_INSTRUMENTS, MUSIC_STYLES } from './score.js';
 const safeVolume = value => Number.isFinite(value) ? Math.max(0, Math.min(0.3, value)) : 0;
 export class GameAudio {
   constructor(config, { Tone = globalThis.Tone, AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext } = {}) {
     this.config = config; this.Tone = Tone; this.AudioContextCtor = AudioContextCtor;
     this.score = config.score || composeScore();
     const errors = validateScore(this.score); if (errors.length) throw new Error(errors.join('; '));
+    this.instrument = instrumentOf(this.score.instrument);
     this.volume = safeVolume(config.volume); this.muted = !config.enabled; this.started = false; this.playing = false; this.disposed = false; this.nodes = []; this.sequences = []; this.scheduledNotes = 0;
   }
   async start() {
@@ -26,7 +27,10 @@ export class GameAudio {
       const own = node => { this.nodes.push(node); return node; };
       this.limiter = own(new T.Limiter(-12)).toDestination();
       this.musicGain = own(new T.Gain(0)).connect(this.limiter);
-      this.lead = own(new T.Synth({ volume: -15, oscillator: { type: this.score.waveform }, envelope: { attack: 0.015, decay: 0.18, sustain: 0.1, release: 0.3 } })).connect(this.musicGain);
+      const preset = MUSIC_INSTRUMENTS[this.instrument];
+      const Voice = preset.engine === 'fm' ? T.FMSynth : T.Synth;
+      const voiceOptions = { volume:preset.volume, oscillator:{type:preset.waveform || this.score.waveform}, envelope:{...preset.envelope}, ...(preset.engine === 'fm' ? {harmonicity:preset.harmonicity,modulationIndex:preset.modulationIndex,modulation:{type:'sine'},modulationEnvelope:{attack:0.01,decay:0.2,sustain:0.1,release:0.3}} : {}) };
+      this.lead = own(new Voice(voiceOptions)).connect(this.musicGain);
       this.bass = own(new T.Synth({ volume: -19, oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.25, sustain: 0.15, release: 0.4 } })).connect(this.musicGain);
       this.transport = T.getTransport(); this.transport.bpm.value = this.score.tempo;
       const sequence = (voice, notes, interval, duration) => {
@@ -35,10 +39,11 @@ export class GameAudio {
         }, notes, interval).start(0);
         this.sequences.push(seq);
       };
-      sequence(this.lead, this.score.melody, '8n', '16n'); sequence(this.bass, this.score.bass, '2n', '4n');
+      sequence(this.lead, this.score.melody, MUSIC_STYLES[this.score.style].step, preset.duration); sequence(this.bass, this.score.bass, '2n', '4n');
       if (this.score.drums) {
         this.drum = own(new T.MembraneSynth({ volume: -25, pitchDecay: 0.025, octaves: 3 })).connect(this.musicGain);
-        sequence(this.drum, ['C2','R','C2','R'], '4n', '16n');
+        const pattern = this.score.style === 'dance' ? ['C2','C2','C2','C2'] : this.score.style === 'lofi' ? ['C2','R','R','C2','R','R','C2','R'] : ['C2','R','C2','R'];
+        sequence(this.drum, pattern, this.score.style === 'lofi' ? '8n' : '4n', '16n');
       }
     }
     this.started = true; this.update();
@@ -72,5 +77,5 @@ export class GameAudio {
     if (this.disposed) return;
     this.disposed = true; this.clearMusic(); this.context?.close()?.catch(() => {}); this.started = false;
   }
-  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes }; }
+  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, instrument: this.instrument, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes }; }
 }

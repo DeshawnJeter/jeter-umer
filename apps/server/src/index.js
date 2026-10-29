@@ -3,6 +3,7 @@ import { readFile, stat, readdir } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { Manager } from './orchestrator/manager.js';
 import { terminalStates } from '../../../shared/policies/index.js';
+import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../shared/music.js';
 const manager = new Manager(); await manager.initialize();
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be 1024–65535');
@@ -44,6 +45,7 @@ const server = createServer(async (req, res) => {
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
     if (url.pathname === '/api/config') return json(res, 200, manager.runtime.publicConfig);
+    if (url.pathname === '/api/music-catalog') return json(res, 200, { styles:Object.entries(MUSIC_STYLES).map(([value,entry])=>({value,label:entry.name})), instruments:[{value:'auto',label:'Let the agent choose'},...Object.entries(MUSIC_INSTRUMENTS).map(([value,entry])=>({value,label:entry.name}))] });
     if (url.pathname === '/api/runs') return json(res, 200, [...manager.runs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
     if (parts[0] === 'api' && parts[1] === 'runs' && parts.length === 3) return json(res, 200, manager.get(parts[2]));
     if (parts[0] === 'api' && parts[1] === 'runs' && parts[3] === 'download' && parts.length === 4) {
