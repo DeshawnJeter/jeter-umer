@@ -101,7 +101,9 @@ function render(run) {
   }
   $('#review').hidden = !run.build;
   if (run.build) {
-    $('#validation').textContent = run.validation.scope;
+    $('#validation').textContent = run.validation.scope+(run.browserChecks?(' Browser checks: '+(run.browserChecks.passed===true?'passed; full playthrough, audio quality and final approval remain yours.':run.browserChecks.passed===false?'failed — '+run.browserChecks.error:run.browserChecks.reason)):'');
+    const previousBrowser=$('#browser-check-report'),browserSignature=JSON.stringify(run.browserChecks||null);
+    if(previousBrowser?.dataset.signature!==browserSignature){const open=previousBrowser?.open;previousBrowser?.remove();if(run.browserChecks){const details=element('details');details.id='browser-check-report';details.dataset.signature=browserSignature;details.open=!!open||run.browserChecks.passed===false;details.append(element('summary','Automatic browser checks: '+(run.browserChecks.passed===true?'passed':run.browserChecks.passed===false?'failed':'disabled')));for(const check of run.browserChecks.tests||[])details.append(element('p',(check.passed?'Passed: ':'Failed: ')+check.name+(check.error?' — '+check.error:'')));details.append(element('p','These checks cover build loading, basic controls, failure and restart under a controlled clock. Full playthroughs, difficulty balance, music quality and final approval remain yours.'));$('#validation').after(details);}}
     const nextUrl = run.build.url;
     if (previewUrl !== nextUrl) {
       previewUrl = nextUrl; $('#preview').src = nextUrl; $('#checklist').replaceChildren();
@@ -109,7 +111,7 @@ function render(run) {
       $('#revision-difficulty').value = run.brief.difficulty; $('#revision-music').checked = run.brief.music; $('#revision-genre').value = run.brief.genre || 'collector'; $('#revision-theme').value = run.brief.theme || 'space'; $('#revision-music-style').value = run.brief.musicStyle || 'adventure'; $('#revision-music-instrument').value = run.brief.musicInstrument || 'auto';
     }
     $('#open-game').href = nextUrl; $('#download').href = `/api/runs/${run.id}/download`;
-    $('#approve').disabled = run.status !== 'awaiting_review'; $('#revise').disabled = run.status !== 'awaiting_review';
+    $('#approve').disabled = run.status !== 'awaiting_review'; $('#revise').disabled = !['awaiting_review','failed'].includes(run.status);
   } else { if (previewUrl) $('#preview').src = 'about:blank'; previewUrl = ''; }
   $('#events').replaceChildren(...run.events.slice(-50).map(event => element('li', `${new Date(event.at).toLocaleTimeString()} ${event.message}`)));
 }

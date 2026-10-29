@@ -122,7 +122,7 @@ class WorkshopGame extends Phaser.Scene {
       if (x) player.setFlipX(x < 0);
       const outcome = roundOutcome(state); if (outcome !== 'playing') end(outcome);
     } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
-    vfx?.update(delta/1000);state.x = player.x; state.y = player.y;
+    vfx?.update(delta/1000);state.x = player.x; state.y = player.y;state.enemyStates=enemies?.getChildren().map(enemy=>({x:enemy.x,y:enemy.y,mode:'chase'}))||[];
     document.querySelector('#game').dataset.phase=state.phase;
     const text = `${state.phase.toUpperCase()} · Stars ${state.score}/${state.required} · ${Math.ceil(state.remaining)}s${genre === 'survival' ? ` · Shields ${state.health}/3` : ''}`;
     if (text !== lastHud) { status.textContent = text; ui.render(); lastHud = text; }

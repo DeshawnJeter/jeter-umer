@@ -15,14 +15,17 @@ import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,accept
 import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
+import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
 
 export class Manager {
-  constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
+  constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
+    if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
     this.store = store; this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
       run.decisions ??= {}; run.tasks ??= {}; run.planApproval ??= null; run.planHash ??= null;
+      run.browserQaMode??=this.browserMode;
       ensureMemory(run);
       for(const role of ROLES)if(run.results?.[role]&&!run.memory.artifacts[role])acceptMemory(run,role,run.results[role],role==='planner'?[]:['planner']);
       if (run.providerUsage) recoverUsage(run.providerUsage);
@@ -45,7 +48,7 @@ export class Manager {
   get(id) { const run = this.runs.get(id); if (!run) throw new Error('Run not found'); return run; }
   async manifest() {
     const instructions = await loadSystemManifest();
-    return { ...instructions, runtime: clone(this.runtime.publicConfig), hash: fingerprint({ instructions: instructions.hash, runtime: this.runtime.publicConfig }) };
+    return { ...instructions, runtime: clone(this.runtime.publicConfig),browserQaMode:this.browserMode, hash: fingerprint({ instructions: instructions.hash, runtime: this.runtime.publicConfig,browserQaMode:this.browserMode }) };
   }
   assertRuntime(run) {
     if (run.mode !== this.runtime.mode || (run.providerConfig && fingerprint(run.providerConfig) !== fingerprint(this.runtime.publicConfig))) throw new Error('Restart with this run’s provider/model configuration, or create a new run. Providers never switch silently.');
@@ -61,7 +64,7 @@ export class Manager {
   }
   async create(brief) {
     const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
-    run.maxSteps=policy.maxSteps;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
+    run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
     if (this.jobs.has(run.id)) return;
@@ -88,7 +91,7 @@ export class Manager {
   invalidate(run, roles) {
     const affected = invalidateMemory(run,roles.includes('planner') ? ROLES : roles);
     for (const role of affected) { delete run.results[role]; delete run.agents[role]; delete run.tasks[role]; }
-    run.generation++; run.build = null; run.validation = null; delete run.approval;
+    run.generation++; run.build = null; run.validation = null;run.browserChecks=null; delete run.approval;
     if (affected.includes('planner')) { run.planHash = null; run.planApproval = null; if(run.brief.inputMode==='prompt')run.briefResolution=null; }
   }
   providerHooks(run,role) {
@@ -114,7 +117,7 @@ export class Manager {
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
@@ -130,6 +133,7 @@ export class Manager {
     try {
       if (run.status !== 'running') return;
       this.assertRuntime(run);
+      if(run.browserQaMode==='on'&&this.browserRunner===runBrowserSmoke)await assertBrowserInstalled();
       const instructions = await this.manifest();
       if (run.instructions && run.instructions.hash !== instructions.hash) {
         this.invalidate(run, ROLES); run.questions = [];
@@ -170,6 +174,13 @@ export class Manager {
       const folder = resolve(this.store.folder(run.id), 'builds', String(run.generation));
       const sha256 = await buildGame(folder, config); if (run.status !== 'running') return;
       run.build = { generation: run.generation, sha256, url: `/preview/${run.id}/${run.generation}/index.html`, checksRequired: humanChecksFor(run.brief.genre) };
+      if(run.browserQaMode==='on'){
+        await this.event(run,'Running isolated browser smoke checks against the delivered build.');
+        const report=await this.browserRunner({folder,config,buildHash:sha256,reportFolder:resolve(this.store.folder(run.id),'browser-checks',`generation-${run.generation}`),signal:this.controllers.get(run.id)?.signal});
+        if(run.status!=='running')return;
+        run.browserChecks=report;recordTests(run,'browser-smoke',report);await this.save(run);
+        if(!report.passed||report.buildHash!==sha256||await hashBuild(folder)!==sha256)throw Error('Browser QA failed: '+(report.error||'The delivered game did not pass current-build smoke checks'));
+      }else{run.browserChecks={scope:'browser-smoke',buildHash:sha256,browserTested:false,passed:null,reason:'Browser QA explicitly disabled; manual playtesting is required'};await this.save(run);}
       this.transition(run, 'awaiting_review'); await this.event(run, 'Ready for human playtest. Static checks do not prove browser behavior.');
     } catch (error) { if (!error.suspended) throw error; }
   }
@@ -210,7 +221,9 @@ export class Manager {
       this.transition(run, 'running'); await this.event(run, 'Human answer saved. Only affected contributions require fresh work.'); this.launch(run); return run;
     }
     if (action === 'revise' || action === 'revise_plan') {
-      if (!['awaiting_plan', 'awaiting_review'].includes(run.status)) throw new Error('Revisions require a checked plan or reviewable build');
+      if (!['awaiting_plan', 'awaiting_review','failed'].includes(run.status)) throw new Error('Revisions require a checked plan, failed run or reviewable build');
+      delete run.error;
+      if(run.browserChecks?.passed===false)run.lastBrowserFailure={buildHash:run.browserChecks.buildHash,generation:run.generation,reason:run.browserChecks.error||'Browser acceptance failed',failedChecks:(run.browserChecks.tests||[]).filter(check=>!check.passed).map(check=>({name:check.name,error:check.error||''}))};
       const updated = validateBrief({ ...run.brief, ...data, inputMode:data.inputMode ?? 'manual' });
       if (updated.inputMode!=='prompt'&&!updated.difficulty) throw new Error('Select difficulty for the revision');
       run.brief = updated; run.questions = [];
@@ -219,6 +232,7 @@ export class Manager {
       this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Plan approval and final approval require renewal.'); this.launch(run); return run;
     }
     if (action === 'approve') {
+      if(run.browserQaMode==='on'&&(!run.browserChecks?.passed||run.browserChecks.buildHash!==run.build?.sha256))throw Error('Current build must pass browser checks before human approval');
       if (run.status !== 'awaiting_review' || !run.planApproval || run.planApproval.hash !== run.planHash || run.questions.some(question => question.blocking) || !run.validation?.passed || data.sha256 !== run.build?.sha256 || humanChecksFor(run.brief.genre).some(key => data.checks?.[key] !== true)) throw new Error('Playtest every required item and approve the current build');
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if (await hashBuild(resolve(this.store.folder(id), 'builds', String(run.build.generation))) !== run.build.sha256) throw new Error('Build changed since validation. Rebuild before approval.');
