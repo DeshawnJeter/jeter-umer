@@ -2,3 +2,6 @@
 
 #plan{margin:25px 0;padding:22px;border:1px solid #65bba0;background:#132a29;border-radius:8px}#plan button{margin:6px 0}#plan form{margin-top:22px}#question section+section{border-top:1px solid #75623d;margin-top:22px;padding-top:10px}#question textarea{min-height:80px}
 fieldset{border:1px solid #344b63;border-radius:8px;padding:0 14px 12px;margin:20px 0}legend{color:#a9bed3;padding:0 8px}#plan li{color:#c1d0e0;line-height:1.6;margin:8px 0}#plan summary{cursor:pointer;color:#8ae8c4;margin-top:18px}button:disabled{cursor:not-allowed}
+/* Long audit summaries must not force the dashboard beyond the viewport. */
+#memory-summary { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.agent { min-width: 0; overflow-wrap: anywhere; }

@@ -1,5 +1,10 @@
 import './preferences.js';
 const $ = selector => document.querySelector(selector);
+function handoffDescription(handoff){
+  const prefix=handoff.role+': ';
+  if(handoff.summary.startsWith(prefix+'{')){try{const fields=JSON.parse(handoff.summary.slice(prefix.length));return Object.entries(fields).filter(([key])=>!key.endsWith('Hash')).map(([key,value])=>`${key.replace(/[A-Z]/g,letter=>' '+letter.toLowerCase())}: ${Array.isArray(value)?value.join(', '):value}`).join('; ');}catch{/* Older summaries remain readable plain text. */}}
+  return handoff.summary;
+}
 let selected = null, current = null, previewUrl = '', questionSignature = '', planSignature = '', busy = false, providerMode = 'scripted-demo';
 const checkLabels = { movement: 'Applicable movement, collisions, jumping or battle targeting work', collectAndWin: 'The selected game mechanics, resources, objective and win condition work', timeoutAndRestart: 'Loss, restart, checkpoints and any timer work where applicable', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };
 async function api(path, data) { const res = await fetch(path, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!res.ok) throw new Error(result.error); return result; }
@@ -89,7 +94,7 @@ function render(run) {
       memory.append(element('summary',`Project memory · revision ${run.memory.revision} · ${run.memory.handoffs.length} checked handoffs`));
       memory.append(element('p',`${run.memory.decisions.length} human decisions · ${run.memory.tests.length} test records. Changes mark dependent work stale; agent summaries do not approve requirements.`));
       for(const decision of run.memory.decisions)memory.append(element('p',`Your decision — ${decision.key}: ${decision.answer}`));
-      for(const handoff of run.memory.handoffs.slice(-15))memory.append(element('p',`${handoff.role}: ${handoff.summary}`));
+      for(const handoff of run.memory.handoffs.slice(-15))memory.append(element('p',`${handoff.role}: ${handoffDescription(handoff)}`));
       for(const record of run.memory.tests)memory.append(element('p',`${record.kind}: ${record.stale?'needs fresh checks':'current'}; browser playtesting and final approval remain yours.`));
       const link=element('a','View full project record');link.href=`/api/runs/${run.id}/memory`;link.target='_blank';memory.append(link);$('#agents').after(memory);
     }
