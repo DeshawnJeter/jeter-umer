@@ -34,6 +34,15 @@ export function buildRequest(config, role, stage, request, repairCode) {
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
   data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
+  if(role==='audio'&&stage==='checker'){
+    // Audio consumes the complete source prompt, resolved music selectors and
+    // human decisions. Gameplay acceptance prose is retained in the checked
+    // project plan instead of being duplicated in this focused review.
+    data.context={...request.context,plan:request.context?.plan?{title:request.context.plan.title,difficulty:request.context.plan.difficulty,checkedPlanHash:request.context.memory?.dependencies?.find(record=>record.role==='planner')?.hash}:undefined};
+    delete data.artifactReference;
+    delete data.hudReference;delete data.capabilityProfile;delete data.lifecycle;
+    data.gameType={id:genre,name:GAME_TYPES[genre].name};
+  }
   if(role==='coding'&&stage==='checker')data.artifactReference={interface:'createGame(api): start/update/inspect'};
   if(role==='coding'&&request.codeExecution)data.codeExecution=request.codeExecution;
   const resolving = request.operation === 'resolve_brief';
