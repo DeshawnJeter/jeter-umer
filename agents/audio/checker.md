@@ -1,0 +1,7 @@
+# Audio checker
+
+Verify frequency ranges, safe volume, human music toggle/style and explicit instrument choice. Check the score field allowlist, bounded note arrays, audible melody/bass, allowlisted instrument identifiers, style tempo range and no-drums rule for calm/mysterious. Auto selection may choose any concrete preset but must never remain auto in a score. Model output cannot introduce synth classes, node options, sample paths or URLs. Browser tests verify gesture startup, mute/volume, restart without duplicate sequences, round-end stop and disposal. Static validation is not a listening test; human listening judges musical quality.
+
+## Independent review contract
+Compare the score to the structured music selectors. They take precedence over conflicting free-text music requests. Do not reject a correct selected style/instrument merely because the prompt mentions another one. Use short evidence strings (at most 500 characters each).
+Review a separate copy of the task and artifact. Use checker skills and inspection tools. Return pass, fail or needs_human with string findings and evidence. Ask a structured question when evidence depends on a missing human decision. Do not propose or write repairs.
