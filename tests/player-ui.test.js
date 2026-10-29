@@ -34,7 +34,7 @@ test('real-model schema includes closed HUD contract and rejects unknown stats',
   assert.equal(schema.additionalProperties,false);
   const result={kind:'artifact',artifact:clone(defaults.ui),question:null,summary:'HUD selected'};
   assert.deepEqual(validateModelOutput('ui','worker',result).artifact.hud,hudFor());
-  result.artifact.hud.stats[0]='mana'; assert.throws(()=>validateModelOutput('ui','worker',result));
+  result.artifact.hud.stats[0]='unbounded_magic'; assert.throws(()=>validateModelOutput('ui','worker',result));
 });
 test('settings reject duplicate/reserved bindings, injected fields, invalid gains and malformed saved records', () => {
   assert.equal(validSettings(defaultSettings()),true);
