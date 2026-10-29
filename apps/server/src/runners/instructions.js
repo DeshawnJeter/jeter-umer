@@ -17,7 +17,7 @@ export async function loadProfile(role) {
   const profile = JSON.parse(await readFile(resolve('agents', role, 'profile.json'), 'utf8'));
   if (profile.version !== 1 || profile.role !== role || profile.provider !== 'scripted-demo' || profile.model !== null || !Number.isInteger(profile.maxAttempts) || profile.maxAttempts < 1 || profile.maxAttempts > policy.maxAttempts) throw new Error(`Invalid ${role} profile`);
   for (const stage of ['worker', 'checker']) {
-    const settings = profile[stage]; const allowedTools = stage === 'worker' ? ['inspect_context', 'propose_artifact','read_project_memory'] : ['inspect_context', 'inspect_artifact','read_project_memory'];
+    const settings = profile[stage]; const allowedTools = stage === 'worker' ? ['inspect_context', 'propose_artifact','read_project_memory',...(role==='coding'?['read_source','search_source','inspect_components']:[])] : ['inspect_context', 'inspect_artifact','read_project_memory'];
     if (!settings || settings.prompt !== (stage === 'worker' ? 'instructions.md' : 'checker.md') || !Array.isArray(settings.tools) || new Set(settings.tools).size !== settings.tools.length || settings.tools.some(name => !allowedTools.includes(name))) throw new Error(`Invalid ${stage} tools or prompt`);
     for (const setting of ['maxContextChars', 'maxOutputChars']) if (!Number.isInteger(settings[setting]) || settings[setting] < 1 || settings[setting] > policy.maxContextChars) throw new Error(`Invalid ${stage} ${setting}`);
   }

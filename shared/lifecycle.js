@@ -4,6 +4,7 @@ export const GAME_LIFECYCLES=Object.freeze({
   maze:{timer:true,health:false,failure:'Time runs out before you escape.'},
   platformer:{timer:true,health:false,failure:'Time runs out before you finish.'},
   survival:{timer:true,health:true,surviveTimer:true,failure:'Your health reaches zero. Survive until the timer ends to win.'},
+  custom:{timer:false,health:true,failure:'The generated rules end the run, health reaches zero, or the code worker fails.'},
   roguelike:{timer:false,health:true,failure:'Party defeat ends this run. Restart creates a new dungeon with fresh resources.'},
   campaign:{timer:false,health:true,failure:'Both party members reach zero HP. Restart resets the campaign.'},
   rpg:{timer:false,health:true,failure:'Both party members reach zero HP.'},

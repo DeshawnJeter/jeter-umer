@@ -1,3 +1,4 @@
+import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../../../../shared/code-game.js';
 import {createHash} from 'node:crypto';
 import {EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../../../../shared/specialists.js';
 import {genreOf} from '../../../../shared/game-types.js';
@@ -17,6 +18,7 @@ export function modulesFor(genre){
 }
 export function referenceFor(role,{brief,context={}}){
   const artifact=extensionDefaults(role),genre=genreOf(brief.genre);
+  if(role==='coding')Object.assign(artifact,{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS});
   if(role==='art'){const match=brief.prompt?.match(/(?:battle|combat)\s+(?:background|backdrop)[^.;\n]{0,30}\b(ruins|cavern|forest|space|neon)\b/i);if(match)artifact.battleBackdrop=match[1].toLowerCase();}
   if(role==='combat')artifact.enemyDamage=brief.difficulty==='experienced'?3:2;
   if(role==='implementation')Object.assign(artifact,{runtime:genre,modules:modulesFor(genre)});

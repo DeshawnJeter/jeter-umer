@@ -7,6 +7,7 @@ import {compileAssembly} from './assembly.js';
 import {lifecycleFor,humanChecksFor} from '../../../../shared/lifecycle.js';
 export async function buildGame(folder, config) {
   await mkdir(folder, { recursive: true });
+  if(config.genre==='custom'){if(!config.coding)throw Error('Missing independently checked game code');const {checkCode}=await import('../runners/code-workspace.js');const report=checkCode(config.coding);if(report.verdict!=='pass')throw Error(report.findings.join('; '));await mkdir(resolve(folder,'generated'),{recursive:true});await writeFile(resolve(folder,'generated','rules.js'),config.coding.source);}
   await cp(resolve('templates/browser-game'), folder, { recursive: true });
   await writeFile(resolve(folder,'assembly.js'),compileAssembly(config));
   await writeFile(resolve(folder,'lifecycle.json'),JSON.stringify({...lifecycleFor(config.genre),requiredHumanChecks:humanChecksFor(config.genre)},null,2));
@@ -14,7 +15,7 @@ export async function buildGame(folder, config) {
   await cp(resolve('shared/art-catalog.js'), resolve(folder, 'art-catalog.js'));
   await cp(resolve('shared/music.js'), resolve(folder, 'score.js'));
   await cp(resolve('shared/player-ui.js'), resolve(folder, 'player-ui.js'));
-  for(const file of ['campaign.js','advanced-games.js','extra-game-types.js','turn-combat.js','stealth-rules.js','lifecycle.js','enemy-behavior.js','game-events.js','vfx-policy.js'])await cp(resolve('shared',file),resolve(folder,file));
+  for(const file of ['code-game.js','campaign.js','advanced-games.js','extra-game-types.js','turn-combat.js','stealth-rules.js','lifecycle.js','enemy-behavior.js','game-events.js','vfx-policy.js'])await cp(resolve('shared',file),resolve(folder,file));
   await writeFile(resolve(folder, 'music-score.json'), JSON.stringify(config.audio.score || composeScore(), null, 2));
   await writeFile(resolve(folder, 'assets-manifest.json'), JSON.stringify({ ...ART_MANIFEST, theme: config.ui.theme || 'space' }, null, 2));
   await mkdir(resolve(folder, 'vendor'), { recursive: true });

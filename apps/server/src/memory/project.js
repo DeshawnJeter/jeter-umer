@@ -41,7 +41,7 @@ export function invalidateMemory(run,roles,reason='Requirements or dependency ch
 }
 export function readMemory(run,role,dependencies=[]){
   validRole(role);const m=ensureMemory(run),records=[];
-  for(const parent of dependencies){const entry=assertCurrentMemory(run,parent);records.push({role:parent,hash:entry.hash,artifact:clone(entry.artifact),auditDirectory:entry.auditDirectory});}
+  for(const parent of dependencies){const entry=assertCurrentMemory(run,parent);const artifact=parent==='coding'&&role!=='coding'?{sourceReference:{hash:entry.hash,path:'generated/rules.js',auditDirectory:entry.auditDirectory},interface:'createGame(api): start/update/inspect',summary:entry.summary}:clone(entry.artifact);records.push({role:parent,hash:entry.hash,artifact,auditDirectory:entry.auditDirectory});}
   const result={projectId:run.id,revision:m.revision,generation:run.generation,specificationHash:m.specification?.planHash||null,decisions:m.decisions.filter(d=>d.affectedRoles.includes(role)||d.affectedRoles.includes('planner')).map(d=>({key:d.key,answer:d.answer,source:d.source})),dependencies:records,checkpoint:m.workspaces[role]?.generation===run.generation?clone(m.workspaces[role]):null,previousHandoff:clone(m.handoffs.findLast(item=>item.role===role)||null),references:{handoffs:m.handoffs.length,tests:m.tests.length}};
   if(JSON.stringify(result).length>7000)throw Error('Focused memory exceeds context budget; split the task instead of truncating requirements');
   return result;
