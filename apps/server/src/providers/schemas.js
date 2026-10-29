@@ -3,13 +3,15 @@ import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
 import { MELODY_NOTES, BASS_NOTES, MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../../shared/music.js';
 import { ModelOutputError } from './output-errors.js';
 import { validateResolution } from '../../../../shared/prompt-brief.js';
+import {GAME_TYPES} from '../../../../shared/game-types.js';
+import {HUD_STATS} from '../../../../shared/player-ui.js';
 const string = { type: 'string' }, number = { type: 'number' }, boolean = { type: 'boolean' };
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const array = items => ({ type: 'array', items });
 const nullable = schema => ({ anyOf: [schema, { type: 'null' }] });
 const boundedText = maxLength => ({ type:'string', minLength:1, maxLength, pattern:'\\S' });
 const reportStrings = minItems => ({ type:'array', items:boundedText(500), minItems, maxItems:12 });
-export const resolutionSchema = object({title:boundedText(60),genre:{type:'string',enum:['collector','maze','platformer','survival']},theme:{type:'string',enum:['space','forest','neon']},difficulty:{type:'string',enum:['beginner','experienced']},music:boolean,musicStyle:{type:'string',enum:Object.keys(MUSIC_STYLES)},musicInstrument:{type:'string',enum:['auto',...Object.keys(MUSIC_INSTRUMENTS)]},assumptions:{type:'array',items:boundedText(240),maxItems:16},unsupportedRequests:{type:'array',items:boundedText(240),maxItems:16}});
+export const resolutionSchema = object({title:boundedText(60),genre:{type:'string',enum:Object.keys(GAME_TYPES)},theme:{type:'string',enum:['space','forest','neon']},difficulty:{type:'string',enum:['beginner','experienced']},music:boolean,musicStyle:{type:'string',enum:Object.keys(MUSIC_STYLES)},musicInstrument:{type:'string',enum:['auto',...Object.keys(MUSIC_INSTRUMENTS)]},assumptions:{type:'array',items:boundedText(240),maxItems:16},unsupportedRequests:{type:'array',items:boundedText(240),maxItems:16}});
 export function resolutionResponseSchema(stage) {
   if(!['worker','checker'].includes(stage))throw new Error('Invalid resolution stage');
   if(stage==='worker')return object({kind:{type:'string',enum:['artifact']},artifact:resolutionSchema,question:{type:'null'},summary:boundedText(500)});
@@ -26,7 +28,7 @@ const artifacts = {
   planner: object({ title: boundedText(60), objective: boundedText(180), difficulty: { type: 'string', enum: ['beginner', 'experienced'] } }),
   gameplay: object({ speed: number, timeLimit: number }),
   levels: object({ spawn: point, exit: point, stars: array(point), walls: array(point) }),
-  ui: object({ title: boundedText(60), playerColor: string, backgroundColor: string, theme: { type: 'string', enum: ['space', 'forest', 'neon'] }, hud: object({ layout: { type:'string', enum:['cards','compact'] }, stats: array({ type:'string', enum:['health','stars','time','objective'] }) }) }),
+  ui: object({ title: boundedText(60), playerColor: string, backgroundColor: string, theme: { type: 'string', enum: ['space', 'forest', 'neon'] }, hud: object({ layout: { type:'string', enum:['cards','compact'] }, stats: array({ type:'string', enum:HUD_STATS }) }) }),
   story: object({ intro: boundedText(180), victory: boundedText(180), defeat: boundedText(180) }),
   audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: Object.keys(MUSIC_STYLES) }, instrument: { type:'string', enum:Object.keys(MUSIC_INSTRUMENTS) }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
 };

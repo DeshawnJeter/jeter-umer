@@ -3,12 +3,14 @@ import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
 import { createArt, drawBackdrop } from './art.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from './score.js';
+import {advancedProfile} from './advanced-games.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
 const response = await fetch('config.json');
 if (!response.ok) throw new Error('Game configuration unavailable');
 const config = await response.json(), genre = genreOf(config.genre), rules = GAME_TYPES[genre];
+if(advancedProfile(genre)){const {startAdvancedGame}=await import('./advanced.js');await startAdvancedGame(config,genre);}else{
 const audio = new GameAudio(config.audio);
 const title = document.querySelector('#title'), message = document.querySelector('#message'), status = document.querySelector('#status');
 title.textContent = config.ui.title; document.title = config.ui.title; message.textContent = config.story.intro;
@@ -125,7 +127,7 @@ document.querySelector('#start').onclick = async () => {
 document.querySelector('#restart').onclick = () => ui.restart();
 for (const button of document.querySelectorAll('[data-control]')) {
   const control = button.dataset.control;
-  button.hidden = control === 'jump' ? genre !== 'platformer' : genre === 'platformer' && ['up','down'].includes(control);
+  button.hidden = !['left','right','up','down','jump'].includes(control) || (control === 'jump' ? genre !== 'platformer' : genre === 'platformer' && ['up','down'].includes(control));
   button.onpointerdown = event => { event.preventDefault(); if (state.phase !== 'playing') return; button.setPointerCapture(event.pointerId); held.add(control); if (control === 'jump') touchJump = true; };
   button.onpointerup = button.onpointercancel = button.onlostpointercapture = () => held.delete(control);
 }
@@ -133,3 +135,4 @@ window.addEventListener('blur', () => { held.clear(); ui.clearInput(); if (state
 document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing') ui.pause(); });
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
 window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
+}

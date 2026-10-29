@@ -1,18 +1,19 @@
-import { hudFor, validateHud, defaultSettings, remap, KEY_CODES, keyLabel } from './player-ui.js';
+import { hudFor, validateHud, defaultSettings, remap, KEY_CODES, keyLabel,upgradeSettings } from './player-ui.js';
+import {advancedProfile} from './advanced-games.js';
 import { loadPreferences, savePreferences } from './preferences.js';
 const $ = selector => document.querySelector(selector);
 export class PlayerInterface {
   constructor(options) { Object.assign(this, options); this.keys = new Set(); this.previousPhase = null; this.capture = null; }
   async initialize() {
     const loaded = await loadPreferences(defaultSettings(this.audio.volume, this.audio.muted));
-    this.settings = loaded.settings; this.storage = loaded.storage;
+    this.settings = upgradeSettings(loaded.settings); this.storage = loaded.storage;this.profile=advancedProfile(this.genre);
     this.hud = validateHud(this.config.ui.hud, this.genre).length ? hudFor(this.genre) : this.config.ui.hud;
     $('#hud').dataset.layout = this.hud.layout;
     for (const stat of this.hud.stats) {
       const card = document.createElement('div'); card.className = 'stat'; card.id = `stat-${stat}`;
-      const label = document.createElement('span'); label.className = 'stat-label'; label.textContent = { health:'Health / shields', stars:this.genre === 'survival' ? 'Healing stars' : this.genre === 'maze' ? 'Bonus stars' : 'Stars collected', time:this.genre === 'survival' ? 'Survive for' : 'Time remaining', objective:'Portal objective' }[stat];
+      const label = document.createElement('span'); label.className = 'stat-label'; label.textContent = { health:'Health / shields', stars:this.genre === 'survival' ? 'Healing stars' : this.genre === 'maze' ? 'Bonus stars' : 'Stars collected', time:this.genre === 'survival' ? 'Survive for' : 'Time remaining', objective:'Objective',mana:this.profile?.manaLabel||'MP',alert:'Detection',progress:'Stage',ability:'Abilities' }[stat];
       const value = document.createElement('strong'); value.id = `value-${stat}`; card.append(label, value);
-      if (['time','health'].includes(stat)) { const meter = document.createElement('progress'); meter.id = `meter-${stat}`; meter.setAttribute('aria-label', label.textContent); card.append(meter); }
+      if (['time','health','mana','alert'].includes(stat)) { const meter = document.createElement('progress'); meter.id = `meter-${stat}`; meter.setAttribute('aria-label', label.textContent); card.append(meter); }
       $('#hud').append(card);
     }
     $('#pause').onclick = () => this.pause(); $('#resume').onclick = () => this.resume();
@@ -45,14 +46,16 @@ export class PlayerInterface {
   }
   controls(focusAction) {
     $('#bindings').replaceChildren();
-    const actions = this.genre === 'platformer' ? ['left','right','jump'] : ['left','right','up','down'];
-    for (const action of actions) {
+    const actions = this.profile?.actions || (this.genre === 'platformer' ? ['left','right','jump'] : ['left','right','up','down']);
+    const other=document.createElement('details'),summary=document.createElement('summary');summary.textContent='Other game-style controls (shared preferences)';other.append(summary);other.open=!!((this.capture&&!actions.includes(this.capture))||(focusAction&&!actions.includes(focusAction)));
+    for (const action of [...actions,...Object.keys(this.settings.bindings).filter(action=>!actions.includes(action))]) {
       const row = document.createElement('div'); row.className = 'binding';
       const label = document.createElement('span'); label.textContent = action[0].toUpperCase() + action.slice(1);
       const button = document.createElement('button'); button.type = 'button'; button.textContent = this.capture === action ? 'Press a letter, number or arrow…' : this.settings.bindings[action].map(keyLabel).join(' / '); button.setAttribute('aria-label', `Change ${action} control`);
       button.onclick = () => { this.capture = action; $('#binding-error').textContent = 'Press a key. Escape cancels. Keys must be unique.'; this.controls(); $('#bindings').querySelector(`[aria-label="Change ${action} control"]`).focus(); };
-      row.append(label, button); $('#bindings').append(row);
+      row.append(label, button); (actions.includes(action)?$('#bindings'):other).append(row);
     }
+    $('#bindings').append(other);
     const hint = actions.map(action => `${action}: ${this.settings.bindings[action].map(keyLabel).join(' / ')}`).join(' · ');
     $('#instructions').textContent = `${hint}. Escape pauses. ${this.config.planner.objective}`;
     if (focusAction) $('#bindings').querySelector(`[aria-label="Change ${focusAction} control"]`)?.focus();
@@ -72,7 +75,8 @@ export class PlayerInterface {
     if (Object.values(this.settings.bindings).some(codes => codes.includes(event.code))) {
       event.preventDefault(); this.keys.add(event.code);
       const jumpKeys = this.settings.bindings.jump;
-      if (!event.repeat && this.genre === 'platformer' && jumpKeys.includes(event.code)) this.onJump();
+      if (!event.repeat && (this.genre === 'platformer'||this.profile?.platform) && jumpKeys.includes(event.code)) this.onJump();
+      if(!event.repeat)for(const action of ['attack','ability','interact'])if(this.settings.bindings[action].includes(event.code))this.onAction?.(action);
     }
   }
   isDown(action) { return this.held.has(action) || this.settings.bindings[action].some(key => this.keys.has(key)); }
@@ -92,10 +96,14 @@ export class PlayerInterface {
     $('#hud').dataset.phase = this.state.phase;
     for (const stat of this.hud.stats) {
       const value = $(`#value-${stat}`);
-      if (stat === 'health') { value.textContent = `${Math.max(0,this.state.health)} / 3`; $('#meter-health').max = 3; $('#meter-health').value = Math.max(0,this.state.health); $('#stat-health').dataset.low = String(this.state.health <= 1); }
+      if (stat === 'health') {const max=this.state.maxHealth||3; value.textContent = `${Math.max(0,this.state.health)} / ${max}`; $('#meter-health').max = max; $('#meter-health').value = Math.max(0,this.state.health); $('#stat-health').dataset.low = String(this.state.health <= Math.max(1,max/4)); }
       if (stat === 'stars') value.textContent = `${this.state.score} / ${this.state.required}`;
       if (stat === 'time') { value.textContent = `${Math.ceil(this.state.remaining)}s`; $('#meter-time').max = this.config.gameplay.timeLimit; $('#meter-time').value = this.state.remaining; $('#stat-time').dataset.low = String(this.state.remaining <= 10); }
-      if (stat === 'objective') value.textContent = this.genre === 'maze' || this.state.score >= this.state.required ? 'Reach the portal' : 'Collect all stars';
+      if (stat === 'objective') value.textContent = this.state.objective || (this.genre === 'maze' || this.state.score >= this.state.required ? 'Reach the portal' : 'Collect all stars');
+      if(stat==='mana'){value.textContent=`${this.state.mana} / ${this.state.maxMana}`;$('#meter-mana').max=this.state.maxMana||1;$('#meter-mana').value=this.state.mana;}
+      if(stat==='alert'){value.textContent=`${Math.round(this.state.alert||0)}%`;$('#meter-alert').max=100;$('#meter-alert').value=this.state.alert||0;}
+      if(stat==='progress')value.textContent=this.state.progress||'1 / 3';
+      if(stat==='ability')value.textContent=this.state.abilities||'Basic jump';
     }
   }
 }
