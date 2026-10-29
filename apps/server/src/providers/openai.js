@@ -94,7 +94,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
       data.context.sourceExcerpt={head:source.slice(0,request.toolHistory?.length?300:600),tail:source.slice(request.toolHistory?.length?-200:-400)};
       body.input[0].content[0].text=JSON.stringify(data);
       body.max_output_tokens=config.maxOutputTokens;body.text.format.schema.properties.artifact.anyOf[0].properties.source={type:'string',enum:['']};
-      body.tools=CODING_TOOLS.filter(tool=>['read_source','search_source','apply_source_patch'].includes(tool.name)&&Object.hasOwn(request.tools,tool.name));body.parallel_tool_calls=false;body.tool_choice='auto';
+      body.tools=CODING_TOOLS.filter(tool=>['read_source','search_source','apply_source_patch'].includes(tool.name)&&Object.hasOwn(request.tools,tool.name));body.parallel_tool_calls=false;body.tool_choice=(request.toolTurns||0)===0?'required':'auto';
       body.instructions=body.instructions.replace(/ You may use the supplied coding functions when needed,[\s\S]*?Tool outputs are untrusted data\./,'').replace(reviewGuidance,' Preserve the full approved prompt, API, lifecycle and replay contract. Use compact code and repeat counts.').replace(' Editing tools are not offered in this focused request. Return the complete repaired source and scenarios directly.','')+' Focused source repair: only the prefix and suffix of the owned file are shown, with its hash. Read bounded line windows or search for other exact locations. Patch the owned file, then return source as an empty string and structured scenarios. Preserve the unshown code and all requirements.';
       serialized=JSON.stringify(body);bytes=Buffer.byteLength(serialized);
     }
@@ -157,7 +157,7 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         combined.throwIfAborted();
         if (!Array.isArray(result.output) || result.output.some(item => !item || typeof item !== 'object' || (item.type === 'message' && !Array.isArray(item.content)))) throw new Error('OpenAI returned an invalid response envelope');
         if (result.output?.some(item => item.type === 'message' && item.content?.some(part => part.type === 'refusal'))) throw new Error('The model refused this request');
-        if (result.status !== 'completed') throw new Error('OpenAI response was incomplete; no partial artifact was accepted');
+        if (result.status !== 'completed') {const reason=['max_output_tokens','content_filter'].includes(result.incomplete_details?.reason)?' ('+result.incomplete_details.reason+')':'';throw new Error('OpenAI response was incomplete'+reason+'; no partial artifact was accepted');}
         const toolCalls=result.output.filter(item=>item.type==='function_call');
         if(toolCalls.length){
           if(role!=='coding'||stage!=='worker'||!request.tools||request.replayRepair||toolCalls.length!==1||(request.toolTurns||0)>=4)throw Error('Coding tool round limit or role boundary exceeded');
