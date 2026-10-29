@@ -29,6 +29,7 @@ function renderPlan(run) {
     for(const [key,label] of [['assumptions','Suggestions and assumptions'],['unsupportedRequests','Requested features this version cannot build']])if(resolution[key].length){const list=element('ul');list.append(...resolution[key].map(note=>element('li',note)));$('#plan').append(element('h4',label),list);}
   }
   const approve = element('button', 'Approve plan and start specialists'); const id = run.id, planHash = run.planHash;
+  if(run.mode==='openai'&&run.minimumModelCalls)$('#plan').append(element('p',`This game activates ${run.requiredRoles.length} jobs: at least ${run.minimumModelCalls} model requests including independent checks. Current call limit: ${run.providerConfig.maxCalls}. Repairs and revisions use additional requests; token limits also apply.`));
   let acknowledge;
   if(resolution?.unsupportedRequests.length){const label=element('label',undefined,'inline');acknowledge=document.createElement('input');acknowledge.type='checkbox';acknowledge.id='acknowledge-unsupported';label.append(acknowledge,document.createTextNode('I understand these features will be omitted. Build only the supported plan above.'));$('#plan').append(label);approve.disabled=true;acknowledge.onchange=()=>{approve.disabled=!acknowledge.checked;};}
   approve.onclick = () => perform(() => api(`/api/runs/${id}/approve_plan`, { planHash,acceptUnsupported:acknowledge?.checked===true })); $('#plan').append(approve);
@@ -67,17 +68,31 @@ function renderQuestions(run) {
 }
 function render(run) {
   current = run; $('#empty').hidden = true; $('#run').hidden = false;
-  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/40 steps · ${run.mode === 'openai' ? `OpenAI: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
+  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/${run.maxSteps||80} steps · ${run.mode === 'openai' ? `OpenAI: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
   $('#controls').replaceChildren();
   const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
   for (const [label, command] of buttons) { const button = element('button', label, 'secondary'); button.onclick = () => perform(() => action(command)); $('#controls').append(button); }
   renderPlan(run); renderQuestions(run);
   $('#agents').replaceChildren();
-  for (const role of ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio']) {
+  const selectedRoles=run.requiredRoles||['planner','gameplay','levels','ui','story','audio'];
+  for (const role of selectedRoles) {
     const agent = run.agents[role], result = run.results[role]; const box = element('div', undefined, `agent ${result ? 'accepted' : ''}`);
     box.append(element('strong', role), element('p', agent ? `${agent.stage} · attempt ${agent.attempt}` : 'Waiting for dependencies'));
     if (result) { box.append(element('small', 'Independent checker: pass')); const details = element('details'); details.append(element('summary', 'Evidence'), element('p', result.report.evidence.join('. '))); box.append(details); }
     $('#agents').append(box);
+  }
+  const existingMemory=$('#memory-summary'),memorySignature=run.memory?run.id+':'+run.memory.revision:'';
+  if(existingMemory?.dataset.signature!==memorySignature){
+    const wasOpen=existingMemory?.open&&existingMemory.dataset.project===run.id;existingMemory?.remove();
+    if(run.memory){
+      const memory=element('details');memory.id='memory-summary';memory.dataset.signature=memorySignature;memory.dataset.project=run.id;memory.open=!!wasOpen;
+      memory.append(element('summary',`Project memory · revision ${run.memory.revision} · ${run.memory.handoffs.length} checked handoffs`));
+      memory.append(element('p',`${run.memory.decisions.length} human decisions · ${run.memory.tests.length} test records. Changes mark dependent work stale; agent summaries do not approve requirements.`));
+      for(const decision of run.memory.decisions)memory.append(element('p',`Your decision — ${decision.key}: ${decision.answer}`));
+      for(const handoff of run.memory.handoffs.slice(-15))memory.append(element('p',`${handoff.role}: ${handoff.summary}`));
+      for(const record of run.memory.tests)memory.append(element('p',`${record.kind}: ${record.stale?'needs fresh checks':'current'}; browser playtesting and final approval remain yours.`));
+      const link=element('a','View full project record');link.href=`/api/runs/${run.id}/memory`;link.target='_blank';memory.append(link);$('#agents').after(memory);
+    }
   }
   $('#review').hidden = !run.build;
   if (run.build) {

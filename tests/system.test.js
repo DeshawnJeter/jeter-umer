@@ -1,10 +1,11 @@
+import {activeRoles,CORE_ROLES,EXTENSION_SPECS} from '../shared/specialists.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defaults, clone, ROLES, validateArtifact, validateBrief } from '../shared/contracts/index.js';
-import { assertTransition } from '../shared/policies/index.js';
+import { assertTransition,policy } from '../shared/policies/index.js';
 import { route } from '../apps/server/src/router/index.js';
 import { runPair } from '../apps/server/src/runners/harness.js';
 import { Store } from '../apps/server/src/storage/store.js';
@@ -33,7 +34,7 @@ test('router rejects unknown agents', async () => { await assert.rejects(route('
 test('each specialist has an independent checker and accepted artifact', async () => {
   const directory = await temp();
   for (const role of ROLES) {
-    const result = await runPair({ role, brief, context: { plan: { ...clone(defaults.planner), title: brief.title } }, ...await route(role), directory });
+    const result = await runPair({ role, brief, context: { plan: { ...clone(defaults.planner), title: brief.title },memory:{dependencies:CORE_ROLES.map(role=>({role,hash:role,artifact:clone(defaults[role])}))} }, ...await route(role), directory });
     assert.equal(result.status, 'accepted', role); assert.equal(result.report.verdict, 'pass');
     assert.deepEqual(JSON.parse(await readFile(join(directory, role, 'accepted.json'), 'utf8')), result.artifact);
   }
@@ -62,7 +63,7 @@ test('human context resumes the loop and exact-build approval is required', asyn
   const m = await manager(); const run = await m.create({ ...brief, difficulty: '' }); await settle(m, run.id);
   assert.equal(run.status, 'awaiting_human'); assert.equal(run.build, null);
   await m.act(run.id, 'answer', { questionId: run.questions[0].id, answer: 'beginner' }); await settle(m, run.id);
-  assert.equal(run.status, 'awaiting_review'); assert.equal(Object.keys(run.results).length, 6);
+  assert.equal(run.status, 'awaiting_review'); assert.equal(Object.keys(run.results).length, activeRoles(run.brief.genre).length);
   assert.equal(run.validation.passed, true); assert.equal(run.answers.length, 1);
   await assert.rejects(m.act(run.id, 'approve', { sha256: run.build.sha256, checks: {} }), /Playtest/);
   const checks = Object.fromEntries(HUMAN_CHECKS.map(key => [key, true]));
@@ -80,9 +81,9 @@ test('revision invalidates the previous build and the global step budget stops e
   await m.act(run.id, 'revise', { difficulty: 'experienced', music: true });
   assert.equal(run.build, null); await settle(m, run.id);
   assert.equal(run.status, 'awaiting_review'); assert.notEqual(run.build.sha256, original);
-  run.steps = 40; await m.save(run);
+  run.steps = policy.maxSteps; await m.save(run);
   await m.act(run.id, 'revise', { difficulty: 'beginner', music: false }); await settle(m, run.id);
-  assert.equal(run.status, 'stopped'); assert.ok(run.steps <= 40); assert.notEqual(run.build?.sha256, original);
+  assert.equal(run.status, 'stopped'); assert.ok(run.steps <= policy.maxSteps); assert.notEqual(run.build?.sha256, original);
 });
 test('cancel is terminal and saved interrupted runs recover as paused', async () => {
   const m = await manager(); const run = await m.create({ ...brief, difficulty: '' }); await settle(m, run.id);

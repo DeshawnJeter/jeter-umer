@@ -1,3 +1,4 @@
+import {policy} from '../shared/policies/index.js';
 import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -55,9 +56,9 @@ export const drivers = Object.freeze({
     return { passed: accepted === 1 && run.answers.length === 1 && run.brief.difficulty === run.answers[0].answer, observed: { accepted, recordedAnswers: run.answers.length, status: run.status }, evidence: ['Two competing answers entered the serialized human-action path'] };
   },
   budget: async payload => {
-    const { manager, run } = await planned(); run.steps = payload.startingSteps;
+    const { manager, run } = await planned(); run.steps = policy.maxSteps;
     await manager.act(run.id, 'approve_plan', { planHash: run.planHash }); await manager.jobs.get(run.id);
-    return { passed: run.status === 'stopped' && run.steps === 40 && run.build === null && !run.approval, observed: { status: run.status, steps: run.steps, build: Boolean(run.build) }, evidence: ['Started a disposable run at its configured step limit and attempted implementation'] };
+    return { passed: run.status === 'stopped' && run.steps === policy.maxSteps && run.build === null && !run.approval, observed: { status: run.status, steps: run.steps, build: Boolean(run.build) }, evidence: ['Started a disposable run at its configured step limit and attempted implementation'] };
   },
   cancelled: async () => {
     const { manager, run } = await planned(); await manager.act(run.id, 'cancel');

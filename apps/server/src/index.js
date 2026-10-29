@@ -5,6 +5,7 @@ import { Manager } from './orchestrator/manager.js';
 import { terminalStates } from '../../../shared/policies/index.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../shared/music.js';
 import {GAME_TYPES} from '../../../shared/game-types.js';
+import {EXTENSION_SPECS,activeRoles,dependenciesFor} from '../../../shared/specialists.js';
 const manager = new Manager(); await manager.initialize();
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be 1024–65535');
@@ -46,6 +47,8 @@ const server = createServer(async (req, res) => {
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
     if(url.pathname==='/api/game-catalog'&&req.method==='GET')return json(res,200,Object.entries(GAME_TYPES).map(([value,game])=>({value,label:game.name})));
+    if(url.pathname==='/api/agent-catalog')return json(res,200,{roles:['planner','gameplay','levels','ui','story','audio',...Object.keys(EXTENSION_SPECS)],jobs:EXTENSION_SPECS});
+    if(parts[0]==='api'&&parts[1]==='runs'&&parts.length===4&&parts[3]==='memory')return json(res,200,manager.get(parts[2]).memory||null);
     if (url.pathname === '/api/config') return json(res, 200, manager.runtime.publicConfig);
     if (url.pathname === '/api/music-catalog') return json(res, 200, { styles:Object.entries(MUSIC_STYLES).map(([value,entry])=>({value,label:entry.name})), instruments:[{value:'auto',label:'Let the agent choose'},...Object.entries(MUSIC_INSTRUMENTS).map(([value,entry])=>({value,label:entry.name}))] });
     if (url.pathname === '/api/runs') return json(res, 200, [...manager.runs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));

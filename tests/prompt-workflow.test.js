@@ -1,3 +1,4 @@
+import {activeRoles,CORE_ROLES,EXTENSION_SPECS} from '../shared/specialists.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,readFile} from 'node:fs/promises';
@@ -30,7 +31,7 @@ function modelRuntime({failFirst=false,invalidFirst=false,falseWarning,env={}}={
       if(failFirst&&!failed&&stage==='checker'){failed=true;value.review={...pass,verdict:'fail',findings:['Recheck the explicit choices against the source prompt']};}
     }else if(stage==='checker')value={review:clone(pass)};
     else{
-      const brief=data.brief,artifact=clone(defaults[role]);
+      const brief=data.brief,artifact=clone(Object.hasOwn(EXTENSION_SPECS,role)?data.artifactReference:defaults[role]);
       if(role==='planner')Object.assign(artifact,{title:brief.title,difficulty:brief.difficulty,objective:GAME_TYPES[brief.genre].objective});
       if(role==='levels')Object.assign(artifact,referenceLevel(brief.genre));
       if(role==='ui')Object.assign(artifact,{title:brief.title,theme:brief.theme,hud:hudFor(brief.genre),playerColor:ART_THEMES[brief.theme].playerColor,backgroundColor:ART_THEMES[brief.theme].backgroundColor});
@@ -107,7 +108,7 @@ test('real-mode extraction uses separate model worker/checker calls, budgets and
   assert.equal(run.status,'awaiting_plan',run.error);assert.equal(calls.length,4);assert.equal(run.providerUsage.calls,4);assert.equal(run.brief.title,'Neon Rescue');
   assert.deepEqual(calls.slice(0,2).map(c=>c.stage),['worker','checker']);assert.equal(calls[0].data.sourcePrompt,prompt);assert.ok(!calls[0].body.instructions.includes(prompt));
   assert.equal(run.modelResponses.filter(a=>a.operation==='resolve_brief').length,2);
-  await m.act(run.id,'approve_plan',{planHash:run.planHash});await m.jobs.get(run.id);assert.equal(run.status,'awaiting_review',run.error);assert.equal(run.providerUsage.calls,14);assert.deepEqual(run.results.ui.report.reviewSources,['openai','deterministic']);
+  await m.act(run.id,'approve_plan',{planHash:run.planHash});await m.jobs.get(run.id);assert.equal(run.status,'awaiting_review',run.error);assert.equal(run.providerUsage.calls,activeRoles(run.brief.genre).length*2+2);assert.deepEqual(run.results.ui.report.reviewSources,['openai','deterministic']);
 });
 test('failed extraction checks drive bounded proposal repairs and malformed extraction uses format recovery',async()=>{
   for(const option of [{failFirst:true},{invalidFirst:true}]){

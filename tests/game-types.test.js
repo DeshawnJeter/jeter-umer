@@ -1,3 +1,4 @@
+import {activeRoles,CORE_ROLES,EXTENSION_SPECS} from '../shared/specialists.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -39,7 +40,7 @@ test('every genre traverses all six checked roles and delivers rules with a hash
     await manager.initialize(); const run = await manager.create({ title: `${genre} test`, prompt: 'An adventure', genre, difficulty: 'beginner', music: false });
     await manager.jobs.get(run.id); assert.equal(run.status, 'awaiting_plan');
     await manager.act(run.id, 'approve_plan', { planHash: run.planHash }); await manager.jobs.get(run.id);
-    assert.equal(run.status, 'awaiting_review', run.error); assert.equal(Object.keys(run.results).length, 6);
+    assert.equal(run.status, 'awaiting_review', run.error); assert.equal(Object.keys(run.results).length, activeRoles(run.brief.genre).length);
     const folder = join(root, run.id, 'builds', '0');
     const config = JSON.parse(await readFile(join(folder, 'config.json'), 'utf8')); assert.equal(config.genre, genre);
     assert.match(await readFile(join(folder, 'rules.js'), 'utf8'), /roundOutcome/);

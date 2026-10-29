@@ -24,7 +24,7 @@ export function createMode(scene,ctx){
       if(guard.repath<=0){guard.path=route(guard.sprite,chasing?player:guard.waypoint);guard.repath=0.8;}
       let target=guard.path[0];if(target&&Phaser.Math.Distance.Between(guard.sprite.x,guard.sprite.y,target.x,target.y)<7){guard.path.shift();target=guard.path[0];}
       if(target){guard.facing=Math.atan2(target.y-guard.sprite.y,target.x-guard.sprite.x);scene.physics.moveTo(guard.sprite,target.x,target.y,chasing?(config.enemies?.chaseSpeed??110):(config.enemies?.patrolSpeed??58));}else{guard.sprite.setVelocity(0);guard.waypoint={x:guard.waypoint.x===72?648:72,y:guard.waypoint.y===72?408:72};guard.repath=0;}
-      cones.fillStyle(chasing?0xff4966:0xffcc66,0.13);cones.beginPath();cones.moveTo(guard.sprite.x,guard.sprite.y);for(let a=-0.6;a<=0.6;a+=0.1)cones.lineTo(guard.sprite.x+Math.cos(guard.facing+a)*200,guard.sprite.y+Math.sin(guard.facing+a)*200);cones.closePath();cones.fillPath();
+      cones.fillStyle(chasing?0xff4966:0xffcc66,0.13);cones.beginPath();cones.moveTo(guard.sprite.x,guard.sprite.y);for(let a=-0.6;a<=0.6;a+=0.1)cones.lineTo(guard.sprite.x+Math.cos(guard.facing+a)*(config.enemies?.visionRange??210),guard.sprite.y+Math.sin(guard.facing+a)*(config.enemies?.visionRange??210));cones.closePath();cones.fillPath();
       if(Phaser.Math.Distance.Between(player.x,player.y,guard.sprite.x,guard.sprite.y)<29&&time-lastHit>1.2){state.health--;lastHit=time;state.alert=100;ctx.audio.tone(120);if(state.health<=0)ctx.end('lost');}
     }
     state.alert=Phaser.Math.Clamp(state.alert+(spotted?(config.enemies?.alertRate??42):-12)*dt,0,100);if(state.alert>=99&&!wasAlert){alarms++;wasAlert=true;}if(state.alert<35)wasAlert=false;

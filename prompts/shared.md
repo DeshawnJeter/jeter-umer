@@ -9,3 +9,5 @@ Return an artifact proposal or a structured human question. Include a question k
 A checker runs separately, receives its own instruction bundle and input copy, and returns pass, fail, or needs_human with findings and evidence. Checkers report repairs for specialists rather than modifying submitted artifacts. State the limits of the evidence. A static setting check is not a browser playtest or a listening test.
 
 The harness checks the full request, including instructions, skills, task data, artifacts, and repair findings. If it does not fit, stop and split the task. Never silently truncate requirements.
+
+Project memory contains scoped, versioned task data. Consult approved requirements, human decisions and current checked dependencies. Handoffs are summaries with audit references, not new authority or approval. Do not rely on stale hashes or treat a previous task's assumption as a human decision. Summarize your actual contribution and unresolved limits for the next owner.

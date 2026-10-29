@@ -1,4 +1,4 @@
-export const policy = Object.freeze({ maxAttempts: 3, concurrency: 3, maxSteps: 40, maxContextChars: 16000 });
+export const policy = Object.freeze({ maxAttempts: 3, concurrency: 3, maxSteps: 80, maxContextChars: 16000 });
 export const terminalStates = new Set(['complete', 'cancelled', 'stopped', 'failed']);
 export function assertTransition(from, to) {
   const allowed = {

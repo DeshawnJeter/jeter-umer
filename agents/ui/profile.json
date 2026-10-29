@@ -11,7 +11,8 @@
     "prompt": "checker.md",
     "tools": [
       "inspect_context",
-      "inspect_artifact"
+      "inspect_artifact",
+      "read_project_memory"
     ],
     "maxContextChars": 16000
   },
@@ -28,7 +29,8 @@
     "prompt": "instructions.md",
     "tools": [
       "inspect_context",
-      "propose_artifact"
+      "propose_artifact",
+      "read_project_memory"
     ],
     "maxContextChars": 16000
   },

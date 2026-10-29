@@ -1,3 +1,4 @@
+import {activeRoles,CORE_ROLES,EXTENSION_SPECS} from '../shared/specialists.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -28,7 +29,7 @@ function response(value, overrides = {}) {
 }
 function fixture(role, stage, data) {
   if (stage === 'checker') return { verdict: 'pass', findings: [], evidence: ['Compared supplied artifact against task constraints'], question: null };
-  const artifact = clone(defaults[role]);
+  const artifact = clone(Object.hasOwn(EXTENSION_SPECS,role)?data.artifactReference:defaults[role]);
   if (role === 'planner') { artifact.title = data.brief.title; artifact.difficulty = data.brief.difficulty; }
   if (role === 'ui') artifact.title = data.context.plan.title;
   if (role === 'audio') artifact.music = data.brief.music;
@@ -73,13 +74,13 @@ test('request preserves instructions/data separation and disables storage/trunca
   req.limits = { maxContextChars: prepared.serialized.length - 1 };
   assert.throws(() => buildRequest(providerConfig(env).publicConfig, 'gameplay', 'worker', req), /context limit/);
 });
-test('all six worker/checker pairs use separate model requests with auditable usage', async () => {
+test('all active worker/checker pairs use separate model requests with auditable usage', async () => {
   const mock = transport(), manager = await liveManager(mock), run = await manager.create(brief); await idle(manager, run);
   assert.equal(run.status, 'awaiting_plan'); assert.equal(mock.calls.length, 2);
   await manager.act(run.id, 'approve_plan', { planHash: run.planHash }); await idle(manager, run);
-  assert.equal(run.status, 'awaiting_review'); assert.equal(run.mode, 'openai'); assert.equal(mock.calls.length, 12);
-  for (const role of ROLES) { const calls = mock.calls.filter(call => call.role === role); assert.equal(calls.length, 2); assert.equal(calls[0].body.model, 'synthetic-worker'); assert.equal(calls[1].body.model, 'synthetic-checker'); assert.deepEqual(run.results[role].report.reviewSources, ['openai', 'deterministic']); }
-  assert.equal(run.providerUsage.calls, 12); assert.equal(run.providerUsage.totalTokens, 1800); assert.equal(run.providerUsage.reservedTokens, 0);
+  assert.equal(run.status, 'awaiting_review'); assert.equal(run.mode, 'openai'); assert.equal(mock.calls.length, activeRoles(run.brief.genre).length*2);
+  for (const role of activeRoles(run.brief.genre)) { const calls = mock.calls.filter(call => call.role === role); assert.equal(calls.length, 2); assert.equal(calls[0].body.model, 'synthetic-worker'); assert.equal(calls[1].body.model, 'synthetic-checker'); assert.deepEqual(run.results[role].report.reviewSources, ['openai', 'deterministic']); }
+  assert.equal(run.providerUsage.calls, activeRoles(run.brief.genre).length*2); assert.equal(run.providerUsage.totalTokens, activeRoles(run.brief.genre).length*300); assert.equal(run.providerUsage.reservedTokens, 0);
   const persisted = await readFile(join(manager.store.folder(run.id), 'state.json'), 'utf8'); assert.ok(!persisted.includes(token));
   const audit = JSON.parse(await readFile(join(manager.store.folder(run.id), 'workspaces/generation-0/gameplay/attempt-1-checker.json'), 'utf8'));
   assert.equal(audit.request.execution.models.checker, 'synthetic-checker'); assert.ok(!JSON.stringify(audit).includes(token));
@@ -250,7 +251,7 @@ test('a complete game recovers worker/checker format errors while retaining inde
   });
   const manager=await liveManager(mock),run=await manager.create(brief);await idle(manager,run);assert.equal(run.status,'awaiting_plan');assert.equal(mock.calls.length,3);
   await manager.act(run.id,'approve_plan',{planHash:run.planHash});await idle(manager,run);
-  assert.equal(run.status,'awaiting_review');assert.equal(run.providerUsage.calls,14);assert.equal(run.modelResponses.length,14);assert.equal(run.modelResponses.filter(a=>a.outcome==='invalid_output').length,2);
+  assert.equal(run.status,'awaiting_review');assert.equal(run.providerUsage.calls,activeRoles(run.brief.genre).length*2+2);assert.equal(run.modelResponses.length,activeRoles(run.brief.genre).length*2+2);assert.equal(run.modelResponses.filter(a=>a.outcome==='invalid_output').length,2);
   assert.equal(run.results.audio.report.verdict,'pass');assert.deepEqual(run.results.audio.report.reviewSources,['openai','deterministic']);assert.equal(run.approval,undefined);
   assert.ok(run.events.some(event=>event.message.includes('response format recovered')));
 });
