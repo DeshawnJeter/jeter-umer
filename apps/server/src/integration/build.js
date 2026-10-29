@@ -9,6 +9,7 @@ export async function buildGame(folder, config) {
   await cp(resolve('shared/game-types.js'), resolve(folder, 'rules.js'));
   await cp(resolve('shared/art-catalog.js'), resolve(folder, 'art-catalog.js'));
   await cp(resolve('shared/music.js'), resolve(folder, 'score.js'));
+  await cp(resolve('shared/player-ui.js'), resolve(folder, 'player-ui.js'));
   await writeFile(resolve(folder, 'music-score.json'), JSON.stringify(config.audio.score || composeScore(), null, 2));
   await writeFile(resolve(folder, 'assets-manifest.json'), JSON.stringify({ ...ART_MANIFEST, theme: config.ui.theme || 'space' }, null, 2));
   await mkdir(resolve(folder, 'vendor'), { recursive: true });

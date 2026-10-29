@@ -6,6 +6,7 @@ export class GameAudio {
     this.score = config.score || composeScore();
     const errors = validateScore(this.score); if (errors.length) throw new Error(errors.join('; '));
     this.instrument = instrumentOf(this.score.instrument);
+    this.musicVolume = 1; this.sfxVolume = 1; this.musicMuted = false; this.sfxMuted = false;
     this.volume = safeVolume(config.volume); this.muted = !config.enabled; this.started = false; this.playing = false; this.disposed = false; this.nodes = []; this.sequences = []; this.scheduledNotes = 0;
   }
   async start() {
@@ -57,11 +58,13 @@ export class GameAudio {
   }
   update() {
     this.volume = safeVolume(this.volume);
-    if (this.gain) this.gain.gain.value = this.muted ? 0 : this.volume;
-    if (this.musicGain) this.musicGain.gain.rampTo(this.muted ? 0 : this.volume * 0.55, 0.05);
+    this.musicVolume = Number.isFinite(this.musicVolume) ? Math.max(0, Math.min(1, this.musicVolume)) : 0;
+    this.sfxVolume = Number.isFinite(this.sfxVolume) ? Math.max(0, Math.min(1, this.sfxVolume)) : 0;
+    if (this.gain) this.gain.gain.value = this.muted || this.sfxMuted ? 0 : this.volume * this.sfxVolume;
+    if (this.musicGain) this.musicGain.gain.rampTo(this.muted || this.musicMuted ? 0 : this.volume * 0.55 * this.musicVolume, 0.05);
   }
   tone(frequency) {
-    if (!this.context || this.muted || this.disposed || !Number.isFinite(frequency) || frequency < 100 || frequency > 2000) return;
+    if (!this.context || this.muted || this.sfxMuted || this.sfxVolume === 0 || this.disposed || !Number.isFinite(frequency) || frequency < 100 || frequency > 2000) return;
     const oscillator = this.context.createOscillator(), envelope = this.context.createGain();
     oscillator.frequency.value = frequency; envelope.gain.setValueAtTime(0.35, this.context.currentTime);
     envelope.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.16);
