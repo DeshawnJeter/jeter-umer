@@ -41,3 +41,8 @@ test('initial inspect exceptions report initialization guidance without reflecti
  const source=DEFAULT_SOURCE.replace('nodes:[{x:player.x',"nodes:[{x:(()=>{throw Error('UNTRUSTED_ERROR_CANARY')})()");
  const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,false);assert.match(report.error,/Initialize all arrays/);assert.ok(!report.error.includes('UNTRUSTED_ERROR_CANARY'));
 });
+
+test('render node overflow reports the observed count as a trusted repair finding',async()=>{
+ const source=DEFAULT_SOURCE.replace("nodes:[{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]","nodes:Array.from({length:65},()=>({x:1,y:1,color:'#66e3bd',size:2,label:''}))");
+ const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,false);assert.match(report.error,/65 nodes.*64/);
+});

@@ -14,7 +14,7 @@ export async function invokeCodingTool(request,call){
   if(!args||typeof args!=='object'||Array.isArray(args)||Object.keys(args).sort().join()!==Object.keys(properties).sort().join()||Object.entries(properties).some(([key,rule])=>(rule.type==='integer'?!Number.isInteger(args[key]):typeof args[key]!==rule.type)||rule.minimum!==undefined&&args[key]<rule.minimum||rule.maximum!==undefined&&args[key]>rule.maximum||rule.maxLength!==undefined&&args[key].length>rule.maxLength||rule.enum&&!rule.enum.includes(args[key])))throw Error('Invalid coding tool arguments');
   let value;
   if(call.name==='inspect_components')value=await request.tools.inspect_components();
-  if(call.name==='read_source'){const source=await request.tools.read_source(args.path),lines=source.split('\n');value={startLine:args.startLine,totalLines:lines.length,source:lines.slice(args.startLine-1,args.startLine-1+args.maxLines).join('\n').slice(0,1600)};}
+  if(call.name==='read_source'){const source=await request.tools.read_source(args.path),lines=source.split('\n');value={startLine:args.startLine,totalLines:lines.length,source:lines.slice(args.startLine-1,args.startLine-1+args.maxLines).join('\n').slice(0,1600),truncated:lines.slice(args.startLine-1,args.startLine-1+args.maxLines).join('\n').length>1600};}
   if(call.name==='search_source')value=await request.tools.search_source(args.query);
   if(call.name==='apply_source_patch')value=await request.tools.apply_source_patch(args);
   if(call.name==='run_rule_checks')value=await request.tools.run_rule_checks(args.scenarios);
