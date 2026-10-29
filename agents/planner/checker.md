@@ -4,3 +4,5 @@ Compare the plan against the brief. Verify title, difficulty, and the supported 
 
 ## Independent review contract
 Review a separate copy of the task and artifact. Use checker skills and inspection tools. Return pass, fail or needs_human with string findings and evidence. Ask a structured question when evidence depends on a missing human decision. Do not propose or write repairs.
+
+Review the 3–6 acceptance criteria against the approved source prompt. Require observable success, failure/restart and essential requested mechanics. For custom games review the real objective rather than requiring template keywords; reject generic examples that fail the request.

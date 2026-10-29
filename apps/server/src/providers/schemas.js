@@ -26,7 +26,7 @@ export function decodeResolutionOutput(stage,value) {
 }
 const point = object({ x: { type: 'integer' }, y: { type: 'integer' } });
 const artifacts = {
-  planner: object({ title: boundedText(60), objective: boundedText(180), difficulty: { type: 'string', enum: ['beginner', 'experienced'] } }),
+  planner: object({ title: boundedText(60), objective: boundedText(180), difficulty: { type: 'string', enum: ['beginner', 'experienced'] },acceptance:{type:'array',items:boundedText(180),minItems:3,maxItems:6} }),
   gameplay: object({ speed: number, timeLimit: number }),
   levels: object({ spawn: point, exit: point, stars: array(point), walls: array(point) }),
   ui: object({ title: boundedText(60), playerColor: string, backgroundColor: string, theme: { type: 'string', enum: ['space', 'forest', 'neon'] }, hud: object({ layout: { type:'string', enum:['cards','compact'] }, stats: array({ type:'string', enum:HUD_STATS }) }) }),
