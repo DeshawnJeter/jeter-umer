@@ -99,4 +99,6 @@ Validation: 124 automated tests passed; the expanded regression suite checks shi
 
 The new feature branches are stacked after prompt-only PR #22, all targeting development, in this merge order: advanced-game-foundation → turn-based-rpg → front-view-battles → stealth-games → scrolling-shooter → jump-shooter → metroidvania-games → expanded-game-validation (all prefixed codex/). Preserve ancestry with merge commits, or rebase downstream branches if prerequisites are squashed. Existing exported builds and their approvals remain unchanged; create a fresh game to receive the new runtimes.
 
+RPG playtest fixes: battle button hints now follow saved attack/spell/potion key bindings and refresh immediately after remapping or resetting controls. Rejected actions do not play a successful action sound, spend resources or advance a turn. Attack/spell targets must be integer enemy indices, so malformed or prototype-key targets are rejected. Browser testing completed all three encounters and the final portal, potion depletion/full-health rejection, zero-MP rejection, targeting, level-up, party defeat and restart. A fresh real-model build passed all six agent/checker pairs; the full regression suite passes 127 tests. The fixes branch is stacked on expanded-game-validation PR #30. Human approval remains separate from these tests.
+
 

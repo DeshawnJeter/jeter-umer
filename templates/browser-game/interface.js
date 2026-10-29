@@ -59,6 +59,7 @@ export class PlayerInterface {
     const hint = actions.map(action => `${action}: ${this.settings.bindings[action].map(keyLabel).join(' / ')}`).join(' · ');
     $('#instructions').textContent = `${hint}. Escape pauses. ${this.config.planner.objective}`;
     if (focusAction) $('#bindings').querySelector(`[aria-label="Change ${focusAction} control"]`)?.focus();
+    this.onControlsChanged?.();
   }
   keydown(event) {
     if (event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
