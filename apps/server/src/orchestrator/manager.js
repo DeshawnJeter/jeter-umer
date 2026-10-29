@@ -89,7 +89,14 @@ export class Manager {
     const handlers = this.router ? await this.router(role) : await this.runtime.route(role, {
       signal: this.controllers.get(run.id)?.signal,
       reserve: estimate => this.reserveCall(run, estimate),
-      finish: async (usage, estimate) => { finishUsage(run.providerUsage, usage, estimate); await this.save(run); }
+      finish: async (usage, estimate) => { finishUsage(run.providerUsage, usage, estimate); await this.save(run); },
+      onAttempt: async audit => {
+        run.modelResponses ??= [];
+        run.modelResponses.push({ ...audit, generation:run.generation, at:new Date().toISOString() });
+        if (audit.outcome === 'invalid_output') await this.event(run, `${role} ${audit.stage}: response format rejected (${audit.code}, request ${audit.attempt}); bounded repair applies.`);
+        else if (audit.outcome === 'accepted' && audit.attempt > 1) await this.event(run, `${role} ${audit.stage}: response format recovered on request ${audit.attempt}.`);
+        else await this.save(run);
+      }
     });
     const task = makeTask(role, run.generation);
     if (role !== 'planner') task.dependencies = [run.tasks.planner.id, 'human:plan-approval'];

@@ -18,8 +18,8 @@ export function createRuntime({ env = process.env, fetchImpl } = {}) {
         return client.generate(role, 'worker', request, hooks);
       },
       checker: async request => {
-        const modelReport = await client.generate(role, 'checker', request, hooks);
         const localReport = await deterministic.checker(request);
+        const modelReport = await client.generate(role, 'checker', { ...request, deterministicReview:structuredClone(localReport) }, hooks);
         const evidence = [...modelReport.evidence.map(item => `Model static review: ${item}`), ...localReport.evidence.map(item => `Deterministic check: ${item}`)];
         if (modelReport.verdict === 'needs_human') return { ...modelReport, evidence, reviewSources: ['openai', 'deterministic'] };
         const findings = [...modelReport.findings, ...localReport.findings];
