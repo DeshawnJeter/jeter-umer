@@ -34,7 +34,13 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     const drive=async(targetFor,steps=80)=>{
       for(let i=0;i<steps;i++){const s=await state();collect(s);if(s.phase!=='playing')return s;const target=targetFor(s);if(!target)return s;
         if(Math.hypot(target.x-s.x,target.y-s.y)<24){await advance(250);continue;}
-        let next=target;if(!['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)){const path=gridPath(s.roomMap||config.levels,{x:s.x,y:s.y},target);if(path===null)throw Error('Input replay target is unreachable');next=path[0]||target;}
+        let next=target;if(!['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)){const path=gridPath(s.roomMap||config.levels,{x:s.x,y:s.y},target);if(path===null)throw Error('Input replay target is unreachable');next=path[0]||target;
+          // A tile path assumes centered turns. Align before crossing a corner
+          // so the player's collision body cannot snag a neighboring wall.
+          const cx=Math.floor(s.x/48)*48+24,cy=Math.floor(s.y/48)*48+24;
+          if(path.length&&Math.abs(next.x-cx)>1&&Math.abs(s.y-cy)>3)next={x:s.x,y:cy};
+          else if(path.length&&Math.abs(next.y-cy)>1&&Math.abs(s.x-cx)>3)next={x:cx,y:s.y};
+        }
         const dx=next.x-s.x,dy=next.y-s.y,key=['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)?(dx<0?'ArrowLeft':'ArrowRight'):Math.abs(dx)>Math.abs(dy)?(dx<0?'ArrowLeft':'ArrowRight'):(dy<0?'ArrowUp':'ArrowDown');
         await page.keyboard.down(key);await advance(Math.min(200,Math.max(40,Math.max(Math.abs(dx),Math.abs(dy))/config.gameplay.speed*1000)));await page.keyboard.up(key);
       }return state();
@@ -59,6 +65,25 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
       if(['rpg','campaign','roguelike'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
       assert(await page.getByRole('button',{name:'Guard / next party member',exact:true}).count(),'No reachable battle controls');
       await click('Guard / next party member');const beforeSpell=await state(),cost=config.combat?.spellCost??2;await click(`Spell · ${cost} MP (K)`);const afterSpell=await state();assert(afterSpell.mana===beforeSpell.mana-cost,'Spell did not spend the configured MP');assert((afterSpell.events||[]).some(event=>event.type==='spell_cast'),'Spell did not publish its presentation event');report.tests.push({name:'spell resource and VFX event',passed:true});
+      assert(afterSpell.presentation==='battle','Encounter did not use a separate battle presentation');
+      if(['campaign','roguelike'].includes(config.genre)){
+        const rooms=config.genre==='roguelike'?5:3;
+        for(let room=0;room<rooms;room++){
+          if(room){const p=(await state()).roomMap.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),100);}
+          for(let turn=0;turn<60&&!await page.getByRole('button',{name:'Return to exploration',exact:true}).count();turn++){
+            const s=await state();assert(s.phase==='playing','Party failed during campaign completion probe');
+            const potion=page.getByRole('button',{name:/^Potion \(/}),spell=page.getByRole('button',{name:/^Spell ·/});
+            if(s.party.some(p=>p.hp>0&&p.hp<=p.maxHp-5)&&await potion.isEnabled())await potion.click({force:true});
+            else if(await spell.isEnabled())await spell.click({force:true});else await page.getByRole('button',{name:/^Attack \(/}).click({force:true});
+            await advance(40);
+          }
+          await click('Return to exploration');const beforeExit=await state();assert(beforeExit.presentation==='overworld','Battle backdrop did not return to overworld');
+          const exit=beforeExit.roomMap.exit;await drive(s=>s.room===room?{x:exit.x*48+24,y:exit.y*48+24}:null,140);
+          const afterExit=await state();assert(afterExit.health===beforeExit.health&&afterExit.mana===beforeExit.mana&&afterExit.potions===beforeExit.potions,'Level transition reset party resources');
+          assert(room===rooms-1?afterExit.phase==='won':afterExit.room===room+1,'Exit did not advance the campaign');
+        }
+        report.tests.push({name:'all level exits, battle backgrounds and persistent party resources',passed:true,rooms});
+      }
       await click('Restart');await click('Start game');if(['rpg','campaign','roguelike'].includes(config.genre)){const p=(await state()).roomMap?.stars[0]||config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
       for(let i=0;i<100&&(await state()).phase==='playing';i++){await click('Guard / next party member');}
     }else if(config.genre==='stealth'){
