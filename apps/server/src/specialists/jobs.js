@@ -27,6 +27,7 @@ export async function work(role,request){const artifact=referenceFor(role,reques
 export async function check(role,request){
   const {artifact,context={}}=request,findings=extensionErrors(role,artifact);
   if(!findings.length){
+    if(role==='vfx'&&artifact.particlesPerBurst>artifact.maxParticles)findings.push('VFX burst must fit the bounded particle pool');
     if(role==='enemies'&&artifact.chaseSpeed<artifact.patrolSpeed)findings.push('Chase speed must not be slower than patrol speed');
     if(role==='enemies'&&!Object.values(enemyFairnessEvidence(artifact)).every(Boolean))findings.push('Enemy warning, cooldown, occlusion or stuck-recovery probes failed');
     if(role==='enemies'&&request.brief.genre==='stealth'&&!Object.values(stealthBehaviorEvidence(artifact)).every(Boolean))findings.push('Stealth behavior must investigate, pursue through lost sight, search, recover and respect walls');

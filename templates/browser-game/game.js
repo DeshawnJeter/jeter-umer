@@ -1,4 +1,5 @@
 import {createGameEvents} from './game-events.js';
+import {GameVfx} from './vfx.js';
 import { PlayerInterface } from './interface.js';
 import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
@@ -26,7 +27,7 @@ const musicInfo = document.createElement('p'); musicInfo.id = 'music-info'; musi
 document.querySelector('#mute').textContent = audio.muted ? 'Unmute' : 'Mute';
 document.querySelector('#mute').setAttribute('aria-pressed', String(audio.muted));
 const state = { ready: false, genre, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, health: 3, x: 0, y: 0 };
-let events,scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
+let events,vfx,scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
 const held = new Set(); let touchJump = false;
 const ui = new PlayerInterface({ config, genre, state, audio, held, onJump: () => { touchJump = true; },
   onPause: () => { held.clear(); touchJump = false; scene?.scene.pause(); },
@@ -48,7 +49,7 @@ class WorkshopGame extends Phaser.Scene {
     scene = this;events=createGameEvents();const sceneEvents=events;this.physics.resume(); elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
     Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3,failureReason:null });
     message.textContent = config.story.intro;
-    createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
+    vfx=new GameVfx(this,events,config.vfx,()=>ui.settings);const sceneVfx=vfx;createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
     const walls = this.physics.add.staticGroup();
     for (const wall of config.levels.walls) {
       const box = this.add.image(center(wall.x), center(wall.y), 'wall');
@@ -91,12 +92,12 @@ class WorkshopGame extends Phaser.Scene {
       this.physics.add.collider(enemies, walls); this.physics.add.collider(enemies, enemies);
       this.physics.add.overlap(player, enemies, () => {
         if (state.phase !== 'playing' || elapsed - lastDamage < 1.2) return;
-        state.health--;events.emit('damage_taken',{x:player.x,y:player.y,amount:1}); lastDamage = elapsed; audio.tone(120); this.cameras.main.shake(120, 0.006);
+        state.health--;events.emit('damage_taken',{x:player.x,y:player.y,amount:1}); lastDamage = elapsed; audio.tone(120);
         if (state.health <= 0) end('lost');
       });
     }
     ui.render();
-    this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false);sceneEvents.dispose(); });
+    this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false);sceneVfx.dispose();sceneEvents.dispose(); });
   }
   update(_, delta) {
     if (!player) return;
@@ -120,7 +121,7 @@ class WorkshopGame extends Phaser.Scene {
       if (x) player.setFlipX(x < 0);
       const outcome = roundOutcome(state); if (outcome !== 'playing') end(outcome);
     } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
-    state.x = player.x; state.y = player.y;
+    vfx?.update(delta/1000);state.x = player.x; state.y = player.y;
     document.querySelector('#game').dataset.phase=state.phase;
     const text = `${state.phase.toUpperCase()} · Stars ${state.score}/${state.required} · ${Math.ceil(state.remaining)}s${genre === 'survival' ? ` · Shields ${state.health}/3` : ''}`;
     if (text !== lastHud) { status.textContent = text; ui.render(); lastHud = text; }
@@ -142,5 +143,5 @@ for (const button of document.querySelectorAll('[data-control]')) {
 window.addEventListener('blur', () => { held.clear(); ui.clearInput(); if (state.phase === 'playing') ui.pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing') ui.pause(); });
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
-window.gameState = () => ({ ...state, errors: [...errors],events:events?.inspect()||[], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
+window.gameState = () => ({ ...state, errors: [...errors],events:events?.inspect()||[],vfx:vfx?.inspect(), muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
 }
