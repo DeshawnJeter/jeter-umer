@@ -41,7 +41,7 @@ class WorkshopGame extends Phaser.Scene {
     scene = this; elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
     Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3 });
     message.textContent = config.story.intro;
-    createArt(this, config.ui); drawBackdrop(this, config.ui);
+    createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
     const walls = this.physics.add.staticGroup();
     for (const wall of config.levels.walls) {
       const box = this.add.image(center(wall.x), center(wall.y), 'wall');
