@@ -36,3 +36,8 @@ test('a failing win replay does not hide the independently failing loss replay',
  const cases=JSON.parse(DEFAULT_SCENARIOS);for(const c of cases)c.steps=[{dt:0.1,input:{}}];
  const report=await runCodeChecks({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)});assert.equal(report.passed,false);assert.equal(report.tests.filter(test=>!test.passed).length,2);assert.match(report.error,/Expected won/);assert.match(report.error,/Expected lost/);
 });
+
+test('initial inspect exceptions report initialization guidance without reflecting thrown source text',async()=>{
+ const source=DEFAULT_SOURCE.replace('nodes:[{x:player.x',"nodes:[{x:(()=>{throw Error('UNTRUSTED_ERROR_CANARY')})()");
+ const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,false);assert.match(report.error,/Initialize all arrays/);assert.ok(!report.error.includes('UNTRUSTED_ERROR_CANARY'));
+});

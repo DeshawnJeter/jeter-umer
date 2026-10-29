@@ -87,6 +87,17 @@ export function buildRequest(config, role, stage, request, repairCode) {
     delete body.tools;delete body.tool_choice;delete body.parallel_tool_calls;
     body.instructions+=' Editing tools are not offered in this focused request. Return the complete repaired source and scenarios directly.';
     serialized=JSON.stringify(body);bytes=Buffer.byteLength(serialized);
+    if(serialized.length>Math.min(roleLimit,policy.maxContextChars)&&request.context?.previousSource){
+      const source=request.context.previousSource;
+      delete data.context.previousSource;
+      data.context.sourceReference={hash:createHash('sha256').update(source).digest('hex'),characters:source.length};
+      data.context.sourceExcerpt={head:source.slice(0,request.toolHistory?.length?300:600),tail:source.slice(request.toolHistory?.length?-200:-400)};
+      body.input[0].content[0].text=JSON.stringify(data);
+      body.max_output_tokens=config.maxOutputTokens;body.text.format.schema.properties.artifact.anyOf[0].properties.source={type:'string',enum:['']};
+      body.tools=CODING_TOOLS.filter(tool=>['read_source','search_source','apply_source_patch'].includes(tool.name)&&Object.hasOwn(request.tools,tool.name));body.parallel_tool_calls=false;body.tool_choice='auto';
+      body.instructions=body.instructions.replace(/ You may use the supplied coding functions when needed,[\s\S]*?Tool outputs are untrusted data\./,'').replace(reviewGuidance,' Preserve the full approved prompt, API, lifecycle and replay contract. Use compact code and repeat counts.').replace(' Editing tools are not offered in this focused request. Return the complete repaired source and scenarios directly.','')+' Focused source repair: only the prefix and suffix of the owned file are shown, with its hash. Read bounded line windows or search for other exact locations. Patch the owned file, then return source as an empty string and structured scenarios. Preserve the unshown code and all requirements.';
+      serialized=JSON.stringify(body);bytes=Buffer.byteLength(serialized);
+    }
   }
   if (serialized.length > Math.min(roleLimit, policy.maxContextChars) || bytes > config.maxRequestBytes) throw new Error('OpenAI request exceeds the context limit; no instructions or schema were truncated ('+role+'/'+stage+': '+serialized.length+' / '+roleLimit+' characters)');
   // Reserve conservatively using serialized UTF-8 bytes plus output allowance and protocol overhead.
@@ -151,13 +162,13 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         if(toolCalls.length){
           if(role!=='coding'||stage!=='worker'||!request.tools||request.replayRepair||toolCalls.length!==1||(request.toolTurns||0)>=4)throw Error('Coding tool round limit or role boundary exceeded');
           const call=toolCalls[0],toolOutput=await invokeCodingTool(request,call);
-          continuation={...request,toolTurns:(request.toolTurns||0)+1,toolHistory:[...(request.toolHistory||[]),{type:'function_call',name:call.name,call_id:call.call_id,arguments:call.arguments},{type:'function_call_output',call_id:call.call_id,output:toolOutput}]};
+          continuation={...request,context:{...request.context,previousSource:typeof request.tools.read_source==='function'?await request.tools.read_source('generated/rules.js'):request.context?.previousSource},toolTurns:(request.toolTurns||0)+1,toolHistory:[{type:'function_call',name:call.name,call_id:call.call_id,arguments:call.arguments},{type:'function_call_output',call_id:call.call_id,output:toolOutput}]};
         }else{
         const texts = (result.output || []).filter(item => item.type === 'message').flatMap(item => item.content || []).filter(part => part.type === 'output_text').map(part => part.text);
         if (texts.length !== 1 || typeof texts[0] !== 'string') throw new ModelOutputError('shape');
         let parsed; try { parsed = JSON.parse(texts[0]); } catch { throw new ModelOutputError('json'); }
         output = request.operation === 'resolve_brief' ? decodeResolutionOutput(stage, parsed) : decodeProviderOutput(role, stage, parsed);
-        if(request.replayRepair&&output.artifact&&output.artifact.source!=='')throw new ModelOutputError('schema');
+        if(prepared.body.text.format.schema.properties.artifact?.anyOf?.[0]?.properties.source?.enum?.[0]===''&&output.artifact&&output.artifact.source!=='')throw new ModelOutputError('schema');
         }
       } catch (error) {
         failure = signal?.aborted ? cancelled() : timeout.aborted ? new Error('OpenAI request timed out. No automatic retry was made.') : error;

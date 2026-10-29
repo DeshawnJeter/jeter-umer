@@ -44,7 +44,7 @@ test('syntax-rejected proposals become the actual repair draft and survive an ex
   if(body.text.format.name==='coding_worker'){
    workers++;
    if(workers===1)return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:broken,scenarios:DEFAULT_SCENARIOS},question:null,summary:'Invalid draft fixture'})}]}]);
-   assert.equal(data.context.previousSource,broken);
+   assert.equal(data.context.previousSource,workers===2?broken:DEFAULT_SOURCE);
    if(workers===2)return response([call('apply_source_patch',{path:'generated/rules.js',find:broken,replacement:DEFAULT_SOURCE})]);
    return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:'',scenarios:DEFAULT_SCENARIOS},question:null,summary:'Repaired draft fixture'})}]}]);
   }
@@ -81,4 +81,10 @@ test('replay structure repairs preserve the exact source that passed lifecycle c
 test('a scenarios-only worker cannot replace its locked source',async()=>{
  let calls=0;const directory=await mkdtemp(join(tmpdir(),'replay-source-lock-'));
  await assert.rejects(runPair({role:'coding',brief:{genre:'custom',difficulty:'beginner'},directory,worker:async()=>({artifact:{source:++calls===1?DEFAULT_SOURCE:'changed',scenarios:DEFAULT_SCENARIOS},summary:'fixture'}),verifyProposal:async()=>({passed:false,tests:[{name:'replay structure',passed:false,error:'Fixture error'},{name:'Start without input',passed:true}]}),checker:async()=>{throw Error('Must not review');}}),/Replay-only repair cannot change/);
+});
+
+test('source reads return bounded line windows and reject invalid ranges',async()=>{
+ const {invokeCodingTool}=await import('../apps/server/src/providers/coding-tools.js');const source=Array.from({length:100},(_,i)=>'line '+(i+1)).join('\n'),request={tools:{read_source:async()=>source}};
+ const result=JSON.parse(await invokeCodingTool(request,call('read_source',{path:'generated/rules.js',startLine:50,maxLines:2})));assert.equal(result.source,'line 50\nline 51');assert.equal(result.totalLines,100);
+ await assert.rejects(invokeCodingTool(request,call('read_source',{path:'generated/rules.js',startLine:0,maxLines:2})),/Invalid coding tool arguments/);
 });

@@ -29,7 +29,7 @@ export async function reviewedRepair(folder,request,maxAttempts){
    if(workerText.length>100000||checkerText.length>100000)break;
    const worker=JSON.parse(workerText),checker=JSON.parse(checkerText),report=checker.report;
    if(repairIdentity(worker.request)!==repairIdentity(request)||fingerprint(worker.result?.artifact)!==fingerprint(checker.request?.artifact)||report?.verdict!=='fail'||report.question||!report.findings?.length||report.findings.some(value=>typeof value!=='string'||!value.trim()))break;
-   found={attempt:attempt+1,findings:report.findings,codeExecution:checker.request.codeExecution,source:worker.result.artifact?.source};
+   found={attempt:attempt+1,findings:report.findings,codeExecution:checker.request.codeExecution,source:worker.result.artifact?.source,artifact:worker.result.artifact};
   }catch{break;}
  }
  return found;

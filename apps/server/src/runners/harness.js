@@ -35,7 +35,14 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
   const workspace=role==='coding'?codeWorkspace(folder):null;
   const questions = []; let findings = [];
   const prior=role==='coding'?await reviewedRepair(folder,{...workerBundle,...clone(input),findings:[],attempt:1,limits:{maxContextChars:profile.worker.maxContextChars,maxOutputChars:profile.worker.maxOutputChars}},profile.maxAttempts):null;
-  if(prior)findings=prior.findings;
+  if(prior){
+    findings=prior.findings;
+    if(prior.codeExecution?.passed===false&&verifyProposal&&prior.source===await workspace.read()){
+      await onEvent({role,stage:'rechecking_saved_source',attempt:prior.attempt});
+      const refreshed=await verifyProposal(prior.artifact);await writeFile(resolve(folder,'repair-preflight-'+prior.attempt+'.json'),JSON.stringify(refreshed,null,2));prior.codeExecution=refreshed;
+      const actual=(refreshed.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);if(actual.length)findings=actual;
+    }
+  }
   let previousExecution=prior?.codeExecution,previousProposalSource=prior?.source;
   for (let attempt = prior?.attempt??1; attempt <= profile.maxAttempts; attempt++) {
     const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt, limits: { maxContextChars: profile.worker.maxContextChars, maxOutputChars: profile.worker.maxOutputChars } };
