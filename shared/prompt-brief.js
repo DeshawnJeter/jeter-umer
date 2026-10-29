@@ -3,12 +3,12 @@ import {GAME_TYPES} from './game-types.js';
 export const SETTING_KEYS = ['title','genre','theme','difficulty','music','musicStyle','musicInstrument'];
 export const PROMPT_DEFAULTS = Object.freeze({title:'My Prompt Game',genre:'collector',theme:'space',difficulty:'beginner',music:false,musicStyle:'adventure',musicInstrument:'auto'});
 const unsupportedPatterns = [
-  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'RPG battles require the party RPG or front-view battle template.',['rpg','front_battle']],
+  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'RPG battles require the party RPG or front-view battle template.',['rpg','front_battle','campaign']],
   [/\bstealth\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?metal gear\b/i,'Stealth requires the stealth mission template.',['stealth']],
   [/\b(?:shoot(?:ing|er)?|projectiles?|weapons?)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:contra|mega\s?man)\b/i,'Shooting requires a shooter or exploration template.',['run_gun','jump_shooter','metroidvania']],
   [/\bmetroidvania\b/i,'Ability-gated exploration requires the metroidvania template.',['metroidvania']],
   [/\b(?:3d|first[- ]person exploration)\b/i,'3D and first-person exploration are not supported.'],
-  [/\binventory\b/i,'Inventory is limited to party potions in the RPG/battle templates.',['rpg','front_battle']],
+  [/\binventory\b/i,'Inventory is limited to party potions in the RPG/battle templates.',['rpg','front_battle','campaign']],
   [/\bcrafting\b/i,'Crafting is not supported.'],
   [/\bboss(?:es)?\b/i,'Boss encounters require an RPG or shooter template.',['rpg','front_battle','run_gun','jump_shooter']],
   [/\bmultiplayer\b/i,'Multiplayer is not supported.']
@@ -61,7 +61,7 @@ export function demoResolve(prompt) {
     if(matches.length)result[key]=matches[0][0];
     if(matches.length!==1)result.assumptions.push(matches.length?'Conflicting '+key+' cues; suggested '+result[key]+'.':fallbackNote);
   };
-  select('genre',[['front_battle',/front[- _]?(?:view|battle)|dragon warrior/i],['metroidvania',/metroidvania/i],['jump_shooter',/jump[- _]?(?:and[- _]?)?shoot|mega\s?man/i],['run_gun',/run[- _]?(?:and[- _]?)?gun|side[- ]scroll.*shoot|contra/i],['stealth',/stealth|metal gear/i],['rpg',/rpg|role[- ]playing|turn[- ]based|final fantasy/i],['platformer',/platform|jump/i],['maze',/maze|labyrinth/i],['survival',/surviv|arena|dodge.*drones/i],['collector',/collect|stars/i]].filter(([id])=>Object.hasOwn(GAME_TYPES,id)),'No clear supported game type; suggested star collector.');
+  select('genre',[['campaign',/multi[- ]level|campaign|multiple levels/i],['front_battle',/front[- _]?(?:view|battle)|dragon warrior/i],['metroidvania',/metroidvania/i],['jump_shooter',/jump[- _]?(?:and[- _]?)?shoot|mega\s?man/i],['run_gun',/run[- _]?(?:and[- _]?)?gun|side[- ]scroll.*shoot|contra/i],['stealth',/stealth|metal gear/i],['rpg',/rpg|role[- ]playing|turn[- ]based|final fantasy/i],['platformer',/platform|jump/i],['maze',/maze|labyrinth/i],['survival',/surviv|arena|dodge.*drones/i],['collector',/collect|stars/i]].filter(([id])=>Object.hasOwn(GAME_TYPES,id)),'No clear supported game type; suggested star collector.');
   select('theme',[['neon',/neon|cyber/i],['forest',/forest|woodland|garden/i],['space',/space|astral|cosmic/i]],'No clear supported art theme; suggested space.');
   select('difficulty',[['experienced',/experienced|expert|hard|challenging/i],['beginner',/beginner|easy|friendly/i]],'No difficulty specified; suggested beginner.');
   select('musicStyle',[['chiptune',/chiptune|retro|8[- ]bit/i],['lofi',/lo[- ]?fi/i],['mysterious',/mysterious|mystery/i],['cinematic',/cinematic/i],['dance',/dance|electronic/i],['arcade',/arcade|energetic/i],['calm',/calm|ambient/i],['adventure',/adventure/i]],'No music style specified; suggested adventure if music is enabled.');

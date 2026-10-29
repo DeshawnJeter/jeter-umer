@@ -1,5 +1,6 @@
 // Trusted capabilities, never model-controlled code or asset paths.
 export const ADVANCED_PROFILES = Object.freeze({
+  campaign:{health:20,mana:6,actions:['left','right','up','down','attack','ability','interact'],hud:['health','mana','objective'],manaLabel:'Party MP'},
   rpg:{health:20,mana:6,actions:['left','right','up','down','attack','ability','interact'],hud:['health','mana','objective'],manaLabel:'Party MP'},
   front_battle:{health:20,mana:6,actions:['attack','ability','interact'],hud:['health','mana','objective'],manaLabel:'Party MP'},
   stealth:{health:4,mana:0,actions:['left','right','up','down','ability'],hud:['health','alert','objective']},
