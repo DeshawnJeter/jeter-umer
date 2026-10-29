@@ -1,10 +1,13 @@
 import { mkdir, cp, writeFile, readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
+import { ART_MANIFEST } from '../../../../shared/art-catalog.js';
 export async function buildGame(folder, config) {
   await mkdir(folder, { recursive: true });
   await cp(resolve('templates/browser-game'), folder, { recursive: true });
   await cp(resolve('shared/game-types.js'), resolve(folder, 'rules.js'));
+  await cp(resolve('shared/art-catalog.js'), resolve(folder, 'art-catalog.js'));
+  await writeFile(resolve(folder, 'assets-manifest.json'), JSON.stringify({ ...ART_MANIFEST, theme: config.ui.theme || 'space' }, null, 2));
   await mkdir(resolve(folder, 'vendor'), { recursive: true });
   await cp(resolve('node_modules/phaser/dist/phaser.min.js'), resolve(folder, 'vendor/phaser.min.js'));
   await cp(resolve('node_modules/tone/build/Tone.js'), resolve(folder, 'vendor/Tone.js'));

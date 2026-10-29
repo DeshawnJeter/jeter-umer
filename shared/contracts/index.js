@@ -1,11 +1,12 @@
 import { genreOf } from '../game-types.js';
+import { themeOf } from '../art-catalog.js';
 export const ROLES = ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio'];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
   planner: { title: 'Star Collector', objective: 'Collect every star and reach the exit.', difficulty: 'beginner' },
   gameplay: { speed: 190, timeLimit: 60 },
   levels: { spawn: { x: 1, y: 1 }, exit: { x: 13, y: 8 }, stars: [{ x: 3, y: 2 }, { x: 8, y: 3 }, { x: 11, y: 6 }], walls: [{ x: 5, y: 4 }, { x: 6, y: 4 }, { x: 7, y: 4 }] },
-  ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30' },
+  ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30', theme: 'space' },
   story: { intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
   audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880 }
 };
@@ -30,7 +31,7 @@ export function validateArtifact(role, value) {
     check(Array.isArray(value.stars) && value.stars.length >= 1 && value.stars.length <= 12 && value.stars.every(point), 'Provide 1–12 valid stars');
     check(Array.isArray(value.walls) && value.walls.length <= 60 && value.walls.every(point), 'Provide at most 60 valid walls');
   }
-  if (role === 'ui') { check(string(value.title, 60), 'UI title is required'); for (const key of ['playerColor', 'backgroundColor']) check(/^#[0-9a-f]{6}$/i.test(value[key]), `Invalid ${key}`); }
+  if (role === 'ui') { check(string(value.title, 60), 'UI title is required'); for (const key of ['playerColor', 'backgroundColor']) check(/^#[0-9a-f]{6}$/i.test(value[key]), `Invalid ${key}`); if (value.theme !== undefined) { try { themeOf(value.theme); } catch { errors.push('Unsupported art theme'); } } }
   if (role === 'story') for (const key of ['intro', 'victory', 'defeat']) check(string(value[key]), `Missing or long ${key}`);
   if (role === 'audio') {
     check(typeof value.enabled === 'boolean' && typeof value.music === 'boolean', 'Audio switches must be booleans');
@@ -43,5 +44,5 @@ export function validateBrief(brief) {
   if (!object(brief) || !string(brief.prompt, 2000)) throw new Error('Describe the game in 1–2000 characters');
   if (!['', 'beginner', 'experienced'].includes(brief.difficulty ?? '')) throw new Error('Invalid difficulty');
   if (brief.title !== undefined && !string(brief.title, 60)) throw new Error('Title must be 1–60 characters');
-  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
+  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
 }

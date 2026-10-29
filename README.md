@@ -44,6 +44,10 @@ Runtime state lives in ignored `.local/runs/`. The existing `.env/` directory st
 
 Choose the game type explicitly in the creation form. Changing it through revision invalidates the plan, accepted role artifacts, build and approval. The selected type is supplied to every real worker/checker and preserved in config.json. Platform levels undergo conservative jump/support checks; other levels use flood-fill checks, with minimum evasion space for survival. These static checks do not prove the game is fun or that every physical route plays as intended. Test the selected controls and objective in the browser. Builds ship their own rules, and hashes cover every delivered file.
 
+Choose Astral voyage, Moonlit forest or Neon city artwork. The UI agent supplies a checked palette and the selected theme. Original local canvas artwork provides animated explorers, drones, glowing pickups, portals, textured tiles, layered scenery and ambient motion. No image-generation service, external downloads or additional API charges are involved. This is procedural art, not a claim to generate arbitrary bespoke illustrations. ZIPs include the renderer, theme catalog, provenance manifest and MIT artwork license; all are covered by the build hash.
+
+For isolated playtest sessions, set `GAME_BUILDER_RUNS_DIR` to a different local run directory and optionally set `PORT`. This keeps test builds separate from existing run history. These are trusted server environment settings, not agent-controlled values.
+
 ## Branches
 
 See [docs/branch-plan.md](docs/branch-plan.md). Each feature branch starts from development and contains one scoped slice. The integration branch assembles dependencies for a runnable demo. Development remains unchanged until reviewed changes merge.

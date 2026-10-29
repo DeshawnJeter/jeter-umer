@@ -7,7 +7,7 @@ const constraints = {
   planner: 'Preserve the exact brief title and difficulty. Describe the selected game type and its supplied objective. Do not change the selected type or promise unsupported mechanics.',
   gameplay: 'Speed must be 100–250. Time limit must be 20–180 seconds, or at least 60 for beginners.',
   levels: '15 by 10 grid. Integer x 0–14, y 0–9. One spawn and exit, 1–12 stars, at most 60 walls. Required objects are distinct, never overlap walls and are reachable from spawn.',
-  ui: 'Title must equal the checked plan. Colors are six-digit #RRGGBB strings. Player/background contrast must be at least 3:1.',
+  ui: 'Title must equal the checked plan. Colors are six-digit #RRGGBB strings. Player/background contrast must be at least 3:1. Preserve brief.theme (space, forest, neon; default space). The procedural asset catalog supplies original themed sprites, tiles and scenery. Return only colors, title and the allowlisted theme, never URLs, file paths or executable drawing code.',
   story: 'Intro, victory and defeat are nonempty plain text, each at most 180 characters. Intro explains the selected game objective. Endings differ. Honor story.direction when supplied.',
   audio: 'Volume 0–0.3. Event frequencies 100–2000 Hz and distinct. Music must match the human brief. Do not claim to have listened.'
 };
