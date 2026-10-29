@@ -56,6 +56,14 @@ test('demo recognizes all selected settings and explicit no music; resolutions r
 test('independent unsupported detection cannot be omitted by a model proposal',()=>{
   const value=finalizeResolution({...PROMPT_DEFAULTS,assumptions:[],unsupportedRequests:[]},'Make a turn-based RPG with stealth, shooting and metroidvania progression.');assert.ok(value.unsupportedRequests.length>=4);
 });
+
+test('custom tower defense rejects a false dedicated-catalog warning without clearing real API omissions',async()=>{
+  const text='Make a basic tower-defense game with fixed sites and J to build towers.',proposal={...PROMPT_DEFAULTS,genre:'custom',assumptions:[],unsupportedRequests:['tower-defense genre (not in supported catalog)']};
+  assert.equal(reviewResolutionIntent(proposal,text).verdict,'fail');
+  const genuine=finalizeResolution({...proposal,unsupportedRequests:[]},text+' Add multiplayer and 3D.');assert.ok(genuine.unsupportedRequests.some(note=>note.includes('Multiplayer')));assert.ok(genuine.unsupportedRequests.some(note=>note.includes('3D')));
+  const mock=modelRuntime({falseWarning:proposal.unsupportedRequests[0]}),m=await manager(mock.runtime),run=await create(m,text);
+  assert.equal(run.status,'awaiting_plan',run.error);assert.deepEqual(run.briefResolution.proposal.unsupportedRequests,[]);assert.equal(mock.calls.filter(call=>call.data.sourcePrompt!==undefined).length,4,'The false warning must trigger an independently checked repair');
+});
 test('feature warnings distinguish negative lists and named titles from later positive requests',()=>{
   for(const text of ['Do not include shooting, stealth, RPG combat, inventory or bosses.','No shooting and no stealth.','Avoid RPG combat, crafting and bosses.','Make a collector titled "Contra Constellations". Contra is only a title; no shooting.','Title: Metal Gear Garden; Game type: collector; no stealth.'])assert.deepEqual(unsupportedIn(text),[],text);
   const later=unsupportedIn('No shooting or inventory, but add stealth and RPG battles.','collector');assert.equal(later.length,2);assert.ok(later.some(s=>s.includes('Stealth')));assert.ok(later.some(s=>s.includes('RPG')));

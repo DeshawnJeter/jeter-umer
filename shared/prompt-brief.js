@@ -29,6 +29,7 @@ export function unsupportedIn(prompt,genre) {
 export function reviewResolutionIntent(proposal,prompt) {
   const requested=unsupportedIn(prompt,proposal.genre),findings=[];
   for(const note of proposal.unsupportedRequests){
+    if(proposal.genre==='custom'&&/^\s*tower[- ]defen[cs]e(?: genre)?\s*[(:-]?\s*not (?:in|listed in) (?:the )?supported (?:game )?catalog\s*\)?[.!]?\s*$/i.test(note))findings.push('Basic keyboard-controlled tower defense fits custom game rules. A missing dedicated genre entry is not an unsupported mechanic. Remove this false catalog warning; preserve real worker API limitations.');
     const categories=unsupportedPatterns.filter(([pattern])=>pattern.test(note)).map(([,text])=>text);
     if(categories.some(category=>!requested.includes(category)))findings.push('An unsupported warning refers to a mechanic absent from positive requests (it may be excluded or only mentioned in a title). Remove that false warning; preserve actual requested unsupported features.');
     if(/\b(?:is|are)\s+(?:actually\s+)?supported\b|\baccepted in\b|\bno unsupported\b/i.test(note))findings.push('The unsupported list contains a statement describing a supported feature. Open arenas, drones and healing stars are supported in survival. Put satisfied constraints in evidence or assumptions.');
