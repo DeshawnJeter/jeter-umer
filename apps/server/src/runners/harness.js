@@ -37,10 +37,11 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
   const prior=role==='coding'?await reviewedRepair(folder,{...workerBundle,...clone(input),findings:[],attempt:1,limits:{maxContextChars:profile.worker.maxContextChars,maxOutputChars:profile.worker.maxOutputChars}},profile.maxAttempts):null;
   if(prior){
     findings=prior.findings;
-    if(prior.codeExecution?.passed===false&&verifyProposal&&prior.source===await workspace.read()){
+    if(prior.codeExecution?.passed===false&&verifyProposal){
+      prior.source=await workspace.read();prior.artifact={...prior.artifact,source:prior.source};
       await onEvent({role,stage:'rechecking_saved_source',attempt:prior.attempt});
       const refreshed=await verifyProposal(prior.artifact);await writeFile(resolve(folder,'repair-preflight-'+prior.attempt+'.json'),JSON.stringify(refreshed,null,2));prior.codeExecution=refreshed;
-      const actual=(refreshed.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);if(actual.length)findings=actual;
+      const actual=(refreshed.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);findings=actual.length?actual:[refreshed.error||'Saved source must pass replay checks'];
     }
   }
   let previousExecution=prior?.codeExecution,previousProposalSource=prior?.source;

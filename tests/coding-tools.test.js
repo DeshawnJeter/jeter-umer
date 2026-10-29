@@ -14,7 +14,7 @@ test('model coding tools inspect and patch owned source, then submit without rep
     if(body.text.format.name==='coding_worker'){
       assert.ok(body.tools.some(tool=>tool.name==='apply_source_patch'&&tool.strict));assert.equal(body.parallel_tool_calls,false);
       if(workers++===0)return response([call('inspect_components',{})]);
-      if(workers===2){assert.ok(body.input.some(item=>item.type==='function_call_output'));return response([call('apply_source_patch',{path:'generated/rules.js',find:'',replacement:DEFAULT_SOURCE},'call_2')]);}
+      if(workers===2){assert.equal(JSON.parse(body.input[0].content[0].text).context.lastToolName,'inspect_components');return response([call('apply_source_patch',{path:'generated/rules.js',find:'',replacement:DEFAULT_SOURCE},'call_2')]);}
       return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:'',scenarios:DEFAULT_SCENARIOS},question:null,summary:'Implemented owned source through a focused tool patch'})}]}]);
     }
     return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({review:{verdict:'pass',findings:[],evidence:['Synthetic independent static comparison'],question:null}})}]}]);

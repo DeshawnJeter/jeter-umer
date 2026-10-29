@@ -81,7 +81,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   let serialized = JSON.stringify(body), bytes = Buffer.byteLength(serialized);
   const roleLimit = request.limits?.maxContextChars ?? policy.maxContextChars;
   if (!Number.isInteger(roleLimit) || roleLimit < 1) throw new Error('Invalid model request context limit');
-  if(role==='coding'&&stage==='worker'&&body.tools&&!request.toolHistory?.length&&(serialized.length>Math.min(roleLimit,policy.maxContextChars)||bytes>config.maxRequestBytes)){
+  if(role==='coding'&&stage==='worker'&&body.tools&&(serialized.length>Math.min(roleLimit,policy.maxContextChars)||bytes>config.maxRequestBytes)){
     // Keep source, requirements and authority intact. Optional editing tools
     // yield to a complete direct submission when their schemas do not fit.
     delete body.tools;delete body.tool_choice;delete body.parallel_tool_calls;
@@ -162,7 +162,7 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         if(toolCalls.length){
           if(role!=='coding'||stage!=='worker'||!request.tools||request.replayRepair||toolCalls.length!==1||(request.toolTurns||0)>=4)throw Error('Coding tool round limit or role boundary exceeded');
           const call=toolCalls[0],toolOutput=await invokeCodingTool(request,call);
-          continuation={...request,context:{...request.context,previousSource:typeof request.tools.read_source==='function'?await request.tools.read_source('generated/rules.js'):request.context?.previousSource},toolTurns:(request.toolTurns||0)+1,toolHistory:[{type:'function_call',name:call.name,call_id:call.call_id,arguments:call.arguments},{type:'function_call_output',call_id:call.call_id,output:toolOutput}]};
+          continuation={...request,context:{...request.context,previousSource:typeof request.tools.read_source==='function'?await request.tools.read_source('generated/rules.js'):request.context?.previousSource,lastToolName:call.name,lastToolResult:JSON.parse(toolOutput)},toolTurns:(request.toolTurns||0)+1,toolHistory:[]};
         }else{
         const texts = (result.output || []).filter(item => item.type === 'message').flatMap(item => item.content || []).filter(part => part.type === 'output_text').map(part => part.text);
         if (texts.length !== 1 || typeof texts[0] !== 'string') throw new ModelOutputError('shape');
