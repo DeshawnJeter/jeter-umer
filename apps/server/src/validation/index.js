@@ -2,7 +2,8 @@ import { ROLES, validateArtifact } from '../../../../shared/contracts/index.js';
 import { inspectLevel } from '../../../../agents/levels/checker.js';
 import { validateHud } from '../../../../shared/player-ui.js';
 import {CORE_ROLES,EXTENSION_SPECS} from '../../../../shared/specialists.js';
-export const HUMAN_CHECKS = ['movement', 'collectAndWin', 'timeoutAndRestart', 'audioControls', 'presentation'];
+import {BASE_HUMAN_CHECKS} from '../../../../shared/lifecycle.js';
+export const HUMAN_CHECKS = BASE_HUMAN_CHECKS;
 export function validateGame(config) {
   const findings = [...CORE_ROLES,...Object.keys(EXTENSION_SPECS).filter(role=>Object.hasOwn(config,role))].flatMap(role => validateArtifact(role, config[role]).map(message => `${role}: ${message}`));
   if (!findings.length) {

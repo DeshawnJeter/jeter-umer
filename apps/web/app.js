@@ -6,7 +6,7 @@ function handoffDescription(handoff){
   return handoff.summary;
 }
 let selected = null, current = null, previewUrl = '', questionSignature = '', planSignature = '', busy = false, providerMode = 'scripted-demo';
-const checkLabels = { movement: 'Applicable movement, collisions, jumping or battle targeting work', collectAndWin: 'The selected game mechanics, resources, objective and win condition work', timeoutAndRestart: 'Loss, restart, checkpoints and any timer work where applicable', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };
+const checkLabels = { enemyReactions:'Stealth guards patrol, investigate sightings, pursue, search, and can cause defeat', movement: 'Applicable movement, collisions, jumping or battle targeting work', collectAndWin: 'The selected game mechanics, resources, objective and win condition work', timeoutAndRestart: 'Loss, restart, checkpoints and any timer work where applicable', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };
 async function api(path, data) { const res = await fetch(path, data === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); const result = await res.json(); if (!res.ok) throw new Error(result.error); return result; }
 function element(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
 function choiceLabel(selector,value) { return [...$(selector).options].find(option=>option.value===value)?.textContent || value; }
@@ -105,7 +105,7 @@ function render(run) {
     const nextUrl = run.build.url;
     if (previewUrl !== nextUrl) {
       previewUrl = nextUrl; $('#preview').src = nextUrl; $('#checklist').replaceChildren();
-      for (const [key, label] of Object.entries(checkLabels)) { const row = element('label', undefined, 'inline'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.check = key; row.append(checkbox, document.createTextNode(label)); $('#checklist').append(row); }
+      for (const key of (run.build.checksRequired||Object.keys(checkLabels).filter(key=>key!=='enemyReactions'))) { const label=checkLabels[key]||key; const row = element('label', undefined, 'inline'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.check = key; row.append(checkbox, document.createTextNode(label)); $('#checklist').append(row); }
       $('#revision-difficulty').value = run.brief.difficulty; $('#revision-music').checked = run.brief.music; $('#revision-genre').value = run.brief.genre || 'collector'; $('#revision-theme').value = run.brief.theme || 'space'; $('#revision-music-style').value = run.brief.musicStyle || 'adventure'; $('#revision-music-instrument').value = run.brief.musicInstrument || 'auto';
     }
     $('#open-game').href = nextUrl; $('#download').href = `/api/runs/${run.id}/download`;

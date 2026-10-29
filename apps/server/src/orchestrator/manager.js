@@ -14,6 +14,7 @@ import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../provider
 import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests} from '../memory/project.js';
 import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 import {runProjectRules} from '../specialists/rules-tests.js';
+import {humanChecksFor} from '../../../../shared/lifecycle.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
@@ -168,7 +169,7 @@ export class Manager {
       await this.event(run, 'Static integration checks passed. Building playable preview.');
       const folder = resolve(this.store.folder(run.id), 'builds', String(run.generation));
       const sha256 = await buildGame(folder, config); if (run.status !== 'running') return;
-      run.build = { generation: run.generation, sha256, url: `/preview/${run.id}/${run.generation}/index.html`, checksRequired: HUMAN_CHECKS };
+      run.build = { generation: run.generation, sha256, url: `/preview/${run.id}/${run.generation}/index.html`, checksRequired: humanChecksFor(run.brief.genre) };
       this.transition(run, 'awaiting_review'); await this.event(run, 'Ready for human playtest. Static checks do not prove browser behavior.');
     } catch (error) { if (!error.suspended) throw error; }
   }
@@ -218,7 +219,7 @@ export class Manager {
       this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Plan approval and final approval require renewal.'); this.launch(run); return run;
     }
     if (action === 'approve') {
-      if (run.status !== 'awaiting_review' || !run.planApproval || run.planApproval.hash !== run.planHash || run.questions.some(question => question.blocking) || !run.validation?.passed || data.sha256 !== run.build?.sha256 || HUMAN_CHECKS.some(key => data.checks?.[key] !== true)) throw new Error('Playtest every required item and approve the current build');
+      if (run.status !== 'awaiting_review' || !run.planApproval || run.planApproval.hash !== run.planHash || run.questions.some(question => question.blocking) || !run.validation?.passed || data.sha256 !== run.build?.sha256 || humanChecksFor(run.brief.genre).some(key => data.checks?.[key] !== true)) throw new Error('Playtest every required item and approve the current build');
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if (await hashBuild(resolve(this.store.folder(id), 'builds', String(run.build.generation))) !== run.build.sha256) throw new Error('Build changed since validation. Rebuild before approval.');
       run.approval = { sha256: run.build.sha256, checks: clone(data.checks), at: new Date().toISOString(), source: 'human-attestation' };

@@ -9,6 +9,7 @@ import {advancedProfile} from '../../../../shared/advanced-games.js';
 import {hudFor} from '../../../../shared/player-ui.js';
 import {EXTENSION_SPECS} from '../../../../shared/specialists.js';
 import {referenceFor} from '../specialists/jobs.js';
+import {lifecycleFor} from '../../../../shared/lifecycle.js';
 export const ENDPOINT = 'https://api.openai.com/v1/responses';
 const constraints = {
   planner: 'Preserve the exact brief title and difficulty. Describe the selected game type and its supplied objective. Do not change the selected type or promise unsupported mechanics.',
@@ -28,6 +29,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   const data = { task: request.task, brief: request.brief, context: request.context, gameType: { id: genre, ...GAME_TYPES[genre], geometryRules: genreConstraints }, artifactReference: role === 'levels' ? referenceLevel(genre) : role === 'planner' ? { ...defaults.planner, objective: GAME_TYPES[genre].objective } : role === 'story' ? { intro: GAME_TYPES[genre].intro, victory: GAME_TYPES[genre].victory, defeat: GAME_TYPES[genre].defeat } : defaults[role], ...(stage === 'worker' ? { repairFindings: request.findings || [] } : { artifact: request.artifact }) };
   if(Object.hasOwn(EXTENSION_SPECS,role))data.artifactReference=referenceFor(role,request);
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
+  data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
   const resolving = request.operation === 'resolve_brief';
   const requestData = resolving ? {task:request.task,sourcePrompt:request.brief.prompt,gameCatalog:Object.entries(GAME_TYPES).map(([id,type])=>({id,name:type.name,objective:type.objective,capabilities:type.capabilities||type.controls})),featureIntent:request.featureIntent,decisions:request.context?.decisions || {},...(stage==='worker'?{repairFindings:request.findings||[]}:{proposal:request.artifact,deterministicReview:request.deterministicReview})} : data;

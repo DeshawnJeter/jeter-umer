@@ -5,6 +5,7 @@ import { createArt, drawBackdrop } from './art.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from './score.js';
 import {advancedProfile} from './advanced-games.js';
 import {assembly} from './assembly.js';
+import {lifecycleFor,failureReason} from './lifecycle.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
@@ -12,6 +13,7 @@ const response = await fetch('config.json');
 if (!response.ok) throw new Error('Game configuration unavailable');
 const config = await response.json(), genre = genreOf(config.genre), rules = GAME_TYPES[genre];
 if(assembly.runtime!==genre)throw Error('Game assembly/runtime mismatch');
+if(!advancedProfile(genre)){const failureNote=document.createElement('p');failureNote.id='failure-rules';failureNote.textContent='Failure: '+lifecycleFor(genre).failure+' Restart is always available.';document.querySelector('#game').before(failureNote);}
 if(advancedProfile(genre)){const {startAdvancedGame}=await import('./advanced.js');await startAdvancedGame(config,genre);}else{
 const audio = new GameAudio(config.audio);
 const title = document.querySelector('#title'), message = document.querySelector('#message'), status = document.querySelector('#status');
@@ -35,13 +37,15 @@ const size = 48, center = n => n * size + size / 2;
 function end(phase) {
   if (state.phase !== 'playing') return;
   state.phase = phase; player.body.setVelocity(0); enemies?.setVelocity(0, 0);
-  message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat'];
+  state.failureReason=phase==='lost'?failureReason(genre,state):null;
+  message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat']+(state.failureReason?' '+state.failureReason+'. Choose Restart to try again.':'');
+  scene.physics.pause();
   audio.tone(phase === 'won' ? config.audio.winFrequency : 140); audio.setPlaying?.(false);
 }
 class WorkshopGame extends Phaser.Scene {
   create() {
-    scene = this; elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
-    Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3 });
+    scene = this;this.physics.resume(); elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
+    Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3,failureReason:null });
     message.textContent = config.story.intro;
     createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
     const walls = this.physics.add.staticGroup();
@@ -116,6 +120,7 @@ class WorkshopGame extends Phaser.Scene {
       const outcome = roundOutcome(state); if (outcome !== 'playing') end(outcome);
     } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
     state.x = player.x; state.y = player.y;
+    document.querySelector('#game').dataset.phase=state.phase;
     const text = `${state.phase.toUpperCase()} · Stars ${state.score}/${state.required} · ${Math.ceil(state.remaining)}s${genre === 'survival' ? ` · Shields ${state.health}/3` : ''}`;
     if (text !== lastHud) { status.textContent = text; ui.render(); lastHud = text; }
   }

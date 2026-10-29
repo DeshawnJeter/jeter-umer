@@ -1,5 +1,6 @@
 import { genreOf } from '../../shared/game-types.js';
 import {advancedProfile} from '../../shared/advanced-games.js';
+import {patrolPlans} from '../../shared/stealth-rules.js';
 function platformReachability(level, walls, findings) {
   const key = p => `${p.x},${p.y}`;
   for (let x = 0; x < 15; x++) if (!walls.has(`${x},9`)) { findings.push('Platform levels require an unbroken floor on row 9'); break; }
@@ -41,6 +42,7 @@ export function inspectLevel(level, genre = 'collector') {
   }
   if (occupied.some(p => !visited.has(p))) findings.push('Every star and the exit must be reachable from spawn');
   if (genre === 'survival' && visited.size < 80) findings.push('Survival arenas need at least 80 reachable cells for evasion');
+  if(genre==='stealth'&&patrolPlans(level,2).length<2)findings.push('Stealth needs two reachable guard patrol routes in the player area');
   return { findings, reachableCells: visited.size };
 }
 export async function check({ artifact, brief = {} }) {
