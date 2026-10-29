@@ -26,7 +26,9 @@
       "read_project_memory",
       "read_source",
       "search_source",
-      "inspect_components"
+      "inspect_components",
+      "apply_source_patch",
+      "run_rule_checks"
     ],
     "maxContextChars": 16000
   },

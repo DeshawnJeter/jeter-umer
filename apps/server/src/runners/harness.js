@@ -6,11 +6,13 @@ import { makeTask } from '../../../../shared/contracts/tasks.js';
 import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
 import { loadProfile, instructionBundle, assertRequestFits } from './instructions.js';
 
-function toolsFor(names, input, role, artifact, calls, workspace) {
+function toolsFor(names, input, role, artifact, calls, workspace,verifyProposal) {
   const available = {
     read_source:path=>workspace.read(path),
     search_source:query=>workspace.search(query),
     inspect_components:()=>workspace.catalog(),
+    apply_source_patch:patch=>workspace.patch(patch),
+    run_rule_checks:async scenarios=>{if(!verifyProposal)throw Error('Browser execution tool is not enabled for this task');return verifyProposal({source:await workspace.read(),scenarios});},
     inspect_context: () => clone(input),
     propose_artifact: proposed => { const errors = validateArtifact(role, proposed); if (errors.length) throw new Error(errors.join('; ')); return { artifact: clone(proposed) }; },
     inspect_artifact: () => clone(artifact),
@@ -37,7 +39,8 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     const workerSize = assertRequestFits(workerRequest, profile.worker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'working', attempt });
     const workerCalls = [];
-    const result = await worker({ ...clone(workerRequest), tools: toolsFor(profile.worker.tools, input, role, undefined, workerCalls, workspace) });
+    const result = await worker({ ...clone(workerRequest), tools: toolsFor(profile.worker.tools, input, role, undefined, workerCalls, workspace,verifyProposal) });
+    if(role==='coding'&&result.artifact?.source==='')result.artifact.source=await workspace.read();
     assertOutputFits(result, profile.worker.maxOutputChars);
     await writeFile(resolve(folder, `attempt-${attempt}-worker.json`), JSON.stringify({ request: workerRequest, contextChars: workerSize, toolCalls: workerCalls, result }, null, 2));
     if (result.question) {

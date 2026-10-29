@@ -1,7 +1,7 @@
 import {parse} from 'acorn';
 import {mkdir,writeFile,readFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {codeScenarios,COMPONENT_CATALOG} from '../../../../shared/code-game.js';
+import {codeScenarios,COMPONENT_CATALOG,DEFAULT_SCENARIOS} from '../../../../shared/code-game.js';
 export function checkCode(artifact){
   const findings=[];
   try{
@@ -19,5 +19,5 @@ export function checkCode(artifact){
 }
 export function codeWorkspace(directory){
   const file=resolve(directory,'generated','rules.js');
-  return Object.freeze({catalog:()=>COMPONENT_CATALOG,async read(path='generated/rules.js'){if(path!=='generated/rules.js')throw Error('Outside owned game source');return readFile(file,'utf8').catch(e=>{if(e.code==='ENOENT')return '';throw e;});},async search(query){if(typeof query!=='string'||query.length>80)throw Error('Invalid search');return (await this.read()).split('\n').map((line,i)=>({line:i+1,text:line})).filter(row=>row.text.includes(query)).slice(0,12);},async apply(artifact){const report=checkCode(artifact);if(report.verdict!=='pass')return report;await mkdir(resolve(directory,'generated'),{recursive:true});await writeFile(file,artifact.source);return report;}});
+  return Object.freeze({catalog:()=>COMPONENT_CATALOG,async read(path='generated/rules.js'){if(path!=='generated/rules.js')throw Error('Outside owned game source');return readFile(file,'utf8').catch(e=>{if(e.code==='ENOENT')return '';throw e;});},async search(query){if(typeof query!=='string'||query.length>80)throw Error('Invalid search');return (await this.read()).split('\n').map((line,i)=>({line:i+1,text:line})).filter(row=>row.text.includes(query)).slice(0,12);},async patch({path,find,replacement}){const current=await this.read(path);if(typeof find!=='string'||typeof replacement!=='string'||!find&&current||find&&current.split(find).length!==2)throw Error('Patch must match one exact owned-source location');return this.apply({source:find?current.replace(find,()=>replacement):replacement,scenarios:DEFAULT_SCENARIOS});},async apply(artifact){const report=checkCode(artifact);if(report.verdict!=='pass')return report;await mkdir(resolve(directory,'generated'),{recursive:true});await writeFile(file,artifact.source);return report;}});
 }
