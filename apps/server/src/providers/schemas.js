@@ -1,0 +1,81 @@
+import { ROLES } from '../../../../shared/contracts/index.js';
+import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
+import { MELODY_NOTES, BASS_NOTES, MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../../shared/music.js';
+import { ModelOutputError } from './output-errors.js';
+const string = { type: 'string' }, number = { type: 'number' }, boolean = { type: 'boolean' };
+const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
+const array = items => ({ type: 'array', items });
+const nullable = schema => ({ anyOf: [schema, { type: 'null' }] });
+const boundedText = maxLength => ({ type:'string', minLength:1, maxLength, pattern:'\\S' });
+const reportStrings = minItems => ({ type:'array', items:boundedText(500), minItems, maxItems:12 });
+const point = object({ x: { type: 'integer' }, y: { type: 'integer' } });
+const artifacts = {
+  planner: object({ title: boundedText(60), objective: boundedText(180), difficulty: { type: 'string', enum: ['beginner', 'experienced'] } }),
+  gameplay: object({ speed: number, timeLimit: number }),
+  levels: object({ spawn: point, exit: point, stars: array(point), walls: array(point) }),
+  ui: object({ title: boundedText(60), playerColor: string, backgroundColor: string, theme: { type: 'string', enum: ['space', 'forest', 'neon'] }, hud: object({ layout: { type:'string', enum:['cards','compact'] }, stats: array({ type:'string', enum:['health','stars','time','objective'] }) }) }),
+  story: object({ intro: boundedText(180), victory: boundedText(180), defeat: boundedText(180) }),
+  audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: Object.keys(MUSIC_STYLES) }, instrument: { type:'string', enum:Object.keys(MUSIC_INSTRUMENTS) }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
+};
+export const questionSchema = object({ key: string, text: string, reason: string, options: array(string), recommended: string, blocking: boolean, affectedRoles: array({ type: 'string', enum: ROLES }), maxLength: { type: 'integer' } });
+export function responseSchema(role, stage) {
+  if (!ROLES.includes(role) || !['worker', 'checker'].includes(stage)) throw new Error('Invalid model role or stage');
+  return stage === 'worker'
+    ? object({ kind: { type: 'string', enum: ['artifact', 'question'] }, artifact: nullable(artifacts[role]), question: nullable(questionSchema), summary: { ...boundedText(500), description:'A concise, nonblank summary, at most 500 characters.' } })
+    : object({ verdict: { type: 'string', enum: ['pass', 'fail', 'needs_human'] }, findings: reportStrings(0), evidence: reportStrings(1), question: nullable(questionSchema) });
+}
+// A nested union is supported by strict Structured Outputs; a root-level union
+// is not. Encode verdict consistency in the wire schema, not just the prompt.
+export function providerResponseSchema(role, stage) {
+  const schema = responseSchema(role, stage);
+  if (stage === 'worker') return schema;
+  return object({ review: { anyOf: [
+    object({ evidence:reportStrings(1), findings:{...reportStrings(0),maxItems:0,description:'No unresolved defects: an empty array.'}, verdict:{type:'string',enum:['pass']}, question:{type:'null'} }),
+    object({ evidence:reportStrings(1), findings:{...reportStrings(1),description:'Only actual unresolved defects requiring artifact changes. Successful, valid, allowed or matching checks belong in evidence.'}, verdict:{type:'string',enum:['fail']}, question:{type:'null'} }),
+    object({ evidence:reportStrings(1), findings:reportStrings(0), verdict:{type:'string',enum:['needs_human']}, question:questionSchema })
+  ] } });
+}
+const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+function matches(schema, value) {
+  if (schema.anyOf) return schema.anyOf.some(candidate => matches(candidate, value));
+  if (schema.enum && !schema.enum.includes(value)) return false;
+  if (schema.type === 'null') return value === null;
+  if (schema.type === 'object') return record(value) && Object.keys(value).length === schema.required.length && schema.required.every(key => Object.hasOwn(value, key) && matches(schema.properties[key], value[key]));
+  if (schema.type === 'array') return Array.isArray(value) && value.length >= (schema.minItems ?? 0) && value.length <= (schema.maxItems ?? Infinity) && value.every(item => matches(schema.items, item));
+  if (schema.type === 'string') return typeof value === 'string' && value.length >= (schema.minLength ?? 0) && value.length <= (schema.maxLength ?? Infinity) && (!schema.pattern || new RegExp(schema.pattern).test(value));
+  if (schema.type === 'integer') return Number.isInteger(value);
+  if (schema.type === 'number') return Number.isFinite(value);
+  return typeof value === schema.type;
+}
+function exactKeys(value, keys) { if (!record(value) || Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) throw new ModelOutputError('shape', 'Model output has unexpected or missing fields'); }
+function humanQuestion(value, role, stage) {
+  exactKeys(value, Object.keys(questionSchema.properties));
+  let normalized;
+  try { normalized = normalizeQuestion(value, role, stage); } catch { throw new ModelOutputError('question'); }
+  if (!normalized.blocking) throw new ModelOutputError('question', 'A question-only model response must be blocking');
+  return value;
+}
+export function validateModelOutput(role, stage, value) {
+  if (stage === 'worker' && record(value) && (typeof value.summary !== 'string' || !value.summary.trim() || value.summary.length > 500)) throw new ModelOutputError('summary', 'Invalid model summary');
+  if (stage === 'checker' && record(value) && (!Array.isArray(value.evidence) || !value.evidence.length || [value.findings,value.evidence].some(items => !Array.isArray(items) || items.length > 12 || items.some(item => typeof item !== 'string' || !item.trim() || item.length > 500)))) throw new ModelOutputError('checker', 'Invalid model checker report');
+  if (!matches(responseSchema(role, stage), value)) throw new ModelOutputError('schema', 'Model output failed structured schema validation');
+  if (stage === 'worker') {
+    exactKeys(value, ['kind', 'artifact', 'question', 'summary']);
+    if (value.kind === 'question' && value.artifact === null) return { question: humanQuestion(value.question, role, stage), summary: value.summary };
+    if (value.kind !== 'artifact' || value.question !== null || value.artifact === null) throw new ModelOutputError('proposal', 'Invalid model proposal kind');
+    // Domain constraints are checked by the harness and fed back as repair findings.
+    if (role === 'levels') for (const point of [value.artifact.spawn, value.artifact.exit, ...value.artifact.stars, ...value.artifact.walls]) exactKeys(point, ['x', 'y']);
+    return { artifact: value.artifact, summary: value.summary };
+  }
+  exactKeys(value, ['verdict', 'findings', 'evidence', 'question']);
+  if (value.verdict === 'needs_human') humanQuestion(value.question, role, stage);
+  else if (value.question !== null || (value.verdict === 'pass' && value.findings.length) || (value.verdict === 'fail' && !value.findings.length)) throw new ModelOutputError('contradiction', 'Contradictory model checker report');
+  return { verdict: value.verdict, findings: value.findings, evidence: value.evidence, ...(value.question ? { question: value.question } : {}) };
+}
+export function decodeProviderOutput(role, stage, value) {
+  if (stage === 'worker') return validateModelOutput(role, stage, value);
+  exactKeys(value, ['review']);
+  const report = validateModelOutput(role, stage, value.review);
+  if (!matches(providerResponseSchema(role, stage), value)) throw new ModelOutputError('schema');
+  return report;
+}
