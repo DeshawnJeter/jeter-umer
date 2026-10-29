@@ -1,0 +1,35 @@
+import {topDownWorld} from '../advanced.js';
+import {newCampaign,beginBattle,battleAction} from '../turn-combat.js';
+export function rpgMode(scene,ctx,{frontView=false}={}){
+  const {state,config,panel}=ctx,campaign=newCampaign(config.planner.difficulty),world=frontView?null:topDownWorld(scene,ctx),cleared=new Set();let battle=null,battleIndex=0,portraits=[];
+  const total=frontView?3:config.levels.stars.length;
+  state.required=total;
+  const sync=()=>{state.health=campaign.party.reduce((n,p)=>n+p.hp,0);state.maxHealth=campaign.party.reduce((n,p)=>n+p.maxHp,0);state.mana=campaign.party.reduce((n,p)=>n+p.mp,0);state.maxMana=campaign.party.reduce((n,p)=>n+p.maxMp,0);state.progress=`${cleared.size} / ${total}`;state.objective=battle?`${battle.phase==='player'?campaign.party[battle.actor].name+' turn':battle.phase} · encounter ${battleIndex+1}/${total}`:`Clear encounters ${cleared.size}/${total}, then reach portal`;};
+  const text=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;panel.append(el);return el;};
+  function paint(){
+    panel.replaceChildren();portraits.forEach(p=>p.destroy());portraits=[];
+    text('p',`Party level ${campaign.level} · XP ${campaign.xp} · Potions ${campaign.potions}`);
+    text('p',campaign.party.map(p=>`${p.name}: HP ${p.hp}/${p.maxHp}${p.maxMp?' · MP '+p.mp+'/'+p.maxMp:''}`).join(' | '));
+    if(!battle){text('p',frontView?'Start your expedition. Three encounters await.':'Walk onto an enemy marker to begin a turn-based encounter.');sync();return;}
+    text('p',battle.message).setAttribute('role','status');
+    battle.enemies.forEach((enemy,i)=>{
+      if(enemy.hp>0)portraits.push(scene.add.image(280+i*140,190,'enemy').setScale(frontView?4:2).setDepth(20));
+      const button=ctx.button(`${i===battle.target?'Target: ':''}${enemy.name} HP ${enemy.hp}/${enemy.maxHp}`,()=>{battle.target=i;paint();});button.disabled=enemy.hp<=0||battle.phase!=='player';
+    });
+    if(battle.phase==='player'){
+      for(const [label,action]of [['Attack (J)','attack'],['Spell · 2 MP (K)','spell'],['Potion (E)','potion'],['Guard / next party member','guard']]){const button=ctx.button(label,()=>act(action));const actor=campaign.party[battle.actor];button.disabled=action==='spell'&&actor.mp<2||action==='potion'&&(campaign.potions===0||actor.hp===actor.maxHp);}
+    }else if(battle.phase==='won')ctx.button(frontView?(cleared.size===total?'Finish expedition':'Next encounter'):'Return to exploration',()=>{
+      battle=null;portraits.forEach(p=>p.destroy());portraits=[];
+      if(frontView){if(cleared.size===total)ctx.end('won');else engage(cleared.size);}else paint();
+    });
+    sync();
+  }
+  function act(action){if(state.phase!=='playing'||!battle||battle.phase!=='player')return;battleAction(battle,action);ctx.audio.tone(action==='spell'?720:300);if(battle.phase==='won'){cleared.add(battleIndex);markers[battleIndex]?.destroy();state.score=cleared.size;}if(battle.phase==='lost'){sync();ctx.end('lost');}paint();}
+  function engage(index){battleIndex=index;battle=beginBattle(campaign,index);world?.player.setVelocity(0);paint();}
+  const markers=frontView?[]:config.levels.stars.map((point,index)=>{
+    const marker=scene.physics.add.staticImage(world.center(point.x),world.center(point.y),'enemy');scene.physics.add.overlap(world.player,marker,()=>{if(state.phase==='playing'&&!battle&&!cleared.has(index))engage(index);});return marker;
+  });
+  if(world){const exit=scene.physics.add.staticImage(world.center(config.levels.exit.x),world.center(config.levels.exit.y),'portal');scene.physics.add.overlap(world.player,exit,()=>{if(state.phase==='playing'&&!battle&&cleared.size===total)ctx.end('won');});}
+  paint();
+  return {player:world?.player,start(){if(frontView)engage(0);},update(){if(world){if(battle)world.player.setVelocity(0);else ctx.move(world.player);}sync();},action(action){act({attack:'attack',ability:'spell',interact:'potion'}[action]);}};
+}
