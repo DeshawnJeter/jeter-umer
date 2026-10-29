@@ -191,6 +191,10 @@ export class Manager {
       }
       await this.checkpoint(run);
       const config = frameworkConfig(run.brief.genre??'collector',Object.fromEntries(Object.entries(run.results).map(([role,result])=>[role,result.artifact])));
+      if(config.genre==='custom'){
+        const rules=runProjectRules(config);recordTests(run,'qa-rules',rules);
+        if(!rules.passed)throw Error('Automatic integration rule checks failed');
+      }
       run.validation = validateGame(config);
       recordTests(run,'static-integration',run.validation);
       if (!run.validation.passed) throw new Error(`Integration failed: ${run.validation.findings.join('; ')}`);

@@ -32,7 +32,7 @@ test('tool selection cannot access host files or escape role/round limits',async
   let calls=0;const runtime=createRuntime({env,fetchImpl:async()=>{calls++;return response([call('inspect_components',{})]);}}),handlers=await runtime.route('coding',{});
   await assert.rejects(handlers.worker({brief:{genre:'custom'},context:{},instructions:'Test',tools:{inspect_components:()=>({version:1})}}),/round limit/);assert.equal(calls,5);
 });
-test('custom games activate seven model roles and leave unused template jobs to the framework',()=>{
-  assert.deepEqual(activeRoles('custom'),['planner','ui','story','audio','coding','integration','qa']);
+test('custom games activate five model roles and leave unused template jobs to the framework',()=>{
+  assert.deepEqual(activeRoles('custom'),['planner','ui','story','audio','coding']);
   assert.equal(activeRoles('campaign').length*2,18);
 });
