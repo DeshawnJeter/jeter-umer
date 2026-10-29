@@ -1,4 +1,5 @@
 import {codeWorkspace} from './code-workspace.js';
+import {pendingProposal} from './proposal-cache.js';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ROLES, clone, validateArtifact } from '../../../../shared/contracts/index.js';
@@ -39,10 +40,12 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     const workerSize = assertRequestFits(workerRequest, profile.worker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'working', attempt });
     const workerCalls = [];
-    const result = await worker({ ...clone(workerRequest), tools: toolsFor(profile.worker.tools, input, role, undefined, workerCalls, workspace,verifyProposal) });
+    const cached=await pendingProposal(folder,attempt,workerRequest);
+    if(cached)await onEvent({role,stage:'reusing_proposal',attempt});
+    const result = cached?.result||await worker({ ...clone(workerRequest), tools: toolsFor(profile.worker.tools, input, role, undefined, workerCalls, workspace,verifyProposal) });
     if(role==='coding'&&result.artifact?.source==='')result.artifact.source=await workspace.read();
     assertOutputFits(result, profile.worker.maxOutputChars);
-    await writeFile(resolve(folder, `attempt-${attempt}-worker.json`), JSON.stringify({ request: workerRequest, contextChars: workerSize, toolCalls: workerCalls, result }, null, 2));
+    await writeFile(resolve(folder, `attempt-${attempt}-worker.json`), JSON.stringify({ request: workerRequest, contextChars: workerSize, toolCalls: workerCalls, result,...(cached?{reusedProposal:true,proposalRequestHash:cached.requestHash}:{}) }, null, 2));
     if (result.question) {
       const question = normalizeQuestion(result.question, role, 'worker');
       if (question.blocking) return { status: 'needs_human', question, role };

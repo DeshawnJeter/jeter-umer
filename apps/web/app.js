@@ -78,7 +78,7 @@ function render(run) {
   current = run; $('#empty').hidden = true; $('#run').hidden = false;
   $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/${run.maxSteps||80} steps · ${run.mode === 'openai' ? `OpenAI: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
   $('#controls').replaceChildren();
-  const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
+  const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : run.status==='failed'&&!run.build ? [['Retry interrupted work','retry'],['Cancel','cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
   for (const [label, command] of buttons) { const button = element('button', label, 'secondary'); button.onclick = () => perform(() => action(command)); $('#controls').append(button); }
   $('#run-status').textContent += run.revisionScope ? ` · reused ${run.revisionScope.reusedRoles.length} checked contributions` : '';
   renderPlan(run); renderQuestions(run);

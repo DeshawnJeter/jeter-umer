@@ -219,6 +219,10 @@ export class Manager {
     if (action === 'pause') { this.transition(run, 'paused'); this.controllers.get(id)?.abort(); await this.event(run, 'Human paused the run'); return run; }
     await this.jobs.get(id);
     this.assertRuntime(run);
+    if(action==='retry'){
+      if(run.status!=='failed'||run.build)throw Error('Only interrupted agent work can retry; delivered builds require a revision');
+      delete run.error;this.transition(run,'running');await this.event(run,'Retrying interrupted agent work within remaining budgets; accepted contributions are retained.');this.launch(run);return run;
+    }
     if (action === 'resume') {
       if (run.status !== 'paused') throw new Error('Only paused runs can resume');
       this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
