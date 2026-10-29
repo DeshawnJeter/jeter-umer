@@ -11,6 +11,7 @@ export function checkCode(artifact){
     const walk=node=>{if(!node||typeof node!=='object')return;
       if(['ImportDeclaration','ImportExpression','ExportAllDeclaration'].includes(node.type)||node.type==='ExportNamedDeclaration'&&node.source)throw Error('Imports and re-exports are not allowed; use supplied api components');
       if(node.type==='ExportNamedDeclaration'&&node.declaration?.type==='FunctionDeclaration'&&node.declaration.id?.name==='createGame')exported=true;
+      if(node.type==='CallExpression'&&node.callee.type==='MemberExpression'&&node.callee.object.type==='Identifier'&&node.callee.object.name==='api'){const key=node.callee.computed?node.callee.property.value:node.callee.property.name;if(!['clamp','damage','give','move','distance'].includes(key))throw Error('Unavailable api method: '+String(key).slice(0,40)+'. Only clamp, damage, give, move and distance are supplied. Framework owns music and sound.');}
       if(node.type==='Identifier'&&['eval','Function','fetch','XMLHttpRequest','WebSocket','Worker','SharedWorker','importScripts','globalThis','self','postMessage','close','navigator','location','indexedDB','caches'].includes(node.name))throw Error('Host capabilities are unavailable in game rules');
       for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);
     };walk(tree);if(!exported)throw Error('Export function createGame(api)');codeScenarios(artifact.scenarios);

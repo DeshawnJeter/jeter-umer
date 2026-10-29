@@ -24,3 +24,10 @@ test('drafts survive syntax rejection and patch mismatches return recoverable fe
  assert.equal(repaired.verdict,'pass');assert.equal(await w.read(),DEFAULT_SOURCE);
  await assert.rejects(w.stage('x'.repeat(6001)));await assert.rejects(w.patch({path:'../../.env',find:'',replacement:'x'}));assert.equal(await w.read(),DEFAULT_SOURCE);
 });
+
+test('repair diagnostics name replay limits, action mappings and unavailable API methods',()=>{
+ const cases=JSON.parse(DEFAULT_SCENARIOS);cases[1].steps=[{dt:0.1,input:{},repeat:300},{dt:0.1,input:{}}];
+ assert.match(checkCode({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)}).findings[0],/301 steps.*300 total/);
+ cases[1].steps=[{dt:0.1,input:{j:true}}];assert.match(checkCode({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)}).findings[0],/J maps to attack/);
+ const source=DEFAULT_SOURCE.replace('time+=dt;','time+=dt;api.musicStart();');assert.match(checkCode({source,scenarios:DEFAULT_SCENARIOS}).findings[0],/Unavailable api method: musicStart/);
+});

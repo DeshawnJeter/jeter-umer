@@ -20,3 +20,8 @@ test('original tower-defense mechanics execute without registering another fixed
   const scenarios=JSON.stringify([{name:'build towers and defend',steps:[{dt:0.1,input:{attack:true},repeat:3},{dt:0.1,input:{},repeat:290}],expect:'won'},{name:'undefended crystal falls',steps:[{dt:0.1,input:{},repeat:290}],expect:'lost'}]);
   const report=await runCodeChecks({source,scenarios});assert.equal(report.passed,true,report.error);
 });
+
+test('start failures explain the exact no-input method contract for model repairs',async()=>{
+ const source=DEFAULT_SOURCE.replace("start(){phase='playing';}","start(){phase='ready';}");
+ const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,false);assert.match(report.error,/game.start\(\) is called without keyboard input/);assert.match(report.error,/observed ready/);
+});

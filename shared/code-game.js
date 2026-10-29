@@ -18,7 +18,19 @@ export function inspectSnapshot(value){
 }
 export function codeScenarios(text){
   if(typeof text!=='string'||text.length>12000)throw Error('Scenarios exceed limit');const cases=JSON.parse(text);
-  if(!Array.isArray(cases)||cases.length<2||cases.length>4||!cases.some(c=>c.expect==='won')||!cases.some(c=>c.expect==='lost'))throw Error('Supply win and loss scenarios');
-  for(const c of cases)if(typeof c.name!=='string'||c.name.length>50||!['won','lost'].includes(c.expect)||!Array.isArray(c.steps)||c.steps.length<1||c.steps.length>300||c.steps.some(s=>!Number.isFinite(s.dt)||s.dt<0||s.dt>0.1||!Number.isInteger(s.repeat??1)||(s.repeat??1)<1||(s.repeat??1)>300||!s.input||Object.entries(s.input).some(([k,v])=>!['left','right','up','down','jump','attack','ability','interact'].includes(k)||typeof v!=='boolean'))||c.steps.reduce((n,s)=>n+(s.repeat??1),0)>300)throw Error('Invalid scenario');
+  if(!Array.isArray(cases)||cases.length<2||cases.length>4||!cases.some(c=>c?.expect==='won')||!cases.some(c=>c?.expect==='lost'))throw Error('Supply win and loss scenarios');
+  for(const [index,c] of cases.entries()){
+    const label='Scenario '+(index+1);
+    if(!c||typeof c!=='object'||typeof c.name!=='string'||c.name.length>50||!['won','lost'].includes(c.expect)||!Array.isArray(c.steps)||c.steps.length<1||c.steps.length>300)throw Error(label+': provide a name, won/lost expectation and 1–300 steps');
+    let total=0;
+    for(const [stepIndex,step] of c.steps.entries()){
+      const at=label+', step '+(stepIndex+1);
+      if(!step||typeof step!=='object'||!Number.isFinite(step.dt)||step.dt<0||step.dt>0.1)throw Error(at+': dt must be between 0 and 0.1 seconds');
+      if(!Number.isInteger(step.repeat??1)||(step.repeat??1)<1||(step.repeat??1)>300)throw Error(at+': repeat must be an integer from 1 to 300');
+      if(!step.input||typeof step.input!=='object'||Array.isArray(step.input)||Object.entries(step.input).some(([key,value])=>!['left','right','up','down','jump','attack','ability','interact'].includes(key)||typeof value!=='boolean'))throw Error(at+': input must use boolean left/right/up/down/jump/attack/ability/interact actions; J maps to attack');
+      total+=step.repeat??1;
+    }
+    if(total>300)throw Error(label+': expanded replay has '+total+' steps; at most 300 total, including setup steps, are allowed. Reduce repeat counts.');
+  }
   return cases;
 }
