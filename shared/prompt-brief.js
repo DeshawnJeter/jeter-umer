@@ -2,16 +2,34 @@ import { validateBrief } from './contracts/index.js';
 export const SETTING_KEYS = ['title','genre','theme','difficulty','music','musicStyle','musicInstrument'];
 export const PROMPT_DEFAULTS = Object.freeze({title:'My Prompt Game',genre:'collector',theme:'space',difficulty:'beginner',music:false,musicStyle:'adventure',musicInstrument:'auto'});
 const unsupportedPatterns = [
-  [/\b(rpg|role[- ]playing|turn[- ]based|final fantasy|dragon warrior)\b/i,'Turn-based RPG, party and battle systems are not supported yet.'],
-  [/\b(stealth|metal gear)\b/i,'Stealth, patrol vision and detection systems are not supported yet.'],
-  [/\b(shoot(?:ing|er)?|contra|mega\s?man)\b/i,'Shooting, weapons and projectile combat are not supported yet.'],
+  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'Turn-based RPG, party and battle systems are not supported yet.'],
+  [/\bstealth\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?metal gear\b/i,'Stealth, patrol vision and detection systems are not supported yet.'],
+  [/\b(?:shoot(?:ing|er)?|projectiles?|weapons?)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:contra|mega\s?man)\b/i,'Shooting, weapons and projectile combat are not supported yet.'],
   [/\bmetroidvania\b/i,'Metroidvania progression and connected-room exploration are not supported yet.'],
   [/\b(first[- ]person|3d)\b/i,'First-person exploration and battle views are not supported yet.'],
   [/\b(inventory|crafting|boss(?:es)?)\b/i,'Inventory, crafting and boss systems are not supported yet.']
 ];
+export function featureRequestText(prompt) {
+  let text=prompt.replace(/\b(?:title(?:d)?|name(?:d)?|called)\s*:?\s*["“][^"”]*["”]/gi,' ').replace(/\b(?:title(?:d)?|name(?:d)?|called)\s*:?\s*'[^']*'/gi,' ');
+  text=text.replace(/\b(?:title|name)\s*:\s*[^\n;.]+/gi,' ');
+  // Remove negative clauses/lists, but retain a later positive instruction such
+  // as "no shooting, but add stealth". This is a conservative lexical backstop;
+  // the independent model still reviews the original, unmodified prompt.
+  text=text.replace(/\b(?:do\s+not\s+(?:include|add|use|enable|implement|want)|don't\s+(?:include|add|use|enable|implement|want)|never\s+(?:include|add|use|enable|implement)|without|no|avoid|not\s+(?:a|an))\b[^.!?;\n]*?(?=[.!?;\n]|\b(?:but|however|instead|except|yet|then|rather|just|add|include|enable|use|make|create|with)\b|$)/gi,' ');
+  return text;
+}
 export function unsupportedIn(prompt) {
-  const positive = prompt.replace(/\b(?:no|without|do not add)\s+(?:any\s+)?(?:rpg|stealth|shooting|shooter|weapons|inventory|crafting|bosses|3d)\b/gi,'');
+  const positive=featureRequestText(prompt);
   return unsupportedPatterns.filter(([pattern])=>pattern.test(positive)).map(([,text])=>text);
+}
+export function reviewResolutionIntent(proposal,prompt) {
+  const requested=unsupportedIn(prompt),findings=[];
+  for(const note of proposal.unsupportedRequests){
+    const categories=unsupportedPatterns.filter(([pattern])=>pattern.test(note)).map(([,text])=>text);
+    if(categories.some(category=>!requested.includes(category)))findings.push('An unsupported warning refers to a mechanic absent from positive requests (it may be excluded or only mentioned in a title). Remove that false warning; preserve actual requested unsupported features.');
+    if(/\b(?:is|are)\s+(?:actually\s+)?supported\b|\baccepted in\b|\bno unsupported\b/i.test(note))findings.push('The unsupported list contains a statement describing a supported feature. Open arenas, drones and healing stars are supported in survival. Put satisfied constraints in evidence or assumptions.');
+  }
+  return {verdict:findings.length?'fail':'pass',findings:[...new Set(findings)],evidence:['Compared known mechanic warnings with positive request clauses, excluding named titles and negative feature lists']};
 }
 export function validateResolution(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).sort().join() !== [...SETTING_KEYS,'assumptions','unsupportedRequests'].sort().join()) throw new Error('Invalid prompt resolution fields');
