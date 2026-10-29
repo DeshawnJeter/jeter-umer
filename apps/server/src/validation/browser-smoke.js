@@ -41,6 +41,11 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     report.tests.push({name:'build boot',passed:!!await page.locator('canvas').count()});
     await click('Start game');assert((await state()).phase==='playing','Start did not enter gameplay');
     await click('Pause / settings');const paused=await state();await advance(1000);const frozen=await state();assert(frozen.phase==='paused'&&frozen.health===paused.health&&frozen.x===paused.x&&frozen.y===paused.y&&frozen.remaining===paused.remaining,'Pause changed gameplay state');report.tests.push({name:'pause freezes gameplay',passed:true});await click('Resume game');
+    if(['run_gun','jump_shooter','metroidvania'].includes(config.genre)){
+      await page.keyboard.down('KeyJ');await advance(650);await page.keyboard.up('KeyJ');const shots=await state();assert((shots.events||[]).some(event=>event.type==='player_shot'&&event.x>shots.x+30),'Projectiles did not publish moving trail events');
+      if(config.genre==='jump_shooter'){await advance(500);const beforePower=await state();await page.keyboard.press('KeyK');await advance(40);assert((await state()).mana===beforePower.mana-2,'Powered shot did not spend weapon energy');}
+      report.tests.push({name:'projectile trails and applicable weapon energy',passed:true});await click('Restart');await click('Start game');
+    }
     const rules=lifecycleFor(config.genre),initial=await state();
     if(['rpg','front_battle'].includes(config.genre)){
       if(config.genre==='rpg'){const p=config.levels.stars[0];await drive(()=>({x:p.x*48+24,y:p.y*48+24}),80);}
