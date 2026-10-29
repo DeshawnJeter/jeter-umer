@@ -30,6 +30,7 @@ const state = { ready: false, genre, phase: 'ready', score: 0, required: config.
 let events,vfx,scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
 const held = new Set(); let touchJump = false;
 const ui = new PlayerInterface({ config, genre, state, audio, held, onJump: () => { touchJump = true; },
+  onEffectsChanged:()=>vfx?.refreshSettings(),
   onPause: () => { held.clear(); touchJump = false; scene?.scene.pause(); },
   onResume: () => { scene?.scene.resume(); },
   onRestart: () => { if (scene) scene.scene.restart(); }
