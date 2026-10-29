@@ -88,3 +88,21 @@ test('source reads return bounded line windows and reject invalid ranges',async(
  const result=JSON.parse(await invokeCodingTool(request,call('read_source',{path:'generated/rules.js',startLine:50,maxLines:2})));assert.equal(result.source,'line 50\nline 51');assert.equal(result.totalLines,100);
  await assert.rejects(invokeCodingTool(request,call('read_source',{path:'generated/rules.js',startLine:0,maxLines:2})),/Invalid coding tool arguments/);
 });
+
+test('a corrected verified test can re-review existing model source without a fourth worker attempt',async()=>{
+ const {fingerprint}=await import('../apps/server/src/runners/instructions.js');const directory=await mkdtemp(join(tmpdir(),'verified-recheck-'));let workers=0,checkers=0;
+ const options={role:'coding',brief:{genre:'custom',difficulty:'beginner',prompt:'Doing nothing must lose within 12 seconds.'},execution:{provider:'openai'},directory,worker:async()=>{workers++;return {artifact:{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},summary:'Real-worker fixture'};},checker:async()=>{checkers++;return {verdict:'pass',findings:[],evidence:['Independent review after actual verification']};}};
+ await assert.rejects(runPair({...options,verifyProposal:async()=>({passed:false,tests:[{passed:false,error:'Early replay ended'}]})}),/exhausted/);assert.equal(workers,3);assert.equal(checkers,0);
+ const cases=JSON.parse(DEFAULT_SCENARIOS);cases[1].steps[0].repeat=120;const effectiveScenarios=JSON.stringify(cases),normalized={source:DEFAULT_SOURCE,scenarios:effectiveScenarios};
+ const result=await runPair({...options,verifyProposal:async artifact=>({passed:true,originalArtifactHash:fingerprint(artifact),sourceHash:fingerprint(normalized),effectiveScenarios,tests:[{passed:true,continuationFrames:10}]})});
+ assert.equal(workers,3);assert.equal(checkers,1);assert.equal(result.artifact.source,DEFAULT_SOURCE);assert.equal(result.artifact.scenarios,effectiveScenarios);assert.equal(result.audit.revalidatedProposal,true);
+ const saved=JSON.parse(await readFile(join(directory,'coding/attempt-3-worker.json'),'utf8'));assert.equal(saved.result.artifact.scenarios,DEFAULT_SCENARIOS);
+});
+
+test('a verified candidate rejected by its independent checker cannot be re-reviewed unchanged',async()=>{
+ const {fingerprint}=await import('../apps/server/src/runners/instructions.js');let workers=0,checkers=0;const directory=await mkdtemp(join(tmpdir(),'recheck-rejection-'));
+ const options={role:'coding',brief:{genre:'custom',difficulty:'beginner'},execution:{provider:'openai'},directory,worker:async()=>{workers++;return {artifact:{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},summary:'fixture'};},checker:async()=>{checkers++;return {verdict:'fail',findings:['Actual remaining defect'],evidence:['Independent fixture review']};}};
+ await assert.rejects(runPair({...options,verifyProposal:async()=>({passed:false,tests:[{passed:false,error:'Early probe'}]})}),/exhausted/);
+ const corrected=JSON.stringify(JSON.parse(DEFAULT_SCENARIOS)),verifyProposal=async artifact=>({passed:true,effectiveScenarios:corrected,originalArtifactHash:fingerprint(artifact),sourceHash:fingerprint({...artifact,scenarios:corrected}),tests:[{passed:true,continuationFrames:1}]});
+ await assert.rejects(runPair({...options,verifyProposal}),/did not pass independent review/);await assert.rejects(runPair({...options,verifyProposal}),/already rejected/);assert.equal(workers,3);assert.equal(checkers,1);
+});

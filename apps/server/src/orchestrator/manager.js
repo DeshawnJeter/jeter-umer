@@ -17,7 +17,7 @@ import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
 import {changedRoles} from './change-scope.js';
-import {runCodeChecks} from '../validation/code-checks.js';
+import {runCodeChecks,lossDeadlineForBrief} from '../validation/code-checks.js';
 import {frameworkConfig} from '../integration/framework.js';
 
 export class Manager {
@@ -135,7 +135,7 @@ export class Manager {
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
     const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
-      directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal);recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
+      directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal,{lossDeadlineSeconds:lossDeadlineForBrief(run.brief)});recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
     // Revalidate the complete handoff chain after asynchronous worker/checker

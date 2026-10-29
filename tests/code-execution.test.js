@@ -51,3 +51,12 @@ test('bounded path decoration supports ready, Start, win/loss and fresh restart 
  const source=DEFAULT_SOURCE.replace("nodes:[{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]","nodes:[...api.pathNodes({x:40,y:240},{x:680,y:240}),{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]");
  const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,true,report.error);assert.deepEqual(report.tests.filter(test=>test.phase).map(test=>test.phase),['won','lost']);
 });
+
+test('an early idle probe continues only to its approved deadline and records actual frames',async()=>{
+ const cases=JSON.parse(DEFAULT_SCENARIOS);cases[1].steps=[{dt:0.1,input:{},repeat:50}];const artifact={source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)};
+ const report=await runCodeChecks(artifact,undefined,{lossDeadlineSeconds:12});assert.equal(report.passed,true,report.error);const loss=report.tests.find(test=>test.phase==='lost');assert.equal(loss.originalFrames,50);assert.ok(loss.elapsedSeconds<=12);assert.ok(loss.frames<=300);assert.ok(loss.continuationFrames>0);assert.ok(report.effectiveScenarios);assert.notEqual(report.originalArtifactHash,report.sourceHash);
+});
+test('idle continuation rejects late losses and never extends active-input or winning probes',async()=>{
+ const cases=JSON.parse(DEFAULT_SCENARIOS);cases[1].steps=[{dt:0.1,input:{},repeat:110}];let report=await runCodeChecks({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)},undefined,{lossDeadlineSeconds:8});assert.equal(report.passed,false);assert.match(report.error,/approved 8 seconds/);
+ cases[1].steps=[{dt:0.1,input:{right:true},repeat:50}];report=await runCodeChecks({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)},undefined,{lossDeadlineSeconds:12});assert.equal(report.passed,false);assert.equal(report.effectiveScenarios,undefined);
+});
