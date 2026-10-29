@@ -7,3 +7,8 @@ test('long paths use at most sixteen valid render nodes and preserve both endpoi
 test('path helpers reject invalid coordinates and colors before producing invalid render data',()=>{
  for(const [start,end,color] of [[{x:NaN,y:0},{x:1,y:1},'#ffffff'],[{x:-1,y:0},{x:1,y:1},'#ffffff'],[{x:0,y:0},{x:1,y:1},'red']])assert.throws(()=>pathNodes(start,end,color),/pathNodes requires/);
 });
+
+test('checker catalog retains every supplied API and the source/render/replay bounds',async()=>{
+ const {CHECKER_COMPONENT_CATALOG,COMPONENT_CATALOG}=await import('../shared/code-game.js');for(const name of Object.keys(components)){assert.ok(CHECKER_COMPONENT_CATALOG.includes(name+'('));assert.ok(COMPONENT_CATALOG.includes(name+'('));}
+ for(const text of ['6000','nodes <=64','300 expanded','0..0.1','label <=40','no imports'])assert.ok(CHECKER_COMPONENT_CATALOG.includes(text));
+});

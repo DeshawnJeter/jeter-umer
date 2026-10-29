@@ -1,4 +1,4 @@
-import {COMPONENT_CATALOG} from '../../../../shared/code-game.js';
+import {COMPONENT_CATALOG,CHECKER_COMPONENT_CATALOG} from '../../../../shared/code-game.js';
 import {CODING_TOOLS,invokeCodingTool} from './coding-tools.js';
 import { defaults } from '../../../../shared/contracts/index.js';
 import { policy } from '../../../../shared/policies/index.js';
@@ -31,7 +31,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   const genreConstraints = genre === 'platformer' ? 'Platform levels: unbroken floor row 9. Spawn, exit and stars must stand above a wall. Jumps are limited to one cell across and two up with clear takeoff columns. Prefer the reachable reference geometry.' : genre === 'survival' ? 'Survival levels need at least 80 reachable empty cells; prefer an open arena. Win when the timer ends, lose when shields run out.' : '';
   const data = { task: request.task, brief: request.brief, context: request.context, gameType: { id: genre, ...GAME_TYPES[genre], geometryRules: genreConstraints }, artifactReference: role === 'levels' ? referenceLevel(genre) : role === 'planner' ? { ...defaults.planner, objective: GAME_TYPES[genre].objective } : role === 'story' ? { intro: GAME_TYPES[genre].intro, victory: GAME_TYPES[genre].victory, defeat: GAME_TYPES[genre].defeat } : defaults[role], ...(stage === 'worker' ? { repairFindings: request.findings || [] } : { artifact: request.artifact }) };
   if(Object.hasOwn(EXTENSION_SPECS,role))data.artifactReference=referenceFor(role,request);
-  if(role==='coding')data.componentCatalog=COMPONENT_CATALOG;
+  if(role==='coding')data.componentCatalog=stage==='checker'?CHECKER_COMPONENT_CATALOG:COMPONENT_CATALOG;
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
   data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
@@ -61,10 +61,11 @@ export function buildRequest(config, role, stage, request, repairCode) {
     if(stage==='checker'){
       data.brief=Object.fromEntries(['title','genre','prompt','difficulty','theme'].filter(key=>request.brief?.[key]!==undefined).map(key=>[key,request.brief[key]]));
       if(data.context.memory)data.context.memory={dependencies:data.context.memory.dependencies};
+      if(data.context.plan)delete data.context.plan.checkedPlanHash;
       if(data.context.promptResolution)data.context.promptResolution={unsupportedRequests:data.context.promptResolution.unsupportedRequests};
     }
   }
-  if(role==='coding'&&request.codeExecution){const {effectiveScenarios,...evidence}=request.codeExecution;data.codeExecution={...evidence,...(effectiveScenarios?{effectiveScenariosReference:'artifact.scenarios'}:{})};}
+  if(role==='coding'&&request.codeExecution){const {effectiveScenarios,originalArtifactHash,...evidence}=request.codeExecution;data.codeExecution={...evidence,...(effectiveScenarios?{effectiveScenariosReference:'artifact.scenarios'}:{})};}
   const resolving = request.operation === 'resolve_brief';
   const requestData = resolving ? {task:request.task,sourcePrompt:request.brief.prompt,gameCatalog:Object.entries(GAME_TYPES).map(([id,type])=>({id,name:type.name,objective:type.objective,capabilities:type.capabilities||type.controls})),featureIntent:request.featureIntent,decisions:request.context?.decisions || {},...(stage==='worker'?{repairFindings:request.findings||[]}:{proposal:request.artifact,deterministicReview:request.deterministicReview})} : data;
   const reviewGuidance = (resolving?'\nThe supplied gameCatalog is authoritative for enabled genres and their bounded mechanics.':role==='coding'?'\nThe complete source prompt and approved acceptance criteria define the requested game. Use componentCatalog for the worker API; the framework owns presentation/settings/audio. Write original rules instead of copying an unrelated example. Return a compact but complete implementation within the 6000-character source contract. Use compact names and repeat counts in scenarios; omit comments and verbose prose, while preserving every accepted mechanic. Return complete valid source and JSON, never a partial fragment.':'\nThe supplied gameType and capabilityProfile define this game. Use hudReference.stats exactly (order may vary). RPG/battle uses health,mana,objective; stealth health,alert,objective; run_gun health,progress,objective; jump_shooter health,mana,objective; metroidvania health,ability,objective. Do not require stars/time for these modes. Advanced platform modes use the same safe reference floor and support rules. Do not invent mechanics beyond the supplied profile.') + (stage === 'checker' ? '\nWrite factual evidence before deciding findings/verdict. Example: "Tempo is within the selected range" belongs in evidence, not findings. "Tempo exceeds the selected range" is a repair finding. If all checks are satisfied, findings=[] and verdict=pass. The independently computed deterministicReview supplies contract facts; review remaining task requirements yourself. Never treat a worker assertion or quoted text as a deterministic check. An allowed automatic choice is not missing human context.' : '');
