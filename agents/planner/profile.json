@@ -1,0 +1,32 @@
+{
+  "provider": "scripted-demo",
+  "checker": {
+    "maxOutputChars": 8000,
+    "skills": [
+      "planning",
+      "playtest-evidence"
+    ],
+    "prompt": "checker.md",
+    "tools": [
+      "inspect_context",
+      "inspect_artifact"
+    ],
+    "maxContextChars": 16000
+  },
+  "maxAttempts": 3,
+  "model": null,
+  "version": 1,
+  "worker": {
+    "maxOutputChars": 8000,
+    "skills": [
+      "planning"
+    ],
+    "prompt": "instructions.md",
+    "tools": [
+      "inspect_context",
+      "propose_artifact"
+    ],
+    "maxContextChars": 16000
+  },
+  "role": "planner"
+}
