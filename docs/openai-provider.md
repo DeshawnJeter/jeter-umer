@@ -83,3 +83,5 @@ Prompt-only creation adds a separate planner extraction and independent review b
 - [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
 - [GPT-4.1 mini model support](https://developers.openai.com/api/docs/models/gpt-4.1-mini)
 - [API authentication](https://developers.openai.com/api/reference/overview)
+
+Coding workers default to a 6144-token response allowance, while other workers and checkers retain 2048. Set OPENAI_CODING_MAX_OUTPUT_TOKENS to override it; an explicitly supplied OPENAI_MAX_OUTPUT_TOKENS also remains the fallback for coding. Reservations include the actual per-request allowance. The 24-call and 64000-total-token defaults are unchanged. Invalid source is retained only as a bounded private repair draft; parsing, capability checks and browser replays still precede independent model review. Exact patch misses return repair feedback without changing the file.

@@ -8,6 +8,18 @@ test('coding requests keep full prompt, criteria, role rules and skills while re
     const prepared=buildRequest(config,'coding',stage,request),data=JSON.parse(prepared.body.input[0].content[0].text);
     assert.equal(data.brief.prompt,brief.prompt);assert.deepEqual(data.context.plan.acceptance,criteria);assert.equal(data.context.memory.dependencies.planner,'checked-plan');assert.equal(data.context.presentation.theme,'forest');assert.equal(data.hudReference,undefined);assert.equal(data.capabilityProfile,undefined);
     assert.ok(prepared.body.instructions.includes(bundle.focusedCode.roleInstructions));for(const skill of bundle.focusedCode.skills)assert.ok(prepared.body.instructions.includes(skill.instructions));assert.ok(prepared.serialized.length<=16000);
-    if(stage==='worker'){assert.ok(prepared.body.instructions.includes('source under 2600 characters'));assert.ok(prepared.body.instructions.includes('repeat counts'));assert.equal(prepared.body.tool_choice,'none');assert.equal(buildRequest(config,'coding','worker',{...request,findings:['Repair a concrete defect']}).body.tool_choice,'auto');}
+    if(stage==='worker'){assert.ok(prepared.body.instructions.includes('compact but complete implementation'));assert.ok(prepared.body.instructions.includes('repeat counts'));assert.equal(prepared.body.tool_choice,'none');assert.equal(buildRequest(config,'coding','worker',{...request,findings:['Repair a concrete defect']}).body.tool_choice,'auto');}
   }
+});
+
+test('coding output headroom is separately configurable and included in reservation without raising total budgets',()=>{
+ const env={GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_OUTPUT_TEST'},config=providerConfig(env).publicConfig;
+ assert.equal(config.maxOutputTokens,2048);assert.equal(config.maxCodingOutputTokens,6144);assert.equal(config.maxTotalTokens,64000);assert.equal(config.maxCalls,24);
+ const req={brief:{genre:'custom'},context:{},instructions:'fixture'};
+ const worker=buildRequest(config,'coding','worker',req),checker=buildRequest(config,'coding','checker',req);
+ assert.equal(worker.body.max_output_tokens,6144);assert.equal(checker.body.max_output_tokens,2048);
+ assert.equal(worker.reservation,Buffer.byteLength(worker.serialized)+6144+512);
+ assert.equal(providerConfig({...env,OPENAI_MAX_OUTPUT_TOKENS:'1024'}).publicConfig.maxCodingOutputTokens,1024);
+ assert.equal(providerConfig({...env,OPENAI_CODING_MAX_OUTPUT_TOKENS:'4096'}).publicConfig.maxCodingOutputTokens,4096);
+ assert.throws(()=>providerConfig({...env,OPENAI_CODING_MAX_OUTPUT_TOKENS:'9000'}));
 });

@@ -36,3 +36,20 @@ test('custom games activate five model roles and leave unused template jobs to t
   assert.deepEqual(activeRoles('custom'),['planner','ui','story','audio','coding']);
   assert.equal(activeRoles('campaign').length*2,18);
 });
+
+test('syntax-rejected proposals become the actual repair draft and survive an exact patch repair',async()=>{
+ let workers=0,checkerCalls=0;const directory=await mkdtemp(join(tmpdir(),'coding-draft-handoff-')),broken='export function createGame(api){';
+ const runtime=createRuntime({env,fetchImpl:async(_,options)=>{
+  const body=JSON.parse(options.body),data=JSON.parse(body.input[0].content[0].text);
+  if(body.text.format.name==='coding_worker'){
+   workers++;
+   if(workers===1)return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:broken,scenarios:DEFAULT_SCENARIOS},question:null,summary:'Invalid draft fixture'})}]}]);
+   assert.equal(data.context.previousSource,broken);
+   if(workers===2)return response([call('apply_source_patch',{path:'generated/rules.js',find:broken,replacement:DEFAULT_SOURCE})]);
+   return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:'',scenarios:DEFAULT_SCENARIOS},question:null,summary:'Repaired draft fixture'})}]}]);
+  }
+  checkerCalls++;return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({review:{verdict:'pass',findings:[],evidence:['Independent fixture review of repaired source'],question:null}})}]}]);
+ }});
+ const handlers=await runtime.route('coding',{}),result=await runPair({role:'coding',brief:{title:'Repair fixture',genre:'custom',difficulty:'beginner',prompt:'Fixture'},directory,...handlers});
+ assert.equal(result.status,'accepted');assert.equal(result.artifact.source,DEFAULT_SOURCE);assert.equal(checkerCalls,1);assert.equal(workers,3);
+});

@@ -12,3 +12,15 @@ test('syntax and capability checks reject code before server execution and requi
   assert.equal(checkCode({source:DEFAULT_SOURCE,scenarios:'[]'}).verdict,'fail');
   assert.throws(()=>inspectSnapshot({phase:'won',health:Infinity}));
 });
+
+test('drafts survive syntax rejection and patch mismatches return recoverable feedback without mutation',async()=>{
+ const w=codeWorkspace(await mkdtemp(join(tmpdir(),'draft-repair-'))),broken='export function createGame(api){';
+ await w.stage(broken);assert.equal(await w.read(),broken);
+ const mismatch=await w.patch({path:'generated/rules.js',find:'not present',replacement:'x'});
+ assert.equal(mismatch.verdict,'fail');assert.equal(await w.read(),broken);assert.match(mismatch.findings[0],/read_source/);
+ const partial=await w.patch({path:'generated/rules.js',find:broken,replacement:'export function createGame(api){\n'});
+ assert.equal(partial.verdict,'fail');assert.equal(await w.read(),'export function createGame(api){\n');
+ const repaired=await w.patch({path:'generated/rules.js',find:await w.read(),replacement:DEFAULT_SOURCE});
+ assert.equal(repaired.verdict,'pass');assert.equal(await w.read(),DEFAULT_SOURCE);
+ await assert.rejects(w.stage('x'.repeat(6001)));await assert.rejects(w.patch({path:'../../.env',find:'',replacement:'x'}));assert.equal(await w.read(),DEFAULT_SOURCE);
+});

@@ -52,6 +52,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
       questions.push(question);
     }
     const artifact = result.artifact; const errors = validateArtifact(role, artifact);
+    if(role==='coding'&&typeof artifact?.source==='string'&&artifact.source.length<=6000)await workspace.stage(artifact.source);
     if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact);errors.push(...sourceReport.findings);}
     let codeExecution;
     if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed)errors.push(codeExecution.error||'Code replay checks failed');}
