@@ -25,7 +25,7 @@ function assertOutputFits(output, limit) {
 export async function runPair({ role, brief, context = {}, task = makeTask(role), execution = { provider: 'scripted-demo' }, worker, checker, directory, verifyProposal, beforeStep = async () => {}, onEvent = async () => {} }) {
   if (!ROLES.includes(role) || task.role !== role) throw new Error('Unknown agent role or mismatched task');
   const profile = await loadProfile(role);
-  const [workerBundle, checkerBundle] = await Promise.all([instructionBundle(role, 'worker', profile), instructionBundle(role, 'checker', profile)]);
+  const [workerBundle, checkerBundle] = await Promise.all([instructionBundle(role, 'worker', profile,brief), instructionBundle(role, 'checker', profile,brief)]);
   const input = { brief: clone(brief), context: clone(context), task: clone(task), execution: clone(execution) };
   assertRequestFits({ ...workerBundle, ...input }, profile.worker.maxContextChars);
   const folder = resolve(directory, role); await mkdir(folder, { recursive: true });

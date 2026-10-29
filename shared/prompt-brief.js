@@ -3,14 +3,14 @@ import {GAME_TYPES} from './game-types.js';
 export const SETTING_KEYS = ['title','genre','theme','difficulty','music','musicStyle','musicInstrument'];
 export const PROMPT_DEFAULTS = Object.freeze({title:'My Prompt Game',genre:'collector',theme:'space',difficulty:'beginner',music:false,musicStyle:'adventure',musicInstrument:'auto'});
 const unsupportedPatterns = [
-  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'RPG battles require the party RPG or front-view battle template.',['rpg','front_battle','campaign','roguelike']],
+  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'RPG battles require the party RPG or front-view battle template.',['rpg','front_battle','campaign','roguelike','custom']],
   [/\bstealth\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?metal gear\b/i,'Stealth requires the stealth mission template.',['stealth']],
   [/\b(?:shoot(?:ing|er)?|projectiles?|weapons?)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:contra|mega\s?man)\b/i,'Shooting requires a shooter or exploration template.',['run_gun','jump_shooter','metroidvania']],
   [/\bmetroidvania\b/i,'Ability-gated exploration requires the metroidvania template.',['metroidvania']],
   [/\b(?:3d|first[- ]person exploration)\b/i,'3D and first-person exploration are not supported.'],
-  [/\binventory\b/i,'Inventory is limited to party potions in the RPG/battle templates.',['rpg','front_battle','campaign','roguelike']],
-  [/\bcrafting\b/i,'Crafting is not supported.'],
-  [/\bboss(?:es)?\b/i,'Boss encounters require an RPG or shooter template.',['rpg','front_battle','run_gun','jump_shooter']],
+  [/\binventory\b/i,'Inventory is limited to party potions in the RPG/battle templates.',['rpg','front_battle','campaign','roguelike','custom']],
+  [/\bcrafting\b/i,'Crafting requires agent-written rules and is not part of the selected template.',['custom']],
+  [/\bboss(?:es)?\b/i,'Boss encounters require an RPG or shooter template.',['rpg','front_battle','campaign','roguelike','run_gun','jump_shooter','custom']],
   [/\bmultiplayer\b/i,'Multiplayer is not supported.']
 ];
 export function featureRequestText(prompt) {

@@ -23,9 +23,11 @@ export async function loadProfile(role) {
   }
   return profile;
 }
-export async function instructionBundle(role, stage, profile) {
+export async function instructionBundle(role, stage, profile, brief=null) {
   if (!['worker', 'checker'].includes(stage)) throw new Error('Unknown instruction stage');
-  const settings = profile[stage]; const skills = await loadSkills(settings.skills);
+  const settings = profile[stage];
+  const focused=[...(role==='coding'?['code-rules']:[]),...(['gameplay','levels','combat','progression'].includes(role)&&(!brief||['campaign','roguelike'].includes(brief.genre))?['campaign-progression']:[]),...(role==='audio'&&(!brief||brief.music)?['adaptive-audio']:[])];
+  const skills = await loadSkills([...new Set([...settings.skills,...focused])]);
   const shared = await readFile(resolve('prompts/shared.md'), 'utf8');
   const roleInstructions = await readFile(resolve('agents', role, settings.prompt), 'utf8');
   if (!shared.trim() || !roleInstructions.trim()) throw new Error(`Missing ${role} instructions`);
