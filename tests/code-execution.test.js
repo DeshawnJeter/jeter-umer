@@ -46,3 +46,8 @@ test('render node overflow reports the observed count as a trusted repair findin
  const source=DEFAULT_SOURCE.replace("nodes:[{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]","nodes:Array.from({length:65},()=>({x:1,y:1,color:'#66e3bd',size:2,label:''}))");
  const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,false);assert.match(report.error,/65 nodes.*64/);
 });
+
+test('bounded path decoration supports ready, Start, win/loss and fresh restart in the real worker',async()=>{
+ const source=DEFAULT_SOURCE.replace("nodes:[{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]","nodes:[...api.pathNodes({x:40,y:240},{x:680,y:240}),{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]");
+ const report=await runCodeChecks({source,scenarios:DEFAULT_SCENARIOS});assert.equal(report.passed,true,report.error);assert.deepEqual(report.tests.filter(test=>test.phase).map(test=>test.phase),['won','lost']);
+});

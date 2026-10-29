@@ -19,7 +19,7 @@ test('drafts survive syntax rejection and patch mismatches return recoverable fe
  const mismatch=await w.patch({path:'generated/rules.js',find:'not present',replacement:'x'});
  assert.equal(mismatch.verdict,'fail');assert.equal(await w.read(),broken);assert.match(mismatch.findings[0],/read_source/);
  const partial=await w.patch({path:'generated/rules.js',find:broken,replacement:'export function createGame(api){\n'});
- assert.equal(partial.verdict,'fail');assert.equal(await w.read(),'export function createGame(api){\n');
+ assert.equal(partial.verdict,'fail');assert.equal(await w.read(),broken);
  const repaired=await w.patch({path:'generated/rules.js',find:await w.read(),replacement:DEFAULT_SOURCE});
  assert.equal(repaired.verdict,'pass');assert.equal(await w.read(),DEFAULT_SOURCE);
  await assert.rejects(w.stage('x'.repeat(6001)));await assert.rejects(w.patch({path:'../../.env',find:'',replacement:'x'}));assert.equal(await w.read(),DEFAULT_SOURCE);
@@ -42,4 +42,10 @@ test('oversized patches remove only parsed comments while preserving literal tok
  const compacted=compactComments(source);const tokens=text=>Array.from(tokenizer(text,{ecmaVersion:'latest',sourceType:'module'}),token=>text.slice(token.start,token.end));assert.deepEqual(tokens(source),tokens(compacted));assert.equal(parse(compacted,{ecmaVersion:'latest',sourceType:'module'}).body[0].declaration.body.body[0].argument,null);
  const w=codeWorkspace(await mkdtemp(join(tmpdir(),'comment-fit-')));await w.stage(DEFAULT_SOURCE+'/*'+'x'.repeat(5000)+'*/');const report=await w.patch({path:'generated/rules.js',find:'score=0',replacement:'score=0/*'+'y'.repeat(1000)+'*/'});assert.equal(report.verdict,'pass');assert.ok((await w.read()).length<=6000);assert.ok(report.evidence.some(line=>line.includes('executable tokens')));
  const before=await w.read(),rejected=await w.patch({path:'generated/rules.js',find:'score=0',replacement:'score=0'+ ' '.repeat(7000)});assert.equal(rejected.verdict,'fail');assert.equal(await w.read(),before);
+});
+
+test('syntax-breaking and unavailable-capability patches leave parseable source unchanged',async()=>{
+ const w=codeWorkspace(await mkdtemp(join(tmpdir(),'atomic-code-')));await w.apply({source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS});
+ for(const [find,replacement] of [["phase='playing'","phase='playing'("],["time+=dt;","time+=dt;api.musicStart();"]]){const report=await w.patch({path:'generated/rules.js',find,replacement});assert.equal(report.verdict,'fail');assert.ok(report.findings.some(line=>line.includes('not changed')));assert.equal(await w.read(),DEFAULT_SOURCE);}
+ const report=await w.patch({path:'generated/rules.js',find:'score>=5',replacement:'score>=4'});assert.equal(report.verdict,'pass');assert.ok((await w.read()).includes('score>=4'));
 });
