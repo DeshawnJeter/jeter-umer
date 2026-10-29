@@ -32,7 +32,7 @@ export async function instructionBundle(role, stage, profile, brief=null) {
   const roleInstructions = await readFile(resolve('agents', role, settings.prompt), 'utf8');
   if (!shared.trim() || !roleInstructions.trim()) throw new Error(`Missing ${role} instructions`);
   const instructions = [shared, roleInstructions, ...skills.map(skill => `# Application skill: ${skill.name}\n${skill.instructions}`)].join('\n\n');
-  return { instructions, hash: fingerprint(instructions), skills: skills.map(skill => skill.name), tools: [...settings.tools] };
+  return { instructions, hash: fingerprint(instructions), skills: skills.map(skill => skill.name), tools: [...settings.tools],...(role==='coding'?{focusedCode:{roleInstructions,skills:skills.map(skill=>({name:skill.name,instructions:skill.instructions}))}}:{}) };
 }
 export function assertRequestFits(request, limit) {
   const size = JSON.stringify(request).length;
