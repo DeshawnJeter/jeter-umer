@@ -1,10 +1,11 @@
 import { providerConfig } from './config.js';
 import { createOpenAIClient } from './openai.js';
 import { route } from '../router/index.js';
+import { resolvePromptBrief } from '../runners/brief.js';
 export function createRuntime({ env = process.env, fetchImpl } = {}) {
   const selected = providerConfig(env), publicConfig = structuredClone(selected.publicConfig);
   const client = selected.mode === 'openai' ? createOpenAIClient(selected.apiKey, publicConfig, { fetchImpl }) : null;
-  return Object.freeze({ mode: selected.mode, publicConfig, async route(role, hooks) {
+  return Object.freeze({ mode: selected.mode, publicConfig, resolveBrief:options=>resolvePromptBrief({...options,client}), async route(role, hooks) {
     const deterministic = await route(role);
     if (!client) return deterministic;
     return {

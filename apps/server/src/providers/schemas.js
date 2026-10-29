@@ -2,12 +2,25 @@ import { ROLES } from '../../../../shared/contracts/index.js';
 import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
 import { MELODY_NOTES, BASS_NOTES, MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../../shared/music.js';
 import { ModelOutputError } from './output-errors.js';
+import { validateResolution } from '../../../../shared/prompt-brief.js';
 const string = { type: 'string' }, number = { type: 'number' }, boolean = { type: 'boolean' };
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const array = items => ({ type: 'array', items });
 const nullable = schema => ({ anyOf: [schema, { type: 'null' }] });
 const boundedText = maxLength => ({ type:'string', minLength:1, maxLength, pattern:'\\S' });
 const reportStrings = minItems => ({ type:'array', items:boundedText(500), minItems, maxItems:12 });
+export const resolutionSchema = object({title:boundedText(60),genre:{type:'string',enum:['collector','maze','platformer','survival']},theme:{type:'string',enum:['space','forest','neon']},difficulty:{type:'string',enum:['beginner','experienced']},music:boolean,musicStyle:{type:'string',enum:Object.keys(MUSIC_STYLES)},musicInstrument:{type:'string',enum:['auto',...Object.keys(MUSIC_INSTRUMENTS)]},assumptions:{type:'array',items:boundedText(240),maxItems:16},unsupportedRequests:{type:'array',items:boundedText(240),maxItems:16}});
+export function resolutionResponseSchema(stage) {
+  if(!['worker','checker'].includes(stage))throw new Error('Invalid resolution stage');
+  if(stage==='worker')return object({kind:{type:'string',enum:['artifact']},artifact:resolutionSchema,question:{type:'null'},summary:boundedText(500)});
+  const schema=providerResponseSchema('planner','checker');schema.properties.review.anyOf=schema.properties.review.anyOf.slice(0,2);return schema;
+}
+export function decodeResolutionOutput(stage,value) {
+  if(stage==='checker'){if(!matches(resolutionResponseSchema(stage),value))throw new ModelOutputError('schema');return decodeProviderOutput('planner','checker',value);}
+  if(!matches(resolutionResponseSchema(stage),value))throw new ModelOutputError('schema');
+  let artifact;try{artifact=validateResolution(value.artifact);}catch{throw new ModelOutputError('schema');}
+  return {artifact,summary:value.summary};
+}
 const point = object({ x: { type: 'integer' }, y: { type: 'integer' } });
 const artifacts = {
   planner: object({ title: boundedText(60), objective: boundedText(180), difficulty: { type: 'string', enum: ['beginner', 'experienced'] } }),

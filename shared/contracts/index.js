@@ -45,7 +45,10 @@ export function validateArtifact(role, value) {
 }
 export function validateBrief(brief) {
   if (!object(brief) || !string(brief.prompt, 2000)) throw new Error('Describe the game in 1–2000 characters');
+  const inputMode=brief.inputMode ?? 'manual';
+  if (!['manual','prompt'].includes(inputMode)) throw new Error('Invalid input mode');
+  if (inputMode === 'prompt') return {prompt:brief.prompt.trim(),inputMode,title:'Game from prompt',genre:'collector',theme:'space',difficulty:'',music:false,musicStyle:'adventure',musicInstrument:'auto',askStory:false};
   if (!['', 'beginner', 'experienced'].includes(brief.difficulty ?? '')) throw new Error('Invalid difficulty');
   if (brief.title !== undefined && !string(brief.title, 60)) throw new Error('Title must be 1–60 characters');
-  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), musicStyle: musicStyleOf(brief.musicStyle), musicInstrument: instrumentOf(brief.musicInstrument,true), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
+  return { prompt: brief.prompt.trim(), inputMode, title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), musicStyle: musicStyleOf(brief.musicStyle), musicInstrument: instrumentOf(brief.musicInstrument,true), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
 }

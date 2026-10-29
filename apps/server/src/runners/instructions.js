@@ -43,5 +43,7 @@ export async function loadSystemManifest() {
     const [worker, checker] = await Promise.all([instructionBundle(role, 'worker', profile), instructionBundle(role, 'checker', profile)]);
     agents[role] = fingerprint({ profile, worker: worker.hash, checker: checker.hash });
   }
-  return { master, agents, hash: fingerprint({ master: master.hash, agents }) };
+  const briefResolver=await readFile(resolve('prompts/brief-resolver.md'),'utf8');
+  if(!briefResolver.trim()||briefResolver.length>policy.maxContextChars)throw new Error('Invalid prompt resolver instructions');
+  return { master, agents, briefResolver:fingerprint(briefResolver), hash: fingerprint({ master: master.hash, agents, briefResolver:fingerprint(briefResolver) }) };
 }

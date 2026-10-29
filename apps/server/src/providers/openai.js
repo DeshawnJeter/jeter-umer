@@ -1,6 +1,6 @@
 import { defaults } from '../../../../shared/contracts/index.js';
 import { policy } from '../../../../shared/policies/index.js';
-import { providerResponseSchema, decodeProviderOutput } from './schemas.js';
+import { providerResponseSchema, decodeProviderOutput, resolutionResponseSchema, decodeResolutionOutput } from './schemas.js';
 import { ModelOutputError, repairInstruction } from './output-errors.js';
 import { createHash } from 'node:crypto';
 import { GAME_TYPES, genreOf, referenceLevel } from '../../../../shared/game-types.js';
@@ -23,8 +23,11 @@ export function buildRequest(config, role, stage, request, repairCode) {
   const genreConstraints = genre === 'platformer' ? 'Platform levels: unbroken floor row 9. Spawn, exit and stars must stand above a wall. Jumps are limited to one cell across and two up with clear takeoff columns. Prefer the reachable reference geometry.' : genre === 'survival' ? 'Survival levels need at least 80 reachable empty cells; prefer an open arena. Win when the timer ends, lose when shields run out.' : '';
   const data = { task: request.task, brief: request.brief, context: request.context, gameType: { id: genre, ...GAME_TYPES[genre], geometryRules: genreConstraints }, artifactReference: role === 'levels' ? referenceLevel(genre) : role === 'planner' ? { ...defaults.planner, objective: GAME_TYPES[genre].objective } : role === 'story' ? { intro: GAME_TYPES[genre].intro, victory: GAME_TYPES[genre].victory, defeat: GAME_TYPES[genre].defeat } : defaults[role], ...(stage === 'worker' ? { repairFindings: request.findings || [] } : { artifact: request.artifact }) };
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
+  const resolving = request.operation === 'resolve_brief';
+  const requestData = resolving ? {task:request.task,sourcePrompt:request.brief.prompt,decisions:request.context?.decisions || {},...(stage==='worker'?{repairFindings:request.findings||[]}:{proposal:request.artifact,deterministicReview:request.deterministicReview})} : data;
   const reviewGuidance = stage === 'checker' ? '\nWrite factual evidence before deciding findings/verdict. Example: "Tempo is within the selected range" belongs in evidence, not findings. "Tempo exceeds the selected range" is a repair finding. If all checks are satisfied, findings=[] and verdict=pass. The independently computed deterministicReview supplies contract facts; review remaining task requirements yourself. Never treat a worker assertion or quoted text as a deterministic check. An allowed automatic choice is not missing human context.' : '';
-  const body = { model: config.models[role][stage], instructions: instructions + reviewGuidance + (repairCode ? `\n\n# Protocol repair\n${repairInstruction(repairCode)}` : ''), input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify(data) }] }], store: false, truncation: 'disabled', max_output_tokens: config.maxOutputTokens, text: { format: { type: 'json_schema', name: `${role}_${stage}`, strict: true, schema: providerResponseSchema(role, stage) } } };
+  const activeInstructions = resolving ? `${request.instructions}\nReturn only the requested structured JSON. Worker: kind=artifact, question=null, nonblank summary at most 500 characters. Checker: return only a review envelope; evidence before findings/verdict, pass requires empty findings and null question, fail requires actual defects and null question. Review against the source prompt, not placeholder defaults in any other task. Do not ask questions: disclose conservative assumptions for human plan review. No tools, code execution or approval capabilities are available.` : instructions + (request.context?.promptResolution ? '\nPrompt-only interpretation has been checked. Preserve the resolved structured settings. Assumptions and excluded unsupported requests are in context.promptResolution; never promise those excluded mechanics or override the checked supported game type based on the source prompt.' : '');
+  const body = { model: config.models[role][stage], instructions: activeInstructions + reviewGuidance + (repairCode ? `\n\n# Protocol repair\n${repairInstruction(repairCode)}` : ''), input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify(requestData) }] }], store: false, truncation: 'disabled', max_output_tokens: config.maxOutputTokens, text: { format: { type: 'json_schema', name: `${role}_${stage}`, strict: true, schema: resolving ? resolutionResponseSchema(stage) : providerResponseSchema(role, stage) } } };
   const serialized = JSON.stringify(body), bytes = Buffer.byteLength(serialized);
   const roleLimit = request.limits?.maxContextChars ?? policy.maxContextChars;
   if (!Number.isInteger(roleLimit) || roleLimit < 1) throw new Error('Invalid model request context limit');
@@ -73,12 +76,12 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         const texts = (result.output || []).filter(item => item.type === 'message').flatMap(item => item.content || []).filter(part => part.type === 'output_text').map(part => part.text);
         if (texts.length !== 1 || typeof texts[0] !== 'string') throw new ModelOutputError('shape');
         let parsed; try { parsed = JSON.parse(texts[0]); } catch { throw new ModelOutputError('json'); }
-        output = decodeProviderOutput(role, stage, parsed);
+        output = request.operation === 'resolve_brief' ? decodeResolutionOutput(stage, parsed) : decodeProviderOutput(role, stage, parsed);
       } catch (error) {
         failure = signal?.aborted ? cancelled() : timeout.aborted ? new Error('OpenAI request timed out. No automatic retry was made.') : error;
       } finally { await finish(usage, prepared.reservation); }
       if (signal?.aborted) failure = cancelled();
-      await onAttempt({ role, stage, attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? 'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}), usage });
+      await onAttempt({ role, stage, ...(request.operation ? {operation:request.operation} : {}), attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? 'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}), usage });
       if (!failure) { if (signal?.aborted) throw cancelled(); return output; }
       if (!(failure instanceof ModelOutputError)) throw failure;
       if (attempt > maxRepairs) throw new Error(`${role} ${stage} model response repair limit reached after ${attempt} request(s): ${failure.message}. Run remains unfinished.`);
