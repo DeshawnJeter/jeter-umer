@@ -23,3 +23,10 @@ test('coding output headroom is separately configurable and included in reservat
  assert.equal(providerConfig({...env,OPENAI_CODING_MAX_OUTPUT_TOKENS:'4096'}).publicConfig.maxCodingOutputTokens,4096);
  assert.throws(()=>providerConfig({...env,OPENAI_CODING_MAX_OUTPUT_TOKENS:'9000'}));
 });
+
+test('UI checker retains prompt, complete plan, HUD and decisions without duplicate planner memory',()=>{
+ const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_UI_CONTEXT'}).publicConfig;
+ const brief={genre:'custom',prompt:'Tower defense with health and coins'},plan={title:'Tower',acceptance:['Show coins and health']},decisions={choice:'forest'};
+ const body=buildRequest(config,'ui','checker',{instructions:'fixture',brief,context:{plan,decisions,memory:{dependencies:[{role:'planner',hash:'plan-hash',artifact:plan,history:'duplicated history'}]}},artifact:{title:'Tower'}}).body;
+ const data=JSON.parse(body.input[0].content[0].text);assert.deepEqual(data.context.plan,plan);assert.equal(data.brief.prompt,brief.prompt);assert.deepEqual(data.context.decisions,decisions);assert.ok(data.hudReference);assert.equal(data.context.memory.dependencies.planner,'plan-hash');assert.equal(data.artifactReference,undefined);
+});

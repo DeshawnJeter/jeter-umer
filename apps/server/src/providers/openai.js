@@ -35,6 +35,13 @@ export function buildRequest(config, role, stage, request, repairCode) {
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
   data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
+  if(role==='ui'&&stage==='checker'){
+    // The checked plan already appears in context.plan; keep its dependency
+    // identity without duplicating its artifact and handoff history.
+    const memory=request.context?.memory;
+    if(memory)data.context={...request.context,memory:{projectId:memory.projectId,generation:memory.generation,specificationHash:memory.specificationHash,dependencies:Object.fromEntries((memory.dependencies||[]).map(({role,hash})=>[role,hash]))}};
+    delete data.artifactReference;
+  }
   if(role==='audio'&&stage==='checker'){
     // Audio consumes the complete source prompt, resolved music selectors and
     // human decisions. Gameplay acceptance prose is retained in the checked
