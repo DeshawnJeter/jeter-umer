@@ -19,7 +19,7 @@ export async function pendingProposal(folder,attempt,request){
   }catch{return null;}
 }
 
-function repairIdentity(request){const copy=semanticRequest(request);delete copy.attempt;delete copy.findings;if(copy.context)delete copy.context.previousSource;return fingerprint(copy);}
+function repairIdentity(request){const copy=semanticRequest(request);delete copy.attempt;delete copy.findings;delete copy.replayRepair;if(copy.context){delete copy.context.previousSource;delete copy.context.sourceReference;}return fingerprint(copy);}
 export async function reviewedRepair(folder,request,maxAttempts){
  if(request.execution?.provider!=='openai')return null;
  let found=null;
@@ -29,7 +29,7 @@ export async function reviewedRepair(folder,request,maxAttempts){
    if(workerText.length>100000||checkerText.length>100000)break;
    const worker=JSON.parse(workerText),checker=JSON.parse(checkerText),report=checker.report;
    if(repairIdentity(worker.request)!==repairIdentity(request)||fingerprint(worker.result?.artifact)!==fingerprint(checker.request?.artifact)||report?.verdict!=='fail'||report.question||!report.findings?.length||report.findings.some(value=>typeof value!=='string'||!value.trim()))break;
-   found={attempt:attempt+1,findings:report.findings};
+   found={attempt:attempt+1,findings:report.findings,codeExecution:checker.request.codeExecution,source:worker.result.artifact?.source};
   }catch{break;}
  }
  return found;

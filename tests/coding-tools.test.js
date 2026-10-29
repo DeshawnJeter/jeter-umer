@@ -70,3 +70,15 @@ test('all lifecycle and replay findings reach the same repair before model accep
  checker:async()=>{checked++;return {verdict:'pass',findings:[],evidence:['Independent fixture check']};}});
  assert.equal(result.status,'accepted');assert.equal(calls,2);assert.equal(verified,2);assert.equal(checked,1);
 });
+
+test('replay structure repairs preserve the exact source that passed lifecycle checks',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'replay-only-'));let calls=0,verified=0;
+ const result=await runPair({role:'coding',brief:{title:'Replay repair',genre:'custom',difficulty:'beginner'},directory,
+ worker:async request=>{calls++;if(calls===2){assert.equal(request.replayRepair.scope,'scenarios-only');assert.equal(request.context.previousSource,undefined);assert.equal(request.context.sourceReference.characters,DEFAULT_SOURCE.length);}return {artifact:{source:calls===1?DEFAULT_SOURCE:'',scenarios:calls===1?'malformed':DEFAULT_SCENARIOS},summary:'Replay fixture'};},
+ verifyProposal:async artifact=>{assert.equal(artifact.source,DEFAULT_SOURCE);return ++verified===1?{passed:false,tests:[{name:'replay structure',passed:false,error:'Malformed replay JSON'},{name:'Start without input',passed:true}]}:{passed:true,tests:[{passed:true}]};},checker:async()=>({verdict:'pass',findings:[],evidence:['Independent fixture review']})});
+ assert.equal(result.artifact.source,DEFAULT_SOURCE);assert.equal(calls,2);assert.equal(verified,2);
+});
+test('a scenarios-only worker cannot replace its locked source',async()=>{
+ let calls=0;const directory=await mkdtemp(join(tmpdir(),'replay-source-lock-'));
+ await assert.rejects(runPair({role:'coding',brief:{genre:'custom',difficulty:'beginner'},directory,worker:async()=>({artifact:{source:++calls===1?DEFAULT_SOURCE:'changed',scenarios:DEFAULT_SCENARIOS},summary:'fixture'}),verifyProposal:async()=>({passed:false,tests:[{name:'replay structure',passed:false,error:'Fixture error'},{name:'Start without input',passed:true}]}),checker:async()=>{throw Error('Must not review');}}),/Replay-only repair cannot change/);
+});

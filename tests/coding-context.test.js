@@ -50,3 +50,9 @@ test('harness counts derived instruction metadata once without hiding distinct r
  assert.ok(JSON.stringify(request).length>16000);assert.ok(assertRequestFits(request,16000)<=16000);
  assert.throws(()=>assertRequestFits({...request,focusedCode:{roleInstructions:'UNIQUE REQUIREMENT '.repeat(1000),skills:[]}},16000),/Context exceeds/);
 });
+
+test('scenarios-only requests lock source and use structured replays without editing tools',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_REPLAY_SCOPE'}).publicConfig;
+ const request={...bundle,brief:{genre:'custom',prompt:'Full approved requirements'},context:{sourceReference:{hash:'locked'}},replayRepair:{scope:'scenarios-only',sourceHash:'locked'},tools:{apply_source_patch(){}}};
+ const body=buildRequest(config,'coding','worker',request).body;assert.equal(body.tools,undefined);assert.equal(body.max_output_tokens,2048);assert.deepEqual(body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(body.instructions.includes('scenarios-only repair'));
+});
