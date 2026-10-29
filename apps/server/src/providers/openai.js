@@ -9,7 +9,7 @@ const constraints = {
   levels: '15 by 10 grid. Integer x 0–14, y 0–9. One spawn and exit, 1–12 stars, at most 60 walls. Required objects are distinct, never overlap walls and are reachable from spawn.',
   ui: 'Title must equal the checked plan. Colors are six-digit #RRGGBB strings. Player/background contrast must be at least 3:1. Preserve brief.theme (space, forest, neon; default space). The procedural asset catalog supplies original themed sprites, tiles and scenery. Return only colors, title and the allowlisted theme, never URLs, file paths or executable drawing code.',
   story: 'Intro, victory and defeat are nonempty plain text, each at most 180 characters. Intro explains the selected game objective. Endings differ. Honor story.direction when supplied.',
-  audio: 'Volume 0–0.3. Event frequencies 100–2000 Hz and distinct. Music must match the human brief. Do not claim to have listened.'
+  audio: 'Volume 0–0.3. Event frequencies 100–2000 Hz and distinct. Preserve brief.music. Compose a score using the allowlisted notes in the schema: 8/16/32 melody steps, 4/8 bass steps, R for a rest; neither part may be all rests. Preserve brief.musicStyle (default adventure). Integer tempos: calm 60–90, adventure 90–120, arcade 110–150 BPM. Calm has drums=false. Use sine, triangle or square waveform. Generate musical data, never code or sample URLs. Do not claim to have listened.'
 };
 export function buildRequest(config, role, stage, request) {
   const genre = genreOf(request.brief?.genre);

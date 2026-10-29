@@ -6,5 +6,5 @@ export async function check({ artifact, brief }) {
   const genre = genreOf(brief.genre);
   const terms = { collector: /star/i, maze: /maze|exit|portal/i, platformer: /jump|platform/i, survival: /surviv/i };
   if (!terms[genre].test(artifact.objective)) findings.push(`The plan must describe the ${GAME_TYPES[genre].name} objective`);
-  return { verdict: findings.length ? 'fail' : 'pass', findings, evidence: ['Compared title and difficulty with the human brief', 'Verified the objective fits the supported star-collector template'] };
+  return { verdict: findings.length ? 'fail' : 'pass', findings, evidence: ['Compared title and difficulty with the human brief', `Verified the objective fits the selected ${genre} template`] };
 }

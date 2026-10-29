@@ -11,7 +11,7 @@ npm ci
 npm start
 ```
 
-Open http://127.0.0.1:3000. Create a game, answer the planner's difficulty question if necessary, then approve the checked plan before specialists begin. Select “Ask me for story direction” to exercise a free-text specialist question while independent tasks continue. Play the generated preview. Use arrow keys or WASD, collect stars, then reach the purple exit. Start audio with the Start button. Optional music uses Tone.js. Downloaded ZIPs include the game and engine files; extract and serve with a local HTTP server rather than opening HTML directly from disk.
+Open http://127.0.0.1:3000. Choose a game type, art theme, music style and brief. Answer the planner's difficulty question if necessary, then approve the checked plan before specialists begin. Select “Ask me for story direction” to exercise a free-text specialist question while independent tasks continue. Follow the generated preview's displayed controls and objective: the platformer adds jumping, and survival wins when time expires. Start audio with the Start button. Downloaded ZIPs include the game and engine files; extract and serve with a local HTTP server rather than opening HTML directly from disk.
 
 ```sh
 npm test
@@ -47,6 +47,10 @@ Choose the game type explicitly in the creation form. Changing it through revisi
 Choose Astral voyage, Moonlit forest or Neon city artwork. The UI agent supplies a checked palette and the selected theme. Original local canvas artwork provides animated explorers, drones, glowing pickups, portals, textured tiles, layered scenery and ambient motion. No image-generation service, external downloads or additional API charges are involved. This is procedural art, not a claim to generate arbitrary bespoke illustrations. ZIPs include the renderer, theme catalog, provenance manifest and MIT artwork license; all are covered by the build hash.
 
 For isolated playtest sessions, set `GAME_BUILDER_RUNS_DIR` to a different local run directory and optionally set `PORT`. This keeps test builds separate from existing run history. These are trusted server environment settings, not agent-controlled values.
+
+The audio specialist can compose calm, adventure or arcade scores as validated musical data: tempo, instrument waveform, melody notes, bass notes and a rhythm toggle. Its independent model checker and deterministic checker review that data. Tone.js schedules separate melody, bass and percussion layers through a limited, low-volume mix. Audio starts after a gesture, stops at round end, pauses when hidden, and reuses/disposes its owned resources rather than adding loops on every restart. Games include music-score.json and the playback code. No recorded songs, vocal generation or remote samples are produced. Human listening is still required; automatic checks establish safe ranges and scheduling behavior, not musical quality.
+
+The feature pull requests are stacked for review, all targeting development: merge the existing OpenAI provider (#13), validation fixes (#14), game types (#15), artwork (#16), Windows state recovery (#17), then composed music. Each new branch contains its feature commit on the preceding tested prerequisite. Development remains unchanged until those requests are reviewed and merged.
 
 ## Branches
 
