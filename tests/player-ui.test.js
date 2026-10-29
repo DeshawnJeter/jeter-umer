@@ -70,7 +70,7 @@ test('pause/resume preserves round phase, clears input, and restart cannot resur
     ui.render=()=>{};ui.controls=()=>{};ui.keys.add('KeyA');ui.capture='left';
     ui.pause();ui.pause();assert.equal(pauses,1);assert.equal(state.phase,'paused');assert.equal(el('#pause-menu').open,true);assert.equal(ui.keys.size+ui.held.size,0);
     ui.resume();ui.resume();assert.equal(resumes,1);assert.equal(state.phase,'playing');assert.equal(state.remaining,37);assert.equal(state.health,2);assert.equal(ui.capture,null);assert.deepEqual(playing,[false,true]);
-    for(const phase of ['ready','won','lost']) {state.phase=phase;ui.pause();ui.resume();assert.equal(state.phase,phase);assert.equal(playing.at(-1),false);}
+    for(const phase of ['ready','won','lost']) {state.phase=phase;ui.pause();ui.resume();assert.equal(state.phase,phase);assert.equal(el('#status').textContent,phase.toUpperCase());assert.equal(playing.at(-1),false);}
     state.phase='lost';ui.pause();ui.restart();assert.equal(restarts,1);assert.equal(state.phase,'ready');assert.equal(el('#pause-menu').open,false);assert.equal(playing.at(-1),false);
   } finally { if(previousDocument===undefined)delete globalThis.document;else globalThis.document=previousDocument; }
 });

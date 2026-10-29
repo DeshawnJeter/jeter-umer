@@ -79,7 +79,7 @@ export class PlayerInterface {
   resume() {
     if (this.previousPhase === null) return;
     this.capture = null; this.clearInput(); this.state.phase = this.previousPhase; this.previousPhase = null;
-    $('#pause-menu').close(); this.onResume(); this.audio.setPlaying(this.state.phase === 'playing'); this.controls(); this.render(); $('#game').focus();
+    $('#pause-menu').close(); this.onResume(); this.audio.setPlaying(this.state.phase === 'playing'); this.controls(); this.render(); $('#status').textContent = this.state.phase.toUpperCase(); $('#game').focus();
   }
   restart() { if (this.previousPhase !== null) this.resume(); this.clearInput(); this.audio.setPlaying(false); this.onRestart(); }
   render() {
