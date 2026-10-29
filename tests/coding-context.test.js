@@ -43,3 +43,10 @@ test('model instructions include an executable lifecycle reference and expanded 
  const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'});
  assert.match(bundle.instructions,/Start button calls game.start\(\) with NO arguments/);assert.match(bundle.instructions,/phase='playing'/);assert.match(bundle.instructions,/247 idle frames is 250/);assert.match(bundle.instructions,/Restart creates a NEW instance/);
 });
+
+test('harness counts derived instruction metadata once without hiding distinct requirements',async()=>{
+ const {assertRequestFits}=await import('../apps/server/src/runners/instructions.js'),profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'});
+ const request={...bundle,brief:{prompt:'p'.repeat(2000)},context:{previousSource:'x'.repeat(6000)}};
+ assert.ok(JSON.stringify(request).length>16000);assert.ok(assertRequestFits(request,16000)<=16000);
+ assert.throws(()=>assertRequestFits({...request,focusedCode:{roleInstructions:'UNIQUE REQUIREMENT '.repeat(1000),skills:[]}},16000),/Context exceeds/);
+});

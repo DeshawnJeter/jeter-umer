@@ -5,7 +5,7 @@ import {runPair} from '../apps/server/src/runners/harness.js';
 import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../shared/code-game.js';
 import {activeRoles} from '../shared/specialists.js';
 const env={GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_CODING_TOOL_TEST'};
-const response=output=>new Response(JSON.stringify({status:'completed',output,usage:{input_tokens:100,output_tokens:50,total_tokens:150}}));
+const response=output=>{for(const item of output)for(const part of item.content||[])if(part.type==='output_text'){const value=JSON.parse(part.text);if(typeof value.artifact?.scenarios==='string'){value.artifact.scenarios=JSON.parse(value.artifact.scenarios).map(c=>({name:c.name,expect:c.expect,steps:c.steps.map(step=>({dt:step.dt,actions:Object.entries(step.input).filter(([,value])=>value).map(([key])=>key),repeat:step.repeat??1}))}));part.text=JSON.stringify(value);}}return new Response(JSON.stringify({status:'completed',output,usage:{input_tokens:100,output_tokens:50,total_tokens:150}}));};
 const call=(name,args,id='call_1')=>({type:'function_call',name,arguments:JSON.stringify(args),call_id:id});
 test('model coding tools inspect and patch owned source, then submit without repeating its source text',async()=>{
   let workers=0,usage=0;const bodies=[],directory=await mkdtemp(join(tmpdir(),'coding-tools-'));

@@ -35,7 +35,11 @@ export async function instructionBundle(role, stage, profile, brief=null) {
   return { instructions, hash: fingerprint(instructions), skills: skills.map(skill => skill.name), tools: [...settings.tools],...(role==='coding'?{focusedCode:{roleInstructions,skills:skills.map(skill=>({name:skill.name,instructions:skill.instructions}))}}:{}) };
 }
 export function assertRequestFits(request, limit) {
-  const size = JSON.stringify(request).length;
+  const measured={...request},focused=request.focusedCode;
+  // focusedCode is a derived provider view of text already in instructions.
+  // Count those exact duplicates once; the provider still bounds its full wire body.
+  if(focused&&typeof request.instructions==='string'&&typeof focused.roleInstructions==='string'&&request.instructions.includes(focused.roleInstructions)&&Array.isArray(focused.skills)&&focused.skills.every(skill=>typeof skill.instructions==='string'&&request.instructions.includes(skill.instructions)))delete measured.focusedCode;
+  const size = JSON.stringify(measured).length;
   if (size > Math.min(limit, policy.maxContextChars)) throw new Error('Context exceeds the limit. Split the task; no instructions, skills, or requirements were removed.');
   return size;
 }
