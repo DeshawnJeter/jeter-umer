@@ -1,3 +1,4 @@
+import {addFeedback,updateFeedback} from './memory/feedback.js';
 import { createServer } from 'node:http';
 import { readFile, stat, readdir } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
@@ -39,6 +40,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts[3]==='feedback'){const data=await body(req);if(parts.length===4)return json(res,201,await addFeedback(manager.projects,parts[2],data));if(parts.length===5)return json(res,200,await updateFeedback(manager.projects,parts[2],parts[4],data));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===2)return json(res,201,await manager.projects.create((await body(req)).title));
       if (parts[0] !== 'api' || parts[1] !== 'runs') return json(res, 404, { error: 'Not found' });
       const data = await body(req);

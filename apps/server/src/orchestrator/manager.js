@@ -1,3 +1,4 @@
+import {feedbackFor} from '../memory/feedback.js';
 import {Versions} from '../storage/versions.js';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -132,6 +133,7 @@ export class Manager {
   }
   async execute(run, role) {
     if (run.results[role] || this.blocked(run, role)) return;
+    const unresolvedFeedback=run.projectId?feedbackFor(await this.projects.get(run.projectId),role):[];
     const handlers = this.router ? await this.router(role) : await this.runtime.route(role, this.providerHooks(run,role));
     const task = makeTask(role, run.generation);
     if (role !== 'planner') task.dependencies = [...dependenciesFor(role,run.brief.genre).map(parent=>run.tasks[parent]?.id||`${run.generation}:${parent}`), 'human:plan-approval'];
@@ -139,7 +141,7 @@ export class Manager {
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.projectHistory?{projectHistory:clone(run.projectHistory)}:{}),...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { unresolvedFeedback,...(run.projectHistory?{projectHistory:clone(run.projectHistory)}:{}),...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal,{lossDeadlineSeconds:lossDeadlineForBrief(run.brief)});recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
