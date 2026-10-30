@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';import {buildRequest} from '../apps/server/src/providers/openai.js';import {providerConfig} from '../apps/server/src/providers/config.js';import {DEFAULT_SCENARIOS,DEFAULT_SOURCE} from '../shared/code-game.js';
+import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';import {buildRequest} from './fixtures/legacy-provider.js';import {providerConfig} from './fixtures/legacy-provider.js';import {DEFAULT_SCENARIOS,DEFAULT_SOURCE} from '../shared/code-game.js';
 test('coding requests keep full prompt, criteria, role rules and skills while removing irrelevant template payload',async()=>{
   const brief={title:'Tower',genre:'custom',difficulty:'beginner',prompt:'Build towers with J to defend a crystal. Enable calm pad music.'},criteria=['Build three fixed towers.','Defeat six enemies to win.','Lose when crystal health reaches zero.'];
   const profile=await loadProfile('coding'),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_CODING_CONTEXT'}).publicConfig;

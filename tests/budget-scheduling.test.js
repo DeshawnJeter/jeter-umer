@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';import {mkdtemp} from 'node:fs/promises';import {join} from 'node:path';import {tmpdir} from 'node:os';
-import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from './fixtures/legacy-provider.js';
 import {emptyUsage,reserveUsage} from '../apps/server/src/providers/usage.js';
 async function fixture(){const manager=new Manager(new Store(await mkdtemp(join(tmpdir(),'usage-scheduling-'))),{runtime:createRuntime({env:{}}),browserMode:'off'}),run={id:randomUUID(),status:'running',providerUsage:emptyUsage(),providerConfig:{maxCalls:3,maxTotalTokens:1000}};manager.controllers.set(run.id,new AbortController());return {manager,run};}
 test('temporary parallel reservations wait for measured usage without cancelling paid requests',async()=>{

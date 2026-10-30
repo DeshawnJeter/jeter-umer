@@ -1,3 +1,5 @@
+> Historical validation record: model names and measurements below describe earlier OpenAI runs. Current live generation uses the [Claude role policy](role-model-policy.md); OpenAI commands are retired.
+
 # Real-model project workflow validation
 
 Validated October 30, 2026 with the configured local API credential, Node 24 and

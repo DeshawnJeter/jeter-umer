@@ -9,7 +9,7 @@ import {clone,defaults} from '../shared/contracts/index.js';
 import {makeTask} from '../shared/contracts/tasks.js';
 import {route} from '../apps/server/src/router/index.js';
 import {runPair} from '../apps/server/src/runners/harness.js';
-import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {createRuntime} from './fixtures/legacy-provider.js';
 import {acceptMemory,readMemory} from '../apps/server/src/memory/project.js';
 import {Manager} from '../apps/server/src/orchestrator/manager.js';
 import {Store} from '../apps/server/src/storage/store.js';

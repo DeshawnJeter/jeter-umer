@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {createOpenAIClient,buildRequest,TOKEN_COUNT_ENDPOINT,ENDPOINT} from '../apps/server/src/providers/openai.js';import {providerConfig} from '../apps/server/src/providers/config.js';import {defaults,clone} from '../shared/contracts/index.js';
+import {createOpenAIClient,buildRequest,TOKEN_COUNT_ENDPOINT,ENDPOINT} from './fixtures/legacy-provider.js';import {providerConfig} from './fixtures/legacy-provider.js';import {defaults,clone} from '../shared/contracts/index.js';
 const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_COUNT_KEY'}).publicConfig;
 const request={instructions:'Review the supplied bounded game task.',brief:{title:'Count',prompt:'Collect stars',difficulty:'beginner'},context:{plan:clone(defaults.planner)}};
 const completion=()=>new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:defaults.gameplay,question:null,summary:'Synthetic bounded proposal'})}]}],usage:{input_tokens:100,output_tokens:20,total_tokens:120}}));

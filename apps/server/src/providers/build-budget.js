@@ -1,6 +1,6 @@
 import {isModelProvider} from '../../../../shared/providers.js';
 import {activeRoles} from '../../../../shared/specialists.js';
-const rates={'claude-sonnet-5-5':[2,10],'claude-opus-5-5':[4,20],'gpt-6-astra':[10,50],'gpt-6.1-sol':[2,10],'gpt-6.1-terra':[1,5],'gpt-6-luna':[0.1,0.5]};
+const rates={'claude-sonnet-5-5':[2,10],'claude-opus-5-5':[4,20],'claude-haiku-5-5':[0.1,0.5]};
 export function buildBudget(config,data={}){
  if(!isModelProvider(config.mode))return null;const result={maxCalls:config.maxCalls,maxTotalTokens:config.maxTotalTokens};
  for(const key of Object.keys(result))if(data[key]!==undefined){if(!Number.isInteger(data[key])||data[key]<(key==='maxCalls'?1:2000)||data[key]>config[key])throw Error('Requested '+key+' must stay within the server limit');result[key]=data[key];}

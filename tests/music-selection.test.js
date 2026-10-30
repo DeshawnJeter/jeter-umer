@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Manager } from '../apps/server/src/orchestrator/manager.js';
 import { Store } from '../apps/server/src/storage/store.js';
-import { createRuntime } from '../apps/server/src/providers/runtime.js';
+import { createRuntime } from './fixtures/legacy-provider.js';
 import { responseSchema } from '../apps/server/src/providers/schemas.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../shared/music.js';
 test('changing music style/instrument requires fresh plan approval and exports the checked choice',async()=>{

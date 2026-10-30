@@ -2,7 +2,7 @@
 
 Current indie workflow, branch dependencies, and limitations: [Indie workflow](docs/indie-workflow.md). Model policy: [Role models](docs/role-model-policy.md). Earlier feature descriptions below include the project’s incremental history.
 
-A local hub-and-spoke game builder with a no-key demo and an opt-in OpenAI provider. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser game for human review. Choose from ten game styles, including six small RPG, stealth, battle, shooter and exploration templates.
+A local hub-and-spoke game builder with a no-key demo and an opt-in Claude / Anthropic provider. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser game for human review. Choose from ten game styles, including six small RPG, stealth, battle, shooter and exploration templates.
 
 ## Run
 
@@ -22,11 +22,11 @@ npm run check
 
 For Claude workers and checkers, see [Anthropic setup](docs/anthropic-provider.md) and use `npm run start:anthropic` with a private `ANTHROPIC_API_KEY`. Existing OpenAI runs retain their provider identity.
 
-For real model workers/checkers, privately set a fresh `OPENAI_API_KEY` in the server environment and run `npm run start:openai`. See [docs/openai-provider.md](docs/openai-provider.md) for model overrides, limits and optional explicit environment-file loading. The dashboard clearly labels billed OpenAI mode. Normal tests strip real credentials and never make paid calls.
+Claude is the only supported live provider. OpenAI startup and validation commands are retired. Normal tests strip real credentials and never make paid calls. Start new Claude runs or restore a version into a new run; historical provider identities and approvals remain unchanged.
 
 ## What this version does
 
-- Runs six specialist/checker pairs with isolated persisted artifacts, using scripted demo workers or separate OpenAI model calls.
+- Runs six specialist/checker pairs with isolated persisted artifacts, using scripted demo workers or separate Claude model calls.
 - Routes tasks by role and runs ready specialists with a concurrency limit of three.
 - Retries failed proposals, preserves checker evidence, and stops at a global step budget.
 - Saves human difficulty answers, supports pause/resume/cancel, and restores interrupted runs as paused.
@@ -40,9 +40,9 @@ For real model workers/checkers, privately set a fresh `OPENAI_API_KEY` in the s
 
 ## Boundaries
 
-**Demo mode is free of API calls. OpenAI mode uses real models for bounded game configuration and static review.** Template styles use trusted Phaser code. Custom mode accepts bounded model-written JavaScript rules, parses them without server execution, and runs them only in isolated browser workers. It does not provide unrestricted project or host access. Demo workers use explicit settings; real workers receive the brief and relevant task context as untrusted data.
+**Demo mode is free of API calls. Claude mode uses real models for bounded game configuration and static review.** Template styles use trusted Phaser code. Custom mode accepts bounded model-written JavaScript rules, parses them without server execution, and runs them only in isolated browser workers. It does not provide unrestricted project or host access. Demo workers use explicit settings; real workers receive the brief and relevant task context as untrusted data.
 
-OpenAI checkers reason independently about supplied artifacts, then deterministic role checks still run. Static integration and isolated browser checks are separate. Browser QA is enabled by default, but smoke checks do not establish complete mechanic coverage or creative quality. Human playtesting supplies the behavioral approval. Prompt files are loaded and audited; only real model workers interpret them. Tool allowlists constrain the harness interface, and the API provider exposes no file/shell tools. Trusted JavaScript worker modules are not OS-isolated.
+Claude checkers reason independently about supplied artifacts, then deterministic role checks still run. Static integration and isolated browser checks are separate. Browser QA is enabled by default, but smoke checks do not establish complete mechanic coverage or creative quality. Human playtesting supplies the behavioral approval. Prompt files are loaded and audited; only real model workers interpret them. Tool allowlists constrain the harness interface, and the API provider exposes no file/shell tools. Trusted JavaScript worker modules are not OS-isolated.
 
 Runtime state lives in ignored `.local/runs/`. The existing `.env/` directory stays ignored. Do not commit secrets. This server binds only to loopback and is a development tool without multi-user authentication. Do not expose it publicly.
 
@@ -64,7 +64,7 @@ Pause/settings (or Escape) freezes the Phaser scene, including physics, enemies,
 
 The HUD/pause-menu branch is stacked on music styles/instruments (#19), also targeting development. Existing saved build bytes and approvals are not rewritten: create a new game or revision to receive these features. Automated checks and model reviews are separate from the human playtest approval.
 
-Real-model generation now places summary/report bounds and consistent checker verdict shapes in the strict output schema. Completed malformed responses receive up to two format-repair requests against the unchanged task/artifact. Each request counts against the existing call/token budgets and gets a safe audit/activity entry. Invalid output is never silently accepted or echoed into repair instructions. Refusals, API errors, incomplete responses and exhausted budgets still stop visibly. See [OpenAI provider](docs/openai-provider.md) for `OPENAI_MAX_RESPONSE_REPAIRS` (0–2, default 2), audit details and limitations. This branch is stacked on HUD/pause-menu PR #20 and targets development; new runs use the updated provider policy after restarting the app.
+Real-model generation now places summary/report bounds and consistent checker verdict shapes in the strict output schema. Completed malformed responses receive up to two format-repair requests against the unchanged task/artifact. Each request counts against the existing call/token budgets and gets a safe audit/activity entry. Invalid output is never silently accepted or echoed into repair instructions. Refusals, API errors, incomplete responses and exhausted budgets still stop visibly. See [Claude provider](docs/anthropic-provider.md) for `ANTHROPIC_MAX_RESPONSE_REPAIRS` (0–2, default 2), audit details and limitations. This branch is stacked on HUD/pause-menu PR #20 and targets development; new runs use the updated provider policy after restarting the app.
 
 Enable **Get settings from my prompt** to describe the title, game type, art, difficulty and music in one prompt. Manual fields are hidden/disabled and are not sent or applied in this mode. A planner resolver and separate checker propose supported settings, disclose assumptions and unsupported requests, then the ordinary checked-plan review lets you edit any setting before approving. Unsupported omissions require explicit acknowledgement in the UI and API. Disabling the option restores manual control, whose values keep priority. Demo resolution recognizes labels/keywords; real mode interprets natural language with the configured planner models. Both use the current game catalog, three art themes and the music catalog. See [prompt-only workflow](docs/prompt-only-workflow.md). The branch is stacked on response-recovery PR #21 and targets development.
 

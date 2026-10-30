@@ -18,7 +18,7 @@ export async function resolvePromptBrief({client,brief,decisions={},hooks={},dir
     const combinedFindings=[...deterministicReview.findings,...modelReport.findings];
     const report={...modelReport,verdict:combinedFindings.length?'fail':modelReport.verdict,findings:combinedFindings,evidence:[...deterministicReview.evidence,...modelReport.evidence]};
     await writeFile(resolve(folder,`attempt-${attempt}-checker.json`),JSON.stringify({proposal,report},null,2));
-    if(report.verdict==='pass'&&!report.findings.length)return {proposal,report,sourcePrompt:brief.prompt,instructionsHash:fingerprint(instructions),provider:client?(client.mode||'openai'):'scripted-demo'};
+    if(report.verdict==='pass'&&!report.findings.length)return {proposal,report,sourcePrompt:brief.prompt,instructionsHash:fingerprint(instructions),provider:client?(client.mode||'anthropic'):'scripted-demo'};
     findings=report.findings.length?report.findings:['Return conservative, supported suggestions for review instead of asking a question.'];
   }
   throw new Error('Prompt interpretation exhausted its checked repair attempts. Revise the prompt; no specialists were started.');

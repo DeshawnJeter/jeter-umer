@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {providerConfig} from '../apps/server/src/providers/config.js';import {buildRequest} from '../apps/server/src/providers/openai.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {providerConfig} from './fixtures/legacy-provider.js';import {buildRequest} from './fixtures/legacy-provider.js';
 import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';import {DEFAULT_SOURCE} from '../shared/code-game.js';
 test('fixed wire schemas do not consume task context but full byte and token limits remain enforced',()=>{
  const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'synthetic'}).publicConfig;

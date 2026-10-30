@@ -8,13 +8,13 @@ import {demoResolve,finalizeResolution,validateResolution,PROMPT_DEFAULTS,unsupp
 import {validateBrief,defaults,clone} from '../shared/contracts/index.js';
 import {Manager} from '../apps/server/src/orchestrator/manager.js';
 import {Store} from '../apps/server/src/storage/store.js';
-import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {createRuntime} from './fixtures/legacy-provider.js';
 import {GAME_TYPES,referenceLevel} from '../shared/game-types.js';
 import {hudFor} from '../shared/player-ui.js';
 import {ART_THEMES} from '../shared/art-catalog.js';
 import {composeScore} from '../shared/music.js';
-import {buildRequest} from '../apps/server/src/providers/openai.js';
-import {providerConfig} from '../apps/server/src/providers/config.js';
+import {buildRequest} from './fixtures/legacy-provider.js';
+import {providerConfig} from './fixtures/legacy-provider.js';
 const prompt='Title: Neon Rescue; Game type: survival arena; Art theme: neon; Difficulty: experienced; Music style: dance; Lead instrument: FM lead; Add music.';
 const temp=()=>mkdtemp(join(tmpdir(),'prompt-workflow-'));
 async function manager(runtime=createRuntime({env:{}})){const m=new Manager(new Store(await temp()),{runtime});await m.initialize();return m;}

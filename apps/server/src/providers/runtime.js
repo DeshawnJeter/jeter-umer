@@ -1,13 +1,14 @@
 import { providerConfig } from './config.js';
-import { createOpenAIClient } from './openai.js';
 import { createAnthropicClient } from './anthropic.js';
-import { isModelProvider } from '../../../../shared/providers.js';
 import { route } from '../router/index.js';
 import { resolvePromptBrief } from '../runners/brief.js';
 export function createRuntime({ env = process.env, fetchImpl,countInputTokens } = {}) {
-  const selected = providerConfig(env), publicConfig = structuredClone(selected.publicConfig);
-  const factory=selected.mode==='anthropic'?createAnthropicClient:createOpenAIClient;
-  const client = isModelProvider(selected.mode) ? factory(selected.apiKey, publicConfig, { fetchImpl,...(countInputTokens===undefined?{}:{countInputTokens}) }) : null;
+  const selected = providerConfig(env);
+  const client = selected.mode==='anthropic' ? createAnthropicClient(selected.apiKey, selected.publicConfig, { fetchImpl,...(countInputTokens===undefined?{}:{countInputTokens}) }) : null;
+  return createRoutedRuntime(selected,client);
+}
+export function createRoutedRuntime(selected,client) {
+  const publicConfig=structuredClone(selected.publicConfig);
   return Object.freeze({ mode: selected.mode, publicConfig, resolveBrief:options=>resolvePromptBrief({...options,client}), async route(role, hooks) {
     const deterministic = await route(role);
     if (!client) return deterministic;

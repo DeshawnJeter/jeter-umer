@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from './fixtures/legacy-provider.js';
 test('new project runs reuse known human story decisions with original provenance and keep explicit brief settings',async()=>{
  const root=await mkdtemp(join(tmpdir(),'cross-run-decisions-'));try{
  const manager=new Manager(new Store(root),{runtime:createRuntime({env:{}}),browserMode:'off'});manager.launch=()=>{};const project=await manager.projects.create('Memory');await manager.projects.update(project.id,p=>p.decisions.push({key:'story.direction',answer:'Use Moonbrook',source:'human-answer',questionId:'story-q',runId:'original',affectedRoles:['story']},{key:'brief.difficulty',answer:'experienced',source:'human-answer',questionId:'difficulty-q',runId:'original',affectedRoles:['planner']}));

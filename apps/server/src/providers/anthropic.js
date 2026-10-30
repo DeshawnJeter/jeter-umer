@@ -1,4 +1,4 @@
-import { createOpenAIClient } from './openai.js';
+import { createModelClient } from './model-client.js';
 
 export const ANTHROPIC_ENDPOINT='https://api.anthropic.com/v1/messages';
 // Anthropic's grammar supports fewer bounds than our authoritative local
@@ -24,6 +24,7 @@ export function anthropicRequest(body) {
     else throw Error('Unsupported Anthropic conversation item');
   }
   const result={model:body.model,max_tokens:body.max_output_tokens,system:body.instructions,messages,output_config:{format:{type:'json_schema',schema:anthropicSchema(body.text.format.schema)}}};
+  if(body.effort)result.output_config.effort=body.effort;
   if(body.tools?.length){
     result.tools=body.tools.map(tool=>({name:tool.name,description:tool.description,input_schema:anthropicSchema(tool.parameters),strict:true}));
     result.tool_choice={type:body.tool_choice==='required'?'any':body.tool_choice==='none'?'none':'auto',...(body.tool_choice==='none'?{}:{disable_parallel_tool_use:true})};
@@ -56,5 +57,5 @@ export const anthropicProtocol=Object.freeze({
   countBody:body=>Object.fromEntries(['model','messages','system','tools','tool_choice','output_config'].filter(key=>body[key]!==undefined).map(key=>[key,body[key]]))
 });
 export function createAnthropicClient(apiKey,config,options={}) {
-  return createOpenAIClient(apiKey,config,{...options,protocol:anthropicProtocol});
+  return createModelClient(apiKey,config,{...options,protocol:anthropicProtocol});
 }

@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {providerConfig} from '../apps/server/src/providers/config.js';
 import {createRuntime} from '../apps/server/src/providers/runtime.js';
 import {anthropicSchema,anthropicRequest,anthropicResponse,createAnthropicClient,ANTHROPIC_ENDPOINT} from '../apps/server/src/providers/anthropic.js';
-import {buildRequest} from '../apps/server/src/providers/openai.js';
+import {buildRequest} from '../apps/server/src/providers/model-client.js';
 import {providerResponseSchema} from '../apps/server/src/providers/schemas.js';
 import {buildBudget,estimateBuild} from '../apps/server/src/providers/build-budget.js';
 import {Manager} from '../apps/server/src/orchestrator/manager.js';
@@ -30,9 +30,9 @@ test('Anthropic credentials and overrides are provider-specific and never public
   assert.throws(()=>providerConfig({GAME_BUILDER_PROVIDER:'anthropic',OPENAI_API_KEY:key}),/ANTHROPIC_API_KEY/);
   const c=providerConfig({...env,OPENAI_MODEL:'wrong-provider',ANTHROPIC_UI_CHECKER_MODEL:'claude-haiku-5-5'});
   assert.equal(c.mode,'anthropic');assert.equal(c.publicConfig.models.ui.checker,'claude-haiku-5-5');assert.equal(c.publicConfig.models.coding.worker,'claude-sonnet-5-5');
-  assert.equal(c.publicConfig.escalation.enabled,false);assert.ok(!JSON.stringify(c.publicConfig).includes(key));
+  assert.equal(c.publicConfig.escalation.enabled,true);assert.ok(!JSON.stringify(c.publicConfig).includes(key));
   assert.equal(c.publicConfig.maxTotalTokens,128000);
-  assert.equal(buildBudget(c.publicConfig,{maxCalls:8}).maxCalls,8);assert.equal(estimateBuild(c.publicConfig,brief).estimatedDollars,null); // Unpriced override stays unknown.
+  assert.equal(buildBudget(c.publicConfig,{maxCalls:8}).maxCalls,8);assert.ok(estimateBuild(c.publicConfig,brief).estimatedDollars>0); const unknown=structuredClone(c.publicConfig);unknown.models.ui.checker='unpriced-claude';assert.equal(estimateBuild(unknown,brief).estimatedDollars,null);
   assert.ok(estimateBuild(config(),brief).estimatedDollars>0);
   assert.throws(()=>buildBudget(c.publicConfig,{maxCalls:41}),/server limit/);
 });
@@ -62,7 +62,7 @@ test('Claude workers/checkers make distinct bounded requests with actual usage a
   assert.equal(run.status,'awaiting_plan');assert.equal(run.mode,'anthropic');assert.equal(run.providerUsage.calls,2);assert.equal(run.providerUsage.totalTokens,300);
   assert.deepEqual(run.results.planner.report.reviewSources,['anthropic','deterministic']);assert.equal(run.results.planner.audit.execution.provider,'anthropic');
   assert.equal(calls.length,2);assert.equal(run.planApproval,null);assert.ok(!JSON.stringify(run).includes(key));
-  const different=new Manager(manager.store,{runtime:createRuntime({env:{GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_OPENAI'}})});
+  const different=new Manager(manager.store,{runtime:{mode:'historical-openai',publicConfig:{mode:'historical-openai'}}});
   assert.throws(()=>different.assertRuntime(run),/Providers never switch silently/);
 });
 

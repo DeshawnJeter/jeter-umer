@@ -1,8 +1,8 @@
-const SOL='gpt-6.1-sol',TERRA='gpt-6.1-terra',LUNA='gpt-6-luna';
-export const ROLE_MODELS=Object.freeze({planner:[SOL,SOL],coding:[SOL,SOL],gameplay:[LUNA,LUNA],combat:[LUNA,SOL],enemies:[LUNA,SOL],levels:[LUNA,SOL],progression:[LUNA,SOL],ui:[TERRA,TERRA],art:[TERRA,TERRA],vfx:[LUNA,TERRA],story:[TERRA,LUNA],audio:[LUNA,LUNA],implementation:[SOL,SOL],integration:[SOL,SOL],qa:[SOL,SOL]});
+const S='claude-sonnet-5-5',H='claude-haiku-5-5';
+export const ROLE_MODELS=Object.freeze({planner:[S,S],coding:[S,S],gameplay:[H,S],combat:[S,S],enemies:[S,S],levels:[H,S],progression:[S,S],ui:[S,S],art:[S,S],vfx:[H,S],story:[S,H],audio:[H,H],implementation:[S,S],integration:[S,S],qa:[S,S]});
 export function selectModel(config,role,stage,request){
  let model=config.models[role][stage],escalated=false;
  if(config.escalation?.enabled&&role==='coding'&&stage==='worker'&&(request.attempt||1)>=config.escalation.afterAttempt&&request.findings?.length){model=config.escalation.model;escalated=true;}
- const reasoning=/^gpt-6(?:\.1)?-(?:astra|sol|terra|luna)(?:-|$)/.test(model)?{effort:escalated?'high':(['coding','planner','qa','integration'].includes(role)?'medium':'low')}:undefined;
- return {model,escalated,...(reasoning?{reasoning}:{})};
+ const effort=/^claude-(sonnet|haiku|opus)-5-5(?:-|$)/.test(model)?(escalated?'high':['planner','coding','combat','enemies','progression','integration','qa','implementation'].includes(role)?'medium':'low'):undefined;
+ return {model,escalated,...(effort?{effort}:{})};
 }
