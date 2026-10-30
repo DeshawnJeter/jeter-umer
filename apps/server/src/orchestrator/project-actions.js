@@ -9,6 +9,7 @@ import {fingerprint} from '../runners/instructions.js';
 import {ensureMemory} from '../memory/project.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {emptyUsage} from '../providers/usage.js';
+import {inspectWholeGame} from '../validation/whole-game-acceptance.js';
 export async function restoreVersion(manager,projectId,versionId){
  const snapshot=await manager.versions.get(projectId,versionId),project=await manager.projects.get(projectId);
  const id=randomUUID(),folder=resolve(manager.store.folder(id),'builds','0');
@@ -22,7 +23,8 @@ export async function restoreVersion(manager,projectId,versionId){
  run.validation=validateGame(config);if(!run.validation.passed)throw Error('Historical version fails current static checks');
  run.build={generation:0,sha256:snapshot.buildHash,url:`/preview/${id}/0/index.html`,checksRequired:humanChecksFor(run.brief.genre)};
  run.planHash=fingerprint({brief:run.brief,plan:run.results.planner.artifact,instructions:run.instructions.hash,restoredFrom:run.restoredFrom});
- run.browserChecks=manager.browserMode==='on'?await manager.browserRunner({folder,config,buildHash:snapshot.buildHash,reportFolder:resolve(manager.store.folder(id),'browser-checks','generation-0')}):{passed:null,browserTested:false,buildHash:snapshot.buildHash,reason:'Browser QA explicitly disabled'};
+ run.browserChecks=manager.browserMode==='on'?await manager.browserRunner({folder,config,buildHash:snapshot.buildHash,reportFolder:resolve(manager.store.folder(id),'browser-checks','generation-0'),acceptanceCases:run.acceptanceCases}):{passed:null,browserTested:false,buildHash:snapshot.buildHash,reason:'Browser QA explicitly disabled'};
+ if(manager.browserMode==='on'){run.browserChecks.acceptance=inspectWholeGame(run.browserChecks,snapshot.buildHash,config.genre,run.acceptanceCases);run.browserChecks.passed=run.browserChecks.acceptance.passed;run.browserChecks.fullPlaythrough=run.browserChecks.acceptance.fullPlaythrough;if(!run.browserChecks.passed&&!run.browserChecks.error)run.browserChecks.error=run.browserChecks.acceptance.findings.join('; ').slice(0,600);if(await hashBuild(folder)!==snapshot.buildHash){run.browserChecks.passed=false;run.browserChecks.error='Restored build changed during browser checks';}}
  if(config.genre==='custom'&&run.acceptanceCases.length){run.independentChecks=await runCodeChecks(config.coding,undefined,{acceptanceCases:run.acceptanceCases});if(!run.independentChecks.passed){run.browserChecks.passed=false;run.browserChecks.error=run.independentChecks.error;}}
  run.status=run.browserChecks.passed===false?'failed':'awaiting_plan';
  if(run.status==='failed')run.error='Restored version failed current browser checks';
