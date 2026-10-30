@@ -1,0 +1,1 @@
+export async function liveProjectWorkflow(){throw Error('Historical OpenAI workflow validation is retired. Use scripts/live-anthropic-check.js --full for Claude. Existing reports remain unchanged.');}
