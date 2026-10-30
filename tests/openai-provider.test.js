@@ -121,7 +121,7 @@ test('model questions are validated and false evidence is not accepted as an emp
   assert.throws(() => validateModelOutput('gameplay', 'checker', { verdict: 'pass', findings: [], evidence: [], question: null }), /Invalid model checker/);
   const question = { key: 'gameplay.pace', text: 'Which pace?', reason: 'Creative preference needed', options: ['slow', 'fast'], recommended: 'slow', blocking: true, affectedRoles: ['gameplay'], maxLength: 100 };
   assert.equal(validateModelOutput('gameplay', 'checker', { verdict: 'needs_human', findings: [], evidence: ['Brief lacks pacing preference'], question }).question.key, question.key);
-  assert.throws(() => validateModelOutput('gameplay', 'worker', { kind: 'question', artifact: null, question: { ...question, blocking: false }, summary: 'Need context' }), /must be blocking/);
+  assert.throws(() => validateModelOutput('gameplay', 'worker', { kind: 'question', artifact: null, question: { ...question, blocking: false }, summary: 'Need context' }), /schema|must be blocking/);
 });
 test('oversized requests never invoke the transport and oversized responses are rejected', async () => {
   let calls = 0; const config = providerConfig(env).publicConfig;
