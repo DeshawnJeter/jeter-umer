@@ -1,3 +1,4 @@
+import {Assets} from '../storage/assets.js';
 import {buildBudget,estimateBuild} from '../providers/build-budget.js';
 import {feedbackFor} from '../memory/feedback.js';
 import {Versions} from '../storage/versions.js';
@@ -27,7 +28,7 @@ import {frameworkConfig} from '../integration/framework.js';
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
     if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
-    this.store = store; this.projects=new Projects(store.root); this.versions=new Versions(store.root,this.projects); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
+    this.store = store; this.projects=new Projects(store.root); this.versions=new Versions(store.root,this.projects);this.assets=new Assets(store.root,this.projects); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
