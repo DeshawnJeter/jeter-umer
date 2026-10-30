@@ -1,0 +1,20 @@
+import {createServer} from 'node:http';
+import {readFile,mkdir,writeFile,lstat,realpath} from 'node:fs/promises';
+import {resolve,sep,extname} from 'node:path';
+import {buildGame} from '../apps/server/src/integration/build.js';
+const args=process.argv.slice(2),option=name=>args[args.indexOf(name)+1];
+if(!args.includes('--config')||!args.includes('--source'))throw Error('Use --config <saved config.json> --source <rules.js> [--port 3108]');
+const port=Number(args.includes('--port')?option('--port'):3108);if(!Number.isInteger(port)||port<1024||port>65535)throw Error('Invalid local port');
+const config=JSON.parse(await readFile(resolve(option('--config')),'utf8'));if(config.genre!=='custom')throw Error('This preview accepts custom-game configurations only');
+config.coding.source=await readFile(resolve(option('--source')),'utf8');
+const folder=resolve('.local/tower-defense-playtest/build'),origin='http://127.0.0.1:'+port;await mkdir(folder,{recursive:true});const buildHash=await buildGame(folder,config);
+await writeFile(resolve('.local/tower-defense-playtest/provenance.json'),JSON.stringify({scope:'local-playtest-candidate',sourceFile:resolve(option('--source')),buildHash,originalRunModified:false,humanApproved:false},null,2));
+const root=await realpath(folder);
+const types={'.js':'text/javascript','.json':'application/json','.html':'text/html','.txt':'text/plain','.md':'text/plain'};
+const server=createServer(async(req,res)=>{try{
+ if(req.method!=='GET'||req.headers.host!=='127.0.0.1:'+port)throw Error('Read-only local preview');
+ const relative=decodeURIComponent(new URL(req.url,origin).pathname).slice(1)||'index.html',file=resolve(folder,relative);
+ if(!file.startsWith(folder+sep)||relative.split(/[\\/]/).some(part=>part.startsWith('.'))||!(await lstat(file)).isFile()||!types[extname(file)]||!(await realpath(file)).startsWith(root+sep))throw Error('Asset not found');
+ const worker=relative==='code-worker.js';res.writeHead(200,{'Content-Type':types[extname(file)],'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':`default-src 'none'; script-src ${origin}; style-src ${origin} 'unsafe-inline'; connect-src ${worker?"'none'":origin}; worker-src ${worker?"'none'":origin}; img-src ${origin} data: blob:; object-src 'none'; base-uri 'none'`});res.end(await readFile(file));
+ }catch{res.writeHead(404);res.end('Asset not found');}});
+server.listen(port,'127.0.0.1',()=>console.log('Local playtest candidate: '+origin+' (original run preserved)'));
