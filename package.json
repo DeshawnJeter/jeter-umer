@@ -1,0 +1,26 @@
+{
+  "name": "jeter-umer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local hub-and-spoke game builder with deterministic demo agents",
+  "scripts": {
+    "start": "node apps/server/src/index.js",
+    "test": "node scripts/test.js",
+    "check": "node scripts/check.js",
+    "test:browser": "node scripts/browser-tests.js",
+    "export:game": "node scripts/export-game.js",
+    "start:anthropic": "node scripts/start-anthropic.js"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "acorn": "8.15.0",
+    "fflate": "0.8.3",
+    "phaser": "3.90.0",
+    "playwright": "1.64.1",
+    "tone": "15.1.22",
+    "vite": "8.3.5"
+  }
+}
