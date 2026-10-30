@@ -1,0 +1,10 @@
+{
+  "origin": "Real prompt-only agent run",
+  "runId": "e6b1237e-0523-4d4c-b54d-f33620032d53",
+  "originalBuildHash": "77c0052201f361f7231b69f89f3c3a4b5ae588caac6b11b3dad6f2f9fd0bdb65",
+  "originalSourceSha256": "2ca2476b0949fe45f64978ab4c107eee481c3b1b93c014198cf10ed963aac021",
+  "codingWorker": "gpt-4.1",
+  "checker": "gpt-4.1-mini",
+  "playtestFix": "Move the build-button latch from per-frame input to persistent game state. Shared runtime fixes use a policy-compatible music clock and outlined labels.",
+  "humanApproved": false
+}
