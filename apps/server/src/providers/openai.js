@@ -36,6 +36,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
   data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
+  if(['qa','integration','implementation'].includes(role)&&stage==='checker')delete data.artifactReference;
   if(role==='ui'&&stage==='checker'){
     // The checked plan already appears in context.plan; keep its dependency
     // identity without duplicating its artifact and handoff history.

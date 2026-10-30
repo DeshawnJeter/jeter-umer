@@ -68,8 +68,8 @@ test('simulated OpenAI runs exercise every RPG worker/checker schema and preserv
   const calls=[];const runtime=createRuntime({env:{GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_SPECIALIST_TEST',OPENAI_MAX_CALLS:'40',OPENAI_MAX_TOTAL_TOKENS:'256000'},fetchImpl:async(_,options)=>{
     const body=JSON.parse(options.body),[role,stage]=body.text.format.name.split('_'),data=JSON.parse(body.input[0].content[0].text);calls.push({role,stage});
     let artifact=clone(data.artifactReference);
-    if(role==='planner')Object.assign(artifact,{title:data.brief.title,difficulty:data.brief.difficulty});
-    if(role==='ui')Object.assign(artifact,{title:data.brief.title,theme:data.brief.theme,hud:data.hudReference,playerColor:ART_THEMES.forest.playerColor,backgroundColor:ART_THEMES.forest.backgroundColor});
+    if(stage==='worker'&&role==='planner')Object.assign(artifact,{title:data.brief.title,difficulty:data.brief.difficulty});
+    if(stage==='worker'&&role==='ui')Object.assign(artifact,{title:data.brief.title,theme:data.brief.theme,hud:data.hudReference,playerColor:ART_THEMES.forest.playerColor,backgroundColor:ART_THEMES.forest.backgroundColor});
     const value=stage==='checker'?{review:{verdict:'pass',findings:[],evidence:['Static fixture comparison'],question:null}}:{kind:'artifact',artifact,question:null,summary:'Synthetic checked specialist contribution'};
     return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(value)}]}],usage:{input_tokens:100,output_tokens:50,total_tokens:150}}));
   }});

@@ -1,5 +1,8 @@
 import {requestChange} from './change-request.js';
-export async function repairFeedback(manager,projectId,data){
+export function repairFeedback(manager,projectId,data){
+ manager.projectRepairJobs??=new Map();const before=manager.projectRepairJobs.get(projectId)||Promise.resolve();const next=before.catch(()=>{}).then(()=>applyRepair(manager,projectId,data));manager.projectRepairJobs.set(projectId,next);return next.finally(()=>{if(manager.projectRepairJobs.get(projectId)===next)manager.projectRepairJobs.delete(projectId);});
+}
+async function applyRepair(manager,projectId,data){
  const project=await manager.projects.get(projectId);
  if(!Array.isArray(data.feedbackIds)||!data.feedbackIds.length||data.feedbackIds.length>5)throw Error('Select one to five unresolved issues');
  const issues=data.feedbackIds.map(id=>{const issue=project.feedback.find(item=>item.id===id&&item.status==='open');if(!issue)throw Error('Choose open feedback from this project');return issue;});

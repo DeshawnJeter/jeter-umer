@@ -2,7 +2,9 @@ import {mkdir,writeFile,readFile,unlink} from 'node:fs/promises';import {resolve
 export function inspectAsset(bytes){
  if(!bytes.length||bytes.length>2*1024*1024)throw Error('Asset must be at most 2 MB');
  if(bytes.length>24&&bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))&&bytes.toString('ascii',12,16)==='IHDR'){
-  const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);if(!width||!height||width>2048||height>2048)throw Error('PNG dimensions must be 1–2048 pixels');return {kind:'image',extension:'png',width,height};
+  const width=bytes.readUInt32BE(16),height=bytes.readUInt32BE(20);if(!width||!height||width>2048||height>2048)throw Error('PNG dimensions must be 1–2048 pixels');
+  let data=false,end=false;for(let pos=8;pos+12<=bytes.length;){const length=bytes.readUInt32BE(pos),tag=bytes.toString('ascii',pos+4,pos+8),next=pos+12+length;if(next>bytes.length)throw Error('Invalid PNG chunk');if(tag==='IDAT'&&length)data=true;if(tag==='IEND'){if(length||next!==bytes.length)throw Error('Invalid PNG ending');end=true;break;}pos=next;}
+  if(bytes.readUInt32BE(8)!==13||!data||!end)throw Error('PNG requires complete image data and ending');return {kind:'image',extension:'png',width,height};
  }
  if(bytes.length>44&&bytes.toString('ascii',0,4)==='RIFF'&&bytes.toString('ascii',8,12)==='WAVE'){
   let format,duration;for(let pos=12;pos+8<=bytes.length;){const tag=bytes.toString('ascii',pos,pos+4),size=bytes.readUInt32LE(pos+4),start=pos+8;if(start+size>bytes.length)throw Error('Invalid WAV chunk');
