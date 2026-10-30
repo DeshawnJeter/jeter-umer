@@ -5,7 +5,7 @@ import {feedbackFor} from '../memory/feedback.js';
 import {Versions} from '../storage/versions.js';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import {Projects} from '../storage/projects.js';
+import {Projects,inheritedProjectDecisions} from '../storage/projects.js';
 import { Store } from '../storage/store.js';
 import { runPair } from '../runners/harness.js';
 import { fingerprint, loadSystemManifest } from '../runners/instructions.js';
@@ -84,9 +84,9 @@ export class Manager {
   async create(brief,options={}) {
     const budgetLimits=buildBudget(this.runtime.publicConfig,brief.budgetLimits||{});
     const project=brief.projectId?await this.projects.get(brief.projectId):await this.projects.create(validateBrief(brief).title);
-    const projectHistory=this.projects.context(project);
-    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, assetSelection:clone(project.assetSelection||{}),budgetLimits, costEstimate:estimateBuild(this.runtime.publicConfig,validateBrief(brief)), parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
-    run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
+    const projectHistory=this.projects.context(project),inherited=inheritedProjectDecisions(project);
+    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, assetSelection:clone(project.assetSelection||{}),budgetLimits, costEstimate:estimateBuild(this.runtime.publicConfig,validateBrief(brief)), parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: Object.fromEntries(inherited.map(d=>[d.key,d.answer])), events: [], planHash: null, planApproval: null, build: null, validation: null };
+    run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);run.memory.decisions=clone(inherited);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
     if (this.jobs.has(run.id)) return;
@@ -237,8 +237,16 @@ export class Manager {
     if (action === 'pause') { this.transition(run, 'paused'); this.controllers.get(id)?.abort(); await this.event(run, 'Human paused the run'); return run; }
     await this.jobs.get(id);
     this.assertRuntime(run);
+    if(action==='retry_delivery'){
+      if(run.status!=='failed'||!run.build||!run.validation?.passed||!run.browserChecks?.passed)throw Error('Only an already validated delivery can retry saving');
+      if((await this.manifest()).hash!==run.instructions.hash)throw Error('Instructions changed; revise the build before retrying delivery');
+      const folder=resolve(this.store.folder(id),'builds',String(run.build.generation));
+      if(await hashBuild(folder)!==run.build.sha256||run.browserChecks.buildHash!==run.build.sha256)throw Error('Delivered bytes or browser evidence changed');
+      await this.versions.capture(run,folder);delete run.error;this.transition(run,'running');this.transition(run,'awaiting_review');await this.event(run,'Saved the already validated delivery without repeating model requests. Human playtesting remains required.');return run;
+    }
     if(action==='retry'){
       if(run.status!=='failed'||run.build)throw Error('Only interrupted agent work can retry; delivered builds require a revision');
+      if(/ exhausted its repair attempts:/.test(run.error||''))throw Error('Repair attempts are exhausted. Review a new plan before starting another task; prior attempt evidence is retained.');
       delete run.error;this.transition(run,'running');await this.event(run,'Retrying interrupted agent work within remaining budgets; accepted contributions are retained.');this.launch(run);return run;
     }
     if (action === 'resume') {

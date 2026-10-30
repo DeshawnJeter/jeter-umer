@@ -23,7 +23,8 @@ const codePort=Number(process.env.GAME_BUILDER_CODE_PREVIEW_PORT)||(port>65400?p
 if(!Number.isInteger(codePort)||codePort<1024||codePort>65535||codePort===port)throw Error('Invalid isolated code preview port');
 const codeOrigin=`http://127.0.0.1:${codePort}`;
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png':'image/png', '.wav':'audio/wav' };
-function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); }
+function runView(value){if(value?.version!==2||!value.brief||!value.build)return value;return {...value,build:{...value.build,url:`${value.brief.genre==='custom'?codeOrigin:''}/preview/${value.id}/${value.build.generation}/index.html`}};}
+function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(Array.isArray(data)?data.map(runView):runView(data))); }
 async function body(req,limit=12000) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new Error('Use application/json');
   let text = ''; for await (const chunk of req) { text += chunk; if (Buffer.byteLength(text) > limit) throw new Error('Request too large'); } return JSON.parse(text || '{}');

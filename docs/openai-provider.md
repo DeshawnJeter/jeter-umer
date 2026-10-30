@@ -6,7 +6,7 @@ Demo mode remains the default and requires no credentials. For live workers and 
 
 ```powershell
 $env:OPENAI_API_KEY = '<fresh key entered locally>'
-$env:OPENAI_MODEL = 'gpt-4.1-mini'
+# Optional explicit model overrides take priority over the role mix.
 npm run start:openai
 ```
 
@@ -22,20 +22,20 @@ The dashboard labels live mode and the Build with OpenAI action. Starting a run 
 
 ## Model selection
 
-The default model is `gpt-4.1-mini`. Choose a model that supports the Responses API and strict structured outputs. Overrides, in priority order:
+New runs use the Sol/Terra/Luna role mix in [model policy](role-model-policy.md), with bounded Astra escalation for coding. Choose models supporting Responses and strict structured outputs. Existing environment files may still pin older models; explicit pins are preserved rather than silently replaced. Overrides, in priority order:
 
 1. `OPENAI_<ROLE>_<STAGE>_MODEL`, such as `OPENAI_GAMEPLAY_CHECKER_MODEL`.
 2. `OPENAI_WORKER_MODEL` or `OPENAI_CHECKER_MODEL`.
 3. `OPENAI_MODEL`.
-4. The default above.
+4. The role/stage default in the model policy.
 
-Roles are PLANNER, GAMEPLAY, LEVELS, UI, STORY and AUDIO. Stages are WORKER and CHECKER. Existing profile files define prompts, skills and limits. Server runtime selection overrides their demo defaults without writing credentials or provider secrets into those files.
+Roles include PLANNER, GAMEPLAY, LEVELS, UI, STORY, AUDIO, CODING, ART, COMBAT, PROGRESSION, ENEMIES, VFX, IMPLEMENTATION, INTEGRATION and QA. Stages are WORKER and CHECKER. Existing profile files define prompts, skills and limits. Server runtime selection overrides their demo defaults without writing credentials or provider secrets into those files.
 
 ## Execution and checking
 
 Every ready worker and checker makes a separate stateless request to the fixed `https://api.openai.com/v1/responses` endpoint. Workers do not share conversations with checkers. Strict role-specific JSON schemas constrain the output. Storage is disabled via `store: false`, request truncation is disabled, response sizes are bounded, and the application validates the returned JSON again.
 
-The models propose game configuration, not executable JavaScript. The trusted Phaser template still implements the game. A future isolated coding runner would be a separate feature. No arbitrary file, shell, network or approval tools are exposed to these model requests.
+Most roles propose typed configuration. The coding role writes bounded JavaScript rules in its owned workspace; parsing and isolated browser execution precede independent model review. The server never executes generated rules as Node code. No arbitrary file, shell, network or approval tools are exposed to these model requests.
 
 The manager remains a deterministic system harness. Missing required difficulty/story choices are handled by preflight human gates before paid generation. The independent deterministic role checker runs first and supplies its actual contract findings/evidence as `deterministicReview` to the model checker, replacing any caller-supplied record. The model still reviews the remaining task requirements, and both checks must pass. Evidence distinguishes model static reasoning from actual deterministic checks. Neither is a browser playtest or a listening test.
 
@@ -54,7 +54,7 @@ Defaults per run:
 - `OPENAI_MAX_OUTPUT_TOKENS=2048` per request (maximum 8192).
 - `OPENAI_TIMEOUT_MS=30000` per request (maximum 60000).
 - `OPENAI_MAX_RESPONSE_REPAIRS=2` per worker/checker invocation (0–2; zero disables format regeneration).
-- Existing 40 harness-step limit, three concurrent ready roles, and three artifact-repair attempts remain enforced. Format requests are bounded by the response-repair and global API budgets; they do not create additional harness steps.
+- Existing 80 harness-step limit, three concurrent ready roles, and three artifact-repair attempts remain enforced. Format requests are bounded by the response-repair and global API budgets; they do not create additional harness steps.
 
 Each outbound attempt reserves one call and an input/output estimate before transmission. Concurrent reservations count toward the run budget. The estimate uses serialized UTF-8 request bytes plus output allowance and protocol overhead. This is not a provider tokenizer or a guaranteed monetary spending cap. Usage returned by OpenAI replaces the estimate. When usage is missing, the estimate is conservatively charged to the local accounting budget. Interrupted reservations are accounted for after restart.
 
@@ -95,3 +95,13 @@ Live repair improvements: model replies use a structured replay array with dt/ac
 Syntax and rendering repair: exact patches now pass source syntax and capability checks before modifying the owned file; rejected patches return findings and preserve the previous text, including when repairing an invalid proposal. The trusted pathNodes(start,end,color) helper produces at most 16 valid decorative markers, preserving both endpoints. Generated games still have a 64-node total budget, and createGame must initialize every resource read by inspect before Start.
 
 Explicit idle-loss deadlines: when the approved prompt says "doing nothing must/should/will lose within N seconds" (N <=30), verification may continue an inconclusive all-idle loss replay until that deadline, with the existing 300-frame cap. It records original frames, added frames and observed elapsed time, and persists the actually executed effective replay with original/corrected hashes. It never extends win or active-input tests, accepts late losses, or changes game source. A saved proposal that now passes corrected verification can receive its first independent checker review without a fourth worker attempt. Rejected independent reviews cannot be repeated unchanged to obtain a different verdict. Original worker/checker audits remain saved.
+
+## Live project validation
+
+`node scripts/live-project-validation.js --preflight` explicitly loads the ignored local credential when absent from the environment and checks the four requested model IDs. It never prints the key. Access lookup alone does not prove billing or generation capability.
+
+`node scripts/live-project-validation.js --full --max-dollars 2.5` opts into billed real workers/checkers in isolated `.local/live-project-validation` storage. It uses the role mix, not old local model pins, without rewriting your environment file. The test checks project decisions across runs, open feedback in actual render output, immutable restore, and an explicit Astra worker/Sol checker probe. Plan approval and a story answer are supplied by the automated test driver; human playtest approval is never fabricated.
+
+Reports retain failed/stopped runs and measured token usage. `--resume <validation folder>` retains cumulative accounting; it never resets application run budgets. `--fresh-second` explicitly starts a new follow-up run and preserves the old one. Standard list-price estimates are conservative; cached-input discounts, unknown usage and the actual invoice can differ.
+
+Task context (instructions and messages) is bounded separately from fixed JSON/tool schemas. The full request retains its byte cap and token reservation. Small source edits stay complete instead of entering source paging only because schemas are large. Completed tools are returned as actual Responses function-call/output pairs; tool limits end with a structured submission that is still executed and independently checked. Temporary Windows version-directory locks retry only the local rename, never paid model work. An already validated delivery can retry saving without regeneration. Exhausted repair attempts require a new plan generation, preserving old audit files and all spending limits.
