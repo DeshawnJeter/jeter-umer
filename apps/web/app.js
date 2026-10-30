@@ -1,3 +1,4 @@
+import {projectWorkspace} from './project-workspace.js';
 import './preferences.js';
 const $ = selector => document.querySelector(selector);
 function handoffDescription(handoff){
@@ -18,7 +19,7 @@ $('#prompt-only').onchange = () => {
 };
 $('#brief').onsubmit = event => { event.preventDefault(); perform(async () => {
   const data=$('#prompt-only').checked?{inputMode:'prompt',prompt:$('#prompt').value}:{inputMode:'manual',title:$('#title').value,prompt:$('#prompt').value,genre:$('#genre').value,theme:$('#theme').value,musicStyle:$('#music-style').value,musicInstrument:$('#music-instrument').value,difficulty:$('#difficulty').value,music:$('#music').checked,askStory:$('#ask-story').checked};
-  const run=await api('/api/runs',data);selected=run.id;
+  data.projectId=workspace.projectId()||undefined;const run=await api('/api/runs',data);selected=run.id;
 }); };
 function renderPlan(run) {
   $('#plan').hidden = run.status !== 'awaiting_plan';
@@ -122,10 +123,11 @@ function render(run) {
 }
 $('#approve').onclick = () => perform(() => action('approve', { sha256: current.build.sha256, checks: Object.fromEntries([...document.querySelectorAll('[data-check]')].map(el => [el.dataset.check, el.checked])) }));
 $('#revise').onclick = () => perform(() => action('revise', { genre: $('#revision-genre').value, theme: $('#revision-theme').value, musicStyle: $('#revision-music-style').value, musicInstrument: $('#revision-music-instrument').value, difficulty: $('#revision-difficulty').value, music: $('#revision-music').checked }));
+const workspace=projectWorkspace({api,perform,getRun:()=>current,selectRun:id=>{selected=id;}});
 let refreshing = false;
 async function refresh() {
   if (refreshing) return; refreshing = true;
-  try { const runs = await api('/api/runs'); $('#history').replaceChildren(); for (const run of runs) { const button = element('button', `${run.brief.title} · ${run.status.replaceAll('_', ' ')}`); button.onclick = () => { selected = run.id; refresh(); }; $('#history').append(button); } if (!selected && runs.length) selected = runs[0].id; if (selected) render(await api(`/api/runs/${selected}`)); }
+  try { const runs = await api('/api/runs'); $('#history').replaceChildren(); for (const run of runs) { const button = element('button', `${run.brief.title} · ${run.status.replaceAll('_', ' ')}`); button.onclick = () => { selected = run.id; refresh(); }; $('#history').append(button); } if (!selected && runs.length) selected = runs[0].id; if (selected) render(await api(`/api/runs/${selected}`)); await workspace.refresh(current); }
   finally { refreshing = false; }
 }
 function musicOptions(id,options,value) { const select=$(id);select.replaceChildren(...options.map(item=>{const option=element('option',item.label);option.value=item.value;return option;}));select.value=value; }
