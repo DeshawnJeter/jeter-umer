@@ -1,9 +1,11 @@
 import { genreOf,GAME_TYPES } from '../../shared/game-types.js';
-export async function check({ artifact, brief = {} }) {
+import {namedStoryPlaces} from '../../shared/explicit-intent.js';
+export async function check({ artifact, brief = {},context={} }) {
   const findings = [];
   const genre=genreOf(brief.genre);
   const terms = { custom:/objective|custom/i, collector: /star/i, maze: /maze|exit|portal/i, platformer: /jump|platform/i, survival: /surviv|dron|shield/i };
   if (genre!=='custom'&&!(terms[genre] || new RegExp(GAME_TYPES[genre].objective.split(' ').filter(w=>w.length>4).slice(0,3).join('|'),'i')).test(artifact.intro)) findings.push('Introduction must explain the selected game objective');
   if (artifact.victory === artifact.defeat) findings.push('Win and loss messages must differ');
+  for(const place of namedStoryPlaces(context))if(!new RegExp('\\b'+place.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i').test(artifact.intro))findings.push('Introduction must preserve the saved place name: '+place);
   return { verdict: findings.length ? 'fail' : 'pass', findings, evidence: ['Compared introduction with the collection objective', 'Verified distinct victory and defeat messages'] };
 }
