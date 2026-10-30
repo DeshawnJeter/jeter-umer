@@ -1,0 +1,36 @@
+{
+  "provider": "scripted-demo",
+  "checker": {
+    "maxOutputChars": 8000,
+    "skills": [
+      "playtest-evidence"
+    ],
+    "prompt": "checker.md",
+    "tools": [
+      "inspect_context",
+      "inspect_artifact",
+      "read_project_memory"
+    ],
+    "maxContextChars": 16000
+  },
+  "maxAttempts": 3,
+  "model": null,
+  "version": 1,
+  "worker": {
+    "maxOutputChars": 14000,
+    "skills": [],
+    "prompt": "instructions.md",
+    "tools": [
+      "inspect_context",
+      "propose_artifact",
+      "read_project_memory",
+      "read_source",
+      "search_source",
+      "inspect_components",
+      "apply_source_patch",
+      "run_rule_checks"
+    ],
+    "maxContextChars": 16000
+  },
+  "role": "coding"
+}
