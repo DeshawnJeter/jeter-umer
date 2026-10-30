@@ -1,0 +1,2 @@
+# Campaign resources
+Campaign and roguelike levels retain the same party HP, MP, XP and potion inventory. Clearing a room grants its reward once; only cleared rooms can advance. Final-room exit wins. Party defeat blocks advancement; restarting resets the entire run. Roguelike seeds reproduce maps, obstacles and rewards. Validate reachability on each generated map, not just the original preview configuration. Battle background changes are presentation and cannot reset combat resources.
