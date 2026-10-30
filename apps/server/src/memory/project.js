@@ -15,8 +15,9 @@ export function assertCurrentMemory(run,role,visiting=new Set()){
   return entry;
 }
 export function ensureMemory(run){
-  run.memory??={version:1,projectId:run.id,revision:0,specification:null,decisions:(run.answers||[]).map(answer=>({key:answer.question.key,answer:answer.answer,questionId:answer.question.id,generation:answer.question.generation||0,affectedRoles:clone(answer.question.affectedRoles),source:'human-answer',at:answer.at})),artifacts:{},workspaces:{},handoffs:[],tests:[],invalidations:[]};
-  if(run.memory.version!==1||run.memory.projectId!==run.id)throw Error('Invalid project memory');
+  run.memory??={version:1,projectId:run.projectId||run.id,revision:0,specification:null,decisions:(run.answers||[]).map(answer=>({key:answer.question.key,answer:answer.answer,questionId:answer.question.id,generation:answer.question.generation||0,affectedRoles:clone(answer.question.affectedRoles),source:'human-answer',at:answer.at})),artifacts:{},workspaces:{},handoffs:[],tests:[],invalidations:[]};
+  if(run.projectId&&run.memory.projectId===run.id)run.memory.projectId=run.projectId;
+  if(run.memory.version!==1||run.memory.projectId!==(run.projectId||run.id))throw Error('Invalid project memory');
   return run.memory;
 }
 export function approveSpecification(run){const m=ensureMemory(run);m.specification={generation:run.generation,planHash:run.planHash,brief:clone(run.brief),plan:clone(run.results.planner.artifact),source:'human-plan-approval'};m.revision++;}
@@ -42,7 +43,7 @@ export function invalidateMemory(run,roles,reason='Requirements or dependency ch
 export function readMemory(run,role,dependencies=[]){
   validRole(role);const m=ensureMemory(run),records=[];
   for(const parent of dependencies){const entry=assertCurrentMemory(run,parent);const artifact=parent==='planner'?{planReference:{hash:entry.hash,field:'context.plan'}}:parent==='coding'&&role!=='coding'?{sourceReference:{hash:entry.hash,path:'generated/rules.js',auditDirectory:entry.auditDirectory},interface:'createGame(api): start/update/inspect',summary:entry.summary}:clone(entry.artifact);records.push({role:parent,hash:entry.hash,artifact,auditDirectory:entry.auditDirectory});}
-  const result={projectId:run.id,revision:m.revision,generation:run.generation,specificationHash:m.specification?.planHash||null,decisions:m.decisions.filter(d=>d.affectedRoles.includes(role)||d.affectedRoles.includes('planner')).map(d=>({key:d.key,answer:d.answer,source:d.source})),dependencies:records,checkpoint:m.workspaces[role]?.generation===run.generation?clone(m.workspaces[role]):null,previousHandoff:clone(m.handoffs.findLast(item=>item.role===role)||null),references:{handoffs:m.handoffs.length,tests:m.tests.length}};
+  const result={projectId:run.projectId||run.id,revision:m.revision,generation:run.generation,specificationHash:m.specification?.planHash||null,decisions:m.decisions.filter(d=>d.affectedRoles.includes(role)||d.affectedRoles.includes('planner')).map(d=>({key:d.key,answer:d.answer,source:d.source})),dependencies:records,checkpoint:m.workspaces[role]?.generation===run.generation?clone(m.workspaces[role]):null,previousHandoff:clone(m.handoffs.findLast(item=>item.role===role)||null),references:{handoffs:m.handoffs.length,tests:m.tests.length}};
   if(JSON.stringify(result).length>7000)throw Error('Focused memory exceeds context budget; split the task instead of truncating requirements');
   return result;
 }
