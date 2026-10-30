@@ -1,10 +1,11 @@
+import {MODULE_PATHS} from '../runners/source-modules.js';
 const object=properties=>({type:'object',properties,required:Object.keys(properties),additionalProperties:false});
 const text=maxLength=>({type:'string',maxLength});
 export const CODING_TOOLS=[
   {name:'inspect_components',description:'Read the trusted game-rule API catalog.',parameters:object({})},
-  {name:'read_source',description:'Read your current owned source file.',parameters:object({path:{type:'string',enum:['generated/rules.js']},startLine:{type:'integer',minimum:1,maximum:6000},maxLines:{type:'integer',minimum:1,maximum:30}})},
+  {name:'read_source',description:'Read your current owned source file.',parameters:object({path:{type:'string',enum:['generated/rules.js',...MODULE_PATHS]},startLine:{type:'integer',minimum:1,maximum:6000},maxLines:{type:'integer',minimum:1,maximum:30}})},
   {name:'search_source',description:'Search lines in your owned source file.',parameters:object({query:text(80)})},
-  {name:'apply_source_patch',description:'Apply a small exact patch, not a full-file rewrite. Find at most 1000 characters; replacement at most 1600. Replace one exact occurrence in your owned file. Empty find initializes an empty file. Final artifact.source may be empty to submit the patched file.',parameters:object({path:{type:'string',enum:['generated/rules.js']},find:text(1000),replacement:text(1600)})},
+  {name:'apply_source_patch',description:'Apply a small exact patch, not a full-file rewrite. Find at most 1000 characters; replacement at most 1600. Replace one exact occurrence in your owned file. Empty find initializes an empty file. Final artifact.source may be empty to submit the patched file.',parameters:object({path:{type:'string',enum:['generated/rules.js',...MODULE_PATHS]},find:text(1000),replacement:text(1600)})},
   {name:'run_rule_checks',description:'Run bounded win/loss scenarios against the current source in an isolated browser worker.',parameters:object({scenarios:text(6000)})}
 ].map(tool=>({...tool,type:'function',strict:true}));
 export async function invokeCodingTool(request,call){
