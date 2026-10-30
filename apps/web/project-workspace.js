@@ -25,6 +25,7 @@ export function projectWorkspace({api,perform,selectRun,getRun}){
   $('acceptance-list').replaceChildren(...(p.acceptanceCases||[]).map(c=>node('p',c.name+': '+c.assertions.map(a=>a.field+' '+a.op+' '+a.value).join(', '))));
   $('project-feedback').replaceChildren();for(const item of p.feedback.toReversed()){
    const row=node('article');row.append(node('p',`${item.status.toUpperCase()}: ${item.title}`),node('p',`Expected: ${item.expected||'—'} Actual: ${item.actual||'—'}`),node('p',item.steps));
+   if(item.status==='open'){const repair=node('button','Make a repair plan');repair.onclick=()=>runAction(`/api/projects/${p.id}/repair`,{versionId:$('feedback-version').value,feedbackIds:[item.id],preserve:[]});row.append(repair);}
    const note=node('input');note.maxLength=500;note.placeholder='Review note';note.setAttribute('aria-label','Feedback review note');row.append(note);
    for(const [status,label]of [['resolved','Resolve after testing selected version'],['deferred','Defer'],['open','Reopen']]){if(item.status===status)continue;const button=node('button',label);button.onclick=()=>perform(async()=>{await api(`/api/projects/${p.id}/feedback/${item.id}`,{status,note:note.value,verifiedVersionId:$('feedback-version').value});signature='';});row.append(button);}$('project-feedback').append(row);
   }

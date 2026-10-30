@@ -1,3 +1,4 @@
+import {repairFeedback} from './orchestrator/feedback-repair.js';
 import {validateAcceptanceCases} from '../../../shared/acceptance-cases.js';
 import {requestChange} from './orchestrator/change-request.js';
 import {restoreVersion,compareVersions} from './orchestrator/project-actions.js';
@@ -43,6 +44,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='repair')return json(res,201,await repairFeedback(manager,parts[2],await body(req)));
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='acceptance'){const data=await body(req);return json(res,200,await manager.projects.update(parts[2],project=>{project.acceptanceCases=validateAcceptanceCases(data.cases);}));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='change')return json(res,201,await requestChange(manager,parts[2],await body(req)));
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='restore')return json(res,201,await restoreVersion(manager,parts[2],(await body(req)).versionId));
