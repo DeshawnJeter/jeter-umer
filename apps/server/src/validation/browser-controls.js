@@ -1,15 +1,23 @@
 import {gameplaySnapshot} from './whole-game-acceptance.js';
-export async function checkHud(page,state,assert){
+export async function checkHud(page,state,assert,requireInGameHud=true){
+ const overlay=page.locator('#in-game-hud'),present=await overlay.count()>0;
+ if(requireInGameHud)assert(present&&await overlay.isVisible(),'In-game HUD is missing');
+ if(present){const box=await overlay.boundingBox(),canvas=await page.locator('canvas').first().boundingBox();assert(box&&canvas&&box.x>=canvas.x&&box.y>=canvas.y&&box.x+box.width<=canvas.x+canvas.width+1&&box.y+box.height<=canvas.y+canvas.height+1,'In-game HUD is outside the play area');}
+ const inGame=async(stat,text)=>{if(!present&&!requireInGameHud)return;const badge=overlay.locator(`[data-stat="${stat}"] strong`);assert(await badge.count()===1&&await badge.innerText()===text,'In-game '+stat+' disagrees with gameplay');};
  for(const [field,max]of [['health','maxHealth'],['mana','maxMana']]){
   const meter=page.locator('#meter-'+field);if(!await meter.count())continue;
   const limit=state[max]??(field==='health'?3:1);
   assert(await page.locator('#value-'+field).innerText()===`${Math.max(0,state[field])} / ${limit}`,'HUD '+field+' text disagrees with gameplay');
   assert(Number(await meter.getAttribute('value'))===Math.max(0,state[field]),'HUD '+field+' meter disagrees with gameplay');
+  await inGame(field,`${Math.max(0,state[field])} / ${limit}`);
  }
- if(await page.locator('#value-stars').count())assert(await page.locator('#value-stars').innerText()===`${state.score} / ${state.required}`,'HUD collection count disagrees with gameplay');
+ if(await page.locator('#value-stars').count()){assert(await page.locator('#value-stars').innerText()===`${state.score} / ${state.required}`,'HUD collection count disagrees with gameplay');await inGame('stars',`${state.score} / ${state.required}`);}
+ if(state.genre==='custom'){await inGame('progress',String(state.score));if(state.codeSnapshot?.remaining!==undefined)await inGame('time',`${Math.ceil(state.remaining)}s`);if(state.codeSnapshot?.maxMana>0)await inGame('mana',`${state.mana} / ${state.maxMana}`);}
+ if(['collector','maze','platformer','survival','stealth'].includes(state.genre))await inGame('time',`${Math.ceil(state.remaining)}s`);
+ if(['rpg','front_battle','campaign','roguelike'].includes(state.genre))await inGame('score',`${state.score} / ${state.required}`);
 }
-export async function checkBrowserControls({page,state,advance,click,assert,config,report}){
- const initial=await state();await checkHud(page,initial,assert);report.tests.push({name:'HUD matches live resources',passed:true});
+export async function checkBrowserControls({page,state,advance,click,assert,config,report,requireInGameHud=true}){
+ const initial=await state();await checkHud(page,initial,assert,requireInGameHud);report.tests.push({name:'HUD matches live resources',passed:true});if(await page.locator('#in-game-hud').count())report.tests.push({name:'in-game HUD matches live resources',passed:true});
  assert(initial.audio?.started===true,'Start did not initialize audio after its gesture');
  if(config.audio.music)assert(initial.audio.music,'Requested music did not initialize its playback source');
  const original={volume:initial.audio.volume,musicVolume:initial.audio.musicVolume,sfxVolume:initial.audio.sfxVolume,muted:initial.audio.muted,musicMuted:initial.audio.musicMuted,sfxMuted:initial.audio.sfxMuted};

@@ -23,7 +23,7 @@ import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
-import {inspectWholeGame} from '../validation/whole-game-acceptance.js';
+import {inspectWholeGame,requiresInGameHud} from '../validation/whole-game-acceptance.js';
 import {changedRoles} from './change-scope.js';
 import {runCodeChecks,lossDeadlineForBrief} from '../validation/code-checks.js';
 import {frameworkConfig} from '../integration/framework.js';
@@ -248,7 +248,7 @@ export class Manager {
     this.assertRuntime(run);
     if(action==='retry_delivery'){
       if(run.status!=='failed'||!run.build||!run.validation?.passed||!run.browserChecks?.passed)throw Error('Only an already validated delivery can retry saving');
-      if(run.browserQaMode==='on'&&!inspectWholeGame(run.browserChecks,run.build.sha256,run.brief.genre,run.acceptanceCases||[]).passed)throw Error('Current build needs whole-game browser checks before retrying delivery');
+      if(run.browserQaMode==='on'&&!inspectWholeGame(run.browserChecks,run.build.sha256,run.brief.genre,run.acceptanceCases||[],{inGameHud:requiresInGameHud(run)}).passed)throw Error('Current build needs whole-game browser checks before retrying delivery');
       if((await this.manifest()).hash!==run.instructions.hash)throw Error('Instructions changed; revise the build before retrying delivery');
       const folder=resolve(this.store.folder(id),'builds',String(run.build.generation));
       if(await hashBuild(folder)!==run.build.sha256||run.browserChecks.buildHash!==run.build.sha256)throw Error('Delivered bytes or browser evidence changed');
@@ -301,7 +301,7 @@ export class Manager {
       this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Unchanged checked contributions are retained; plan and build approvals require renewal.'); this.launch(run); return run;
     }
     if (action === 'approve') {
-      if(run.browserQaMode==='on'&&!inspectWholeGame(run.browserChecks,run.build?.sha256,run.brief.genre,run.acceptanceCases||[]).passed)throw Error('Current build must pass whole-game browser checks before human approval');
+      if(run.browserQaMode==='on'&&!inspectWholeGame(run.browserChecks,run.build?.sha256,run.brief.genre,run.acceptanceCases||[],{inGameHud:requiresInGameHud(run)}).passed)throw Error('Current build must pass whole-game browser checks before human approval');
       if (run.status !== 'awaiting_review' || !run.planApproval || run.planApproval.hash !== run.planHash || run.questions.some(question => question.blocking) || !run.validation?.passed || data.sha256 !== run.build?.sha256 || humanChecksFor(run.brief.genre).some(key => data.checks?.[key] !== true)) throw new Error('Playtest every required item and approve the current build');
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if (await hashBuild(resolve(this.store.folder(id), 'builds', String(run.build.generation))) !== run.build.sha256) throw new Error('Build changed since validation. Rebuild before approval.');

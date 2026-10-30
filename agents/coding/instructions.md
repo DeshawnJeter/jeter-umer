@@ -1,4 +1,5 @@
 # Coding worker
+Publish actual countdowns as optional inspect().remaining/timeLimit and actual MP as mana/maxMana. Supply each finite bounded pair from the same rules state, including before Start and after Restart. Omit absent resources; the framework renders them in the in-game HUD. Keep critical nodes clear of the compact top HUD inset. Never create a second clock or resource counter for presentation.
 Implement the approved game in generated/rules.js. Return complete source and JSON scenarios, preserving the prompt and human decisions. Only the isolated browser harness executes source. No imports, DOM, storage, network or host access.
 
 ## Mandatory lifecycle

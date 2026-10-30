@@ -95,6 +95,7 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/providers.js') return await serve(res, 'shared', 'providers.js');
     if (url.pathname === '/player-ui.js') return await serve(res, 'shared', 'player-ui.js');
     if (url.pathname === '/advanced-games.js') return await serve(res, 'shared', 'advanced-games.js');
+    if (url.pathname === '/lifecycle.js') return await serve(res, 'shared', 'lifecycle.js');
     if (url.pathname === '/project-workspace.js' || url.pathname === '/app.js' || url.pathname === '/preferences.js' || url.pathname === '/style.css') return await serve(res, 'apps/web', parts[0]);
     json(res, 404, { error: 'Not found' });
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }

@@ -6,19 +6,20 @@ import {gridPath} from '../../../../shared/stealth-rules.js';
 import {lifecycleFor} from '../../../../shared/lifecycle.js';
 import {runCodeChecks} from './code-checks.js';
 import {inspectWholeGame,gameplaySnapshot} from './whole-game-acceptance.js';
-import {checkBrowserControls,checkHud} from './browser-controls.js';
+import {checkBrowserControls,checkHud as inspectHud} from './browser-controls.js';
 let queue=Promise.resolve();
 export async function assertBrowserInstalled(){const {chromium}=await import('playwright');const paths=process.platform==='win32'?['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe']:[chromium.executablePath()];for(const path of paths)try{await access(path);return;}catch{/* Try the next standard installation. */}throw Error('Browser QA needs an installed Edge browser on Windows or Playwright Chromium on other systems. Install it before using paid model runs, or explicitly configure manual-only browser QA.');}
 export function runBrowserSmoke(options){const job=queue.catch(()=>{}).then(()=>execute(options));queue=job.catch(()=>{});return job;}
-async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCases=[]}){
+async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCases=[],requireInGameHud=true}){
   const report={scope:'browser-smoke',buildHash,passed:false,tests:[],browserTested:false,fullPlaythrough:false,listeningTested:false,humanApproved:false,virtualTime:true};
   let browser,server,page,timedOut=false;const errors=[];
+  const checkHud=(page,state,assert)=>inspectHud(page,state,assert,requireInGameHud);
   const deadline=setTimeout(()=>{timedOut=true;browser?.close().catch(()=>{});},60000);deadline.unref();
   const abort=()=>browser?.close().catch(()=>{});signal?.addEventListener('abort',abort,{once:true});
   try{
     if(signal?.aborted)throw Error('Browser checks cancelled');
     const root=resolve(folder);
-    server=createServer(async(req,res)=>{try{const relative=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname).slice(1)||'index.html',path=resolve(root,relative);if(!path.startsWith(root+sep)||relative.split(/[\\/]/).some(part=>part.startsWith('.')))throw Error('Outside build');const types={'.js':'text/javascript','.json':'application/json','.html':'text/html','.png':'image/png','.wav':'audio/wav'};res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'});res.end(await readFile(path));}catch{res.writeHead(404);res.end('Not found');}});
+    server=createServer(async(req,res)=>{try{const relative=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname).slice(1)||'index.html',path=resolve(root,relative);if(!path.startsWith(root+sep)||relative.split(/[\\/]/).some(part=>part.startsWith('.')))throw Error('Outside build');const types={'.js':'text/javascript','.css':'text/css','.json':'application/json','.html':'text/html','.png':'image/png','.wav':'audio/wav'};res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'});res.end(await readFile(path));}catch{res.writeHead(404);res.end('Not found');}});
     await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});
     const origin=`http://127.0.0.1:${server.address().port}`;
     const {chromium}=await import('playwright');
@@ -51,7 +52,7 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     report.tests.push({name:'build boot',passed:!!await page.locator('canvas').count()});
     await click('Start game');assert((await state()).phase==='playing','Start did not enter gameplay');
     report.tests.push({name:'Start enters gameplay',passed:true});
-    await checkBrowserControls({page,state,advance,click,assert,config,report});
+    await checkBrowserControls({page,state,advance,click,assert,config,report,requireInGameHud});
     if(config.genre==='custom'){
       assert(await page.locator('#stat-progress .stat-label').textContent()==='Score'&&await page.locator('#value-progress').innerText()===String((await state()).score),'Custom HUD must show score rather than a stage counter');
       report.tests.push({name:'custom HUD uses actual game score',passed:true});
@@ -60,7 +61,7 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
       report.tests.push(...rules.tests.map(test=>({...test,name:'isolated rules: '+test.name})));report.codeSourceHash=rules.sourceHash;assert(rules.passed,rules.error||'Generated rule replays failed');
       await click('Restart');await page.waitForFunction(()=>window.gameState?.().ready&&window.gameState().codeSnapshot?.phase==='ready');await advance(80);assert((await state()).phase==='ready','Custom preview did not reset');
       assert(await page.locator('#value-progress').innerText()==='0','Custom restart did not reset the displayed score');
-      assert(!errors.length,'Custom preview script errors: '+errors.join('; '));report.tests.push({name:'custom preview restart and no script errors',passed:true},{name:'restart resets gameplay',passed:true},{name:'no browser script errors',passed:true});report.passed=report.tests.every(test=>test.passed);report.acceptance=inspectWholeGame(report,buildHash,config.genre,acceptanceCases);report.passed=report.acceptance.passed;report.fullPlaythrough=report.acceptance.fullPlaythrough;
+      assert(!errors.length,'Custom preview script errors: '+errors.join('; '));report.tests.push({name:'custom preview restart and no script errors',passed:true},{name:'restart resets gameplay',passed:true},{name:'no browser script errors',passed:true});report.passed=report.tests.every(test=>test.passed);report.acceptance=inspectWholeGame(report,buildHash,config.genre,acceptanceCases,{inGameHud:requireInGameHud});report.passed=report.acceptance.passed;report.fullPlaythrough=report.acceptance.fullPlaythrough;
       if(reportFolder){await mkdir(reportFolder,{recursive:true});await page.screenshot({path:resolve(reportFolder,'browser-smoke.png'),fullPage:true});}return report;
     }
     if(['run_gun','jump_shooter','metroidvania'].includes(config.genre)){
@@ -139,6 +140,6 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     if(reportFolder){await mkdir(reportFolder,{recursive:true});await page.screenshot({path:resolve(reportFolder,'browser-smoke.png'),fullPage:true});}
   }catch(error){report.error=timedOut?'Browser check time budget exhausted':String(error.message).slice(0,600);report.tests.push({name:'browser smoke execution',passed:false,error:report.error});if(reportFolder&&page&&!page.isClosed())try{await mkdir(reportFolder,{recursive:true});await page.screenshot({path:resolve(reportFolder,'browser-failure.png'),fullPage:true,timeout:3000});}catch{/* The error report remains available if the browser already closed. */}}
   finally{clearTimeout(deadline);signal?.removeEventListener('abort',abort);await browser?.close().catch(()=>{});if(server)await new Promise(resolve=>server.close(resolve));}
-  report.acceptance=inspectWholeGame(report,buildHash,config.genre,acceptanceCases);report.passed=report.acceptance.passed;report.fullPlaythrough=report.acceptance.fullPlaythrough;if(!report.passed&&!report.error)report.error=report.acceptance.findings.join('; ').slice(0,600);
+  report.acceptance=inspectWholeGame(report,buildHash,config.genre,acceptanceCases,{inGameHud:requireInGameHud});report.passed=report.acceptance.passed;report.fullPlaythrough=report.acceptance.fullPlaythrough;if(!report.passed&&!report.error)report.error=report.acceptance.findings.join('; ').slice(0,600);
   return report;
 }
