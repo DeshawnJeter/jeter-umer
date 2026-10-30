@@ -1,3 +1,4 @@
+import {validateAcceptanceCases} from '../../../../shared/acceptance-cases.js';
 import {createServer} from 'node:http';
 import {mkdtemp,mkdir,writeFile,cp,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';import {resolve,sep,extname,join} from 'node:path';
@@ -7,7 +8,8 @@ import {checkCode} from '../runners/code-workspace.js';
 let queue=Promise.resolve();
 export function lossDeadlineForBrief(brief){const match=brief?.prompt?.match(/\bdoing nothing (?:must|should|will) lose within (\d+(?:\.\d+)?)\s*(?:s\b|seconds?\b)/i);const value=match?Number(match[1]):null;return value>0&&value<=30?value:null;}
 export function runCodeChecks(artifact,signal,options={}){const job=queue.catch(()=>{}).then(()=>execute(artifact,signal,options));queue=job.catch(()=>{});return job;}
-async function execute(artifact,signal,{lossDeadlineSeconds=null}={}){
+async function execute(artifact,signal,{lossDeadlineSeconds=null,acceptanceCases=[]}={}){
+  acceptanceCases=validateAcceptanceCases(acceptanceCases);
   const report={passed:false,sourceHash:fingerprint(artifact),scope:'isolated-browser-worker',browserTested:false,tests:[]};
   const syntax=checkCode(artifact,{sourceOnly:true});if(syntax.verdict!=='pass')return {...report,error:syntax.findings.join('; ')};
   let cases=[];try{cases=codeScenarios(artifact.scenarios);}catch(error){report.tests.push({name:'replay structure',passed:false,error:error.message});}
@@ -27,7 +29,7 @@ async function execute(artifact,signal,{lossDeadlineSeconds=null}={}){
     const {chromium}=await import('playwright');browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--disable-background-networking'],env:Object.fromEntries(Object.entries(process.env).filter(([key,value])=>typeof value==='string'&&!/^(OPENAI_|AWS_|GH_|GITHUB_|CODEX_)/.test(key)))});
     const context=await browser.newContext({serviceWorkers:'block'});await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();page.setDefaultTimeout(5000);await page.goto(origin+'/index.html');report.browserTested=true;
-    const executed=await page.evaluate(async ({cases,lossDeadlineSeconds})=>{
+    const executed=await page.evaluate(async ({cases,lossDeadlineSeconds,acceptanceCases})=>{
       const {CodeClient}=await import('./code-client.js');const tests=[];
       const enter=async client=>{
         const initial=await client.request('inspect');if(initial.phase!=='ready')throw Error('New createGame(api) instance must be ready, before start() is called.');
@@ -54,8 +56,9 @@ async function execute(artifact,signal,{lossDeadlineSeconds=null}={}){
         const reset=await client.request('reset');if(JSON.stringify(reset)!==JSON.stringify(initial))throw Error('Restart did not reset rules');
         tests.push({name:c.name,passed:true,phase:state.phase,frames:frames+extra,elapsedSeconds:Math.round(elapsed*1000)/1000,...(extra?{originalFrames:frames,continuationFrames:extra,approvedLossDeadlineSeconds:lossDeadlineSeconds}:{})});
       }catch(error){tests.push({name:c.name,passed:false,error:error.message});}finally{client.dispose();}}
+      for(const c of acceptanceCases){const client=new CodeClient();try{let {state}=await enter(client);for(const step of c.steps)for(let i=0;i<step.repeat;i++)state=await client.request('step',{dt:step.dt,input:Object.fromEntries(step.actions.map(action=>[action,true]))});for(const a of c.assertions){const value=a.field==='nodes'?state.nodes.length:state[a.field];if(!(a.op==='eq'?value===a.value:a.op==='gte'?value>=a.value:value<=a.value))throw Error(a.field+' '+a.op+' '+a.value+' failed: observed '+value);}tests.push({name:'Independent: '+c.name,passed:true,source:'human-project-requirement'});}catch(error){tests.push({name:'Independent: '+c.name,passed:false,error:error.message,source:'human-project-requirement'});}finally{client.dispose();}}
       return {tests,cases};
-    },{cases,lossDeadlineSeconds});
+    },{cases,lossDeadlineSeconds,acceptanceCases});
     report.tests.push(...executed.tests);
     report.passed=report.tests.every(test=>test.passed);
     if(report.passed&&report.tests.some(test=>test.continuationFrames)){report.originalArtifactHash=report.sourceHash;report.effectiveScenarios=JSON.stringify(executed.cases);codeScenarios(report.effectiveScenarios);report.sourceHash=fingerprint({...artifact,scenarios:report.effectiveScenarios});}
