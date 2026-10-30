@@ -10,7 +10,8 @@
     "test": "node scripts/test.js",
     "check": "node scripts/check.js",
     "test:browser": "node scripts/browser-tests.js",
-    "export:game": "node scripts/export-game.js"
+    "export:game": "node scripts/export-game.js",
+    "start:anthropic": "node scripts/start-anthropic.js"
   },
   "engines": {
     "node": ">=22.12.0"

@@ -146,7 +146,10 @@ function usageOf(value) {
   if (!value || !['input_tokens', 'output_tokens', 'total_tokens'].every(key => Number.isSafeInteger(value[key]) && value[key] >= 0) || value.total_tokens !== value.input_tokens + value.output_tokens) return null;
   return { inputTokens: value.input_tokens, outputTokens: value.output_tokens, totalTokens: value.total_tokens };
 }
-export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetch,countInputTokens=fetchImpl===globalThis.fetch } = {}) {
+export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetch,countInputTokens=fetchImpl===globalThis.fetch,protocol } = {}) {
+  const label=protocol?.label||'OpenAI',endpoint=protocol?.endpoint||ENDPOINT,countEndpoint=protocol?.countEndpoint||TOKEN_COUNT_ENDPOINT;
+  const headers=()=>protocol?protocol.headers(apiKey):{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'};
+  const providerError=message=>new Error(message.replaceAll('OpenAI',label));
   const maxRepairs = config.maxResponseRepairs ?? 2;
   if (!Number.isInteger(maxRepairs) || maxRepairs < 0 || maxRepairs > 2) throw new Error('Invalid model response repair limit');
   function cancelled() { const error = new Error('Model request cancelled at a run checkpoint'); error.suspended = true; return error; }
@@ -157,8 +160,8 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
     if(counts.has(hash))return {tokens:counts.get(hash)+prepared.body.max_output_tokens+512,method:'provider-count'};
     try{
       if(signal?.aborted)throw cancelled();
-      const payload=Object.fromEntries(['model','input','instructions','tools','tool_choice','parallel_tool_calls','text','reasoning'].filter(key=>prepared.body[key]!==undefined).map(key=>[key,prepared.body[key]]));
-      const response=await fetchImpl(TOKEN_COUNT_ENDPOINT,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify(payload),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000),redirect:'error'});
+      const payload=protocol?protocol.countBody(prepared.wireBody):Object.fromEntries(['model','input','instructions','tools','tool_choice','parallel_tool_calls','text','reasoning'].filter(key=>prepared.body[key]!==undefined).map(key=>[key,prepared.body[key]]));
+      const response=await fetchImpl(countEndpoint,{method:'POST',headers:headers(),body:JSON.stringify(payload),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000),redirect:'error'});
       if(!response.ok){await response.body?.cancel();throw Error('Token count unavailable');}
       const value=await readBounded(response,4096),input=value.input_tokens;
       if(!Number.isSafeInteger(input)||input<0||input>10000000)throw Error('Invalid input token count');
@@ -171,6 +174,12 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
     for (let attempt = 1; attempt <= maxRepairs + 1; attempt++) {
       if (signal?.aborted) throw cancelled();
       const prepared = buildRequest(config, role, stage, request, repairCode);
+      if(protocol){
+        prepared.wireBody=protocol.prepare(prepared.body);prepared.serialized=JSON.stringify(prepared.wireBody);
+        const bytes=Buffer.byteLength(prepared.serialized);
+        if(bytes>config.maxRequestBytes)throw providerError('OpenAI request exceeds the wire size limit; no instructions or schema were truncated');
+        prepared.reservation=bytes+prepared.body.max_output_tokens+512;
+      }
       const reservation=await reservationFor(prepared,signal);prepared.reservation=reservation.tokens;
       await reserve(prepared.reservation);
       let usage = null, output, failure,continuation;
@@ -179,10 +188,11 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
       try {
         combined.throwIfAborted();
         let response;
-        try { response = await fetchImpl(ENDPOINT, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: prepared.serialized, signal: combined, redirect: 'error' }); }
-        catch { if (combined.aborted) throw new Error('aborted'); throw new Error('OpenAI network request failed. No automatic retry was made.'); }
-        if (!response.ok) { await response.body?.cancel(); throw new Error(`OpenAI request failed (HTTP ${response.status}). Check credentials, billing, rate limits and model access.`); }
-        const result = await readBounded(response, config.maxResponseBytes);
+        try { response = await fetchImpl(endpoint, { method: 'POST', headers: headers(), body: prepared.serialized, signal: combined, redirect: 'error' }); }
+        catch { if (combined.aborted) throw new Error('aborted'); throw providerError('OpenAI network request failed. No automatic retry was made.'); }
+        if (!response.ok) { await response.body?.cancel(); throw providerError(`OpenAI request failed (HTTP ${response.status}). Check credentials, billing, rate limits and model access.`); }
+        const raw = await readBounded(response, config.maxResponseBytes).catch(error=>{throw providerError(error.message);});
+        const result = protocol?protocol.decode(raw):raw;
         if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('OpenAI returned an invalid response envelope');
         usage = usageOf(result.usage);
         combined.throwIfAborted();
@@ -203,7 +213,7 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         if(prepared.body.text.format.schema.properties.artifact?.anyOf?.[0]?.properties.source?.enum?.[0]===''&&output.artifact&&output.artifact.source!=='')throw new ModelOutputError('schema');
         }
       } catch (error) {
-        failure = signal?.aborted ? cancelled() : timeout.aborted ? new Error('OpenAI request timed out. No automatic retry was made.') : error;
+        failure = signal?.aborted ? cancelled() : timeout.aborted ? providerError('OpenAI request timed out. No automatic retry was made.') : protocol && !(error instanceof ModelOutputError) ? providerError(error.message) : error;
       } finally { await finish(usage, prepared.reservation); }
       if (signal?.aborted) failure = cancelled();
       await onAttempt({ role, stage, model:prepared.body.model,reasoning:prepared.body.reasoning||null, ...(request.operation ? {operation:request.operation} : {}), attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? continuation?'tool_call':'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}), reservationMethod:reservation.method,reservationTokens:reservation.tokens,usage });
@@ -213,5 +223,5 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
       repairCode = failure.code;
     }
   }
-  return Object.freeze({generate});
+  return Object.freeze({generate,mode:config.mode||'openai'});
 }

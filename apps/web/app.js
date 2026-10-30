@@ -1,3 +1,4 @@
+import {isModelProvider,providerLabel} from './providers.js';
 import {projectWorkspace} from './project-workspace.js';
 import './preferences.js';
 const $ = selector => document.querySelector(selector);
@@ -15,7 +16,7 @@ async function perform(fn) { if (busy) return; busy = true; $('#error').textCont
 async function action(name, data = {}) { await api(`/api/runs/${selected}/${name}`, data); }
 $('#prompt-only').onchange = () => {
   const promptOnly=$('#prompt-only').checked;$('#manual-settings').disabled=promptOnly;$('#manual-settings').hidden=promptOnly;
-  $('#input-mode-help').textContent=promptOnly?(providerMode==='openai'?'The planner will interpret your prompt. ':'Demo mode recognizes supported labels and keywords. ')+'Hidden form values are ignored. Review, edit and approve the checked plan before specialists start.':'Form selections take priority over your description. You will review a plan before building.';
+  $('#input-mode-help').textContent=promptOnly?(isModelProvider(providerMode)?'The planner will interpret your prompt. ':'Demo mode recognizes supported labels and keywords. ')+'Hidden form values are ignored. Review, edit and approve the checked plan before specialists start.':'Form selections take priority over your description. You will review a plan before building.';
 };
 $('#brief').onsubmit = event => { event.preventDefault(); perform(async () => {
   const data=$('#prompt-only').checked?{inputMode:'prompt',prompt:$('#prompt').value}:{inputMode:'manual',title:$('#title').value,prompt:$('#prompt').value,genre:$('#genre').value,theme:$('#theme').value,musicStyle:$('#music-style').value,musicInstrument:$('#music-instrument').value,difficulty:$('#difficulty').value,music:$('#music').checked,askStory:$('#ask-story').checked};
@@ -29,7 +30,7 @@ function renderPlan(run) {
   const plan = run.results.planner.artifact;
   if(run.costEstimate)$('#plan').append(element('p',`Estimated first pass: ${run.costEstimate.calls} model requests${run.costEstimate.estimatedDollars===null?'':` · about ${run.costEstimate.estimatedDollars}`}. ${run.costEstimate.assumptions||run.costEstimate.note} ${run.budgetLimits?`Limits: ${run.budgetLimits.maxCalls} calls / ${run.budgetLimits.maxTotalTokens} tokens.`:''}`));
   if(plan.acceptance){const list=element('ul');list.append(...plan.acceptance.map(item=>element('li',item)));$('#plan').append(element('h4','What we will test'),list);}
-  if(run.brief.genre==='custom'&&run.mode!=='openai')$('#plan').append(element('p','Local demo uses a small example game. OpenAI mode is required to write new mechanics from your description.'));
+  if(run.brief.genre==='custom'&&!isModelProvider(run.mode))$('#plan').append(element('p','Local demo uses a small example game. A real model provider is required to write new mechanics from your description.'));
   $('#plan').append(element('h3', 'Review the checked plan'), element('p', `${plan.title}: ${plan.objective}`), element('p', `Game type: ${choiceLabel('#genre',run.brief.genre || 'collector')}. Art: ${choiceLabel('#theme',run.brief.theme || 'space')}. Difficulty: ${plan.difficulty}. Music: ${run.brief.music ? `${choiceLabel('#music-style',run.brief.musicStyle || 'adventure')} · ${choiceLabel('#music-instrument',run.brief.musicInstrument || 'auto')}` : 'disabled'}.`), element('p', 'The planner checker passed. Specialists will start after you approve this plan.'));
   if(plan.acceptance){const list=element('ul');list.append(...plan.acceptance.map(item=>element('li',item)));$('#plan').append(element('h4','What we will test'),list);}
   const resolution=run.briefResolution?.proposal;
@@ -39,7 +40,7 @@ function renderPlan(run) {
     for(const [key,label] of [['assumptions','Suggestions and assumptions'],['unsupportedRequests','Requested features this version cannot build']])if(resolution[key].length){const list=element('ul');list.append(...resolution[key].map(note=>element('li',note)));$('#plan').append(element('h4',label),list);}
   }
   const approve = element('button', 'Approve plan and start specialists'); const id = run.id, planHash = run.planHash;
-  if(run.mode==='openai'&&run.minimumModelCalls)$('#plan').append(element('p',`This game activates ${run.requiredRoles.length} jobs: at least ${run.minimumModelCalls} model requests including independent checks. Current call limit: ${run.providerConfig.maxCalls}. Repairs and revisions use additional requests; token limits also apply.`));
+  if(isModelProvider(run.mode)&&run.minimumModelCalls)$('#plan').append(element('p',`This game activates ${run.requiredRoles.length} jobs: at least ${run.minimumModelCalls} model requests including independent checks. Current call limit: ${run.providerConfig.maxCalls}. Repairs and revisions use additional requests; token limits also apply.`));
   let acknowledge;
   if(resolution?.unsupportedRequests.length){const label=element('label',undefined,'inline');acknowledge=document.createElement('input');acknowledge.type='checkbox';acknowledge.id='acknowledge-unsupported';label.append(acknowledge,document.createTextNode('I understand these features will be omitted. Build only the supported plan above.'));$('#plan').append(label);approve.disabled=true;acknowledge.onchange=()=>{approve.disabled=!acknowledge.checked;};}
   approve.onclick = () => perform(() => api(`/api/runs/${id}/approve_plan`, { planHash,acceptUnsupported:acknowledge?.checked===true })); $('#plan').append(approve);
@@ -78,7 +79,7 @@ function renderQuestions(run) {
 }
 function render(run) {
   current = run; $('#empty').hidden = true; $('#run').hidden = false;
-  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/${run.maxSteps||80} steps · ${run.mode === 'openai' ? `OpenAI: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
+  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/${run.maxSteps||80} steps · ${isModelProvider(run.mode) ? `${providerLabel(run.mode)}: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
   $('#controls').replaceChildren();
   const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : run.status==='failed'&&run.build&&run.validation?.passed&&run.browserChecks?.passed ? [['Retry saving validated build','retry_delivery'],['Cancel','cancel']] : run.status==='failed'&&!run.build ? [[/ exhausted its repair attempts:/.test(run.error||'')?'Review a new plan':'Retry interrupted work',/ exhausted its repair attempts:/.test(run.error||'')?'revise_plan':'retry'],['Cancel','cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
   for (const [label, command] of buttons) { const button = element('button', label, 'secondary'); button.onclick = () => perform(() => action(command)); $('#controls').append(button); }
@@ -136,6 +137,6 @@ Promise.all([api('/api/config'),api('/api/music-catalog'),api('/api/game-catalog
   providerMode=config.mode;for(const id of ['#genre','#revision-genre'])musicOptions(id,games,'collector');
   for(const id of ['#music-style','#revision-music-style'])musicOptions(id,catalog.styles,'adventure');
   for(const id of ['#music-instrument','#revision-music-instrument'])musicOptions(id,catalog.instruments,'auto');
-  $('#provider-status').textContent = config.mode === 'openai' ? 'OpenAI mode · API usage is billed' : 'Local demo · no API calls'; $('#create-run').textContent = config.mode === 'openai' ? 'Build with OpenAI' : 'Build a game'; $('#create-run').disabled = false; return refresh();
+  $('#provider-status').textContent = isModelProvider(config.mode) ? `${providerLabel(config.mode)} mode · API usage is billed` : 'Local demo · no API calls'; $('#create-run').textContent = isModelProvider(config.mode) ? `Build with ${providerLabel(config.mode)}` : 'Build a game'; $('#create-run').disabled = false; return refresh();
 }).catch(error => { $('#error').textContent = error.message; });
 setInterval(() => refresh().catch(error => { $('#error').textContent = error.message; }), 1500);

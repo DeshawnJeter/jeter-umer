@@ -20,6 +20,8 @@ npm test
 npm run check
 ```
 
+For Claude workers and checkers, see [Anthropic setup](docs/anthropic-provider.md) and use `npm run start:anthropic` with a private `ANTHROPIC_API_KEY`. Existing OpenAI runs retain their provider identity.
+
 For real model workers/checkers, privately set a fresh `OPENAI_API_KEY` in the server environment and run `npm run start:openai`. See [docs/openai-provider.md](docs/openai-provider.md) for model overrides, limits and optional explicit environment-file loading. The dashboard clearly labels billed OpenAI mode. Normal tests strip real credentials and never make paid calls.
 
 ## What this version does
