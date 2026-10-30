@@ -4,6 +4,7 @@ export function projectWorkspace({api,perform,selectRun,getRun}){
  const selector=$('project-select');selector.onchange=()=>{projectId=selector.value;signature='';};
  const runAction=(path,data)=>perform(async()=>{const run=await api(path,data);selectRun(run.id);signature='';});
  $('save-version').onclick=()=>perform(async()=>{const run=getRun();await api(`/api/runs/${run.id}/save_version`,{});projectId=run.projectId;signature='';});
+ $('change-form').onsubmit=event=>{event.preventDefault();runAction(`/api/projects/${projectId}/change`,{versionId:$('feedback-version').value,request:$('change-request').value,preserve:$('change-preserve').value.split('\n').map(s=>s.trim()).filter(Boolean)});};
  $('feedback-form').onsubmit=event=>{event.preventDefault();perform(async()=>{await api(`/api/projects/${projectId}/feedback`,{versionId:$('feedback-version').value,title:$('feedback-title').value,expected:$('feedback-expected').value,actual:$('feedback-actual').value,steps:$('feedback-steps').value,roles:[$('feedback-role').value]});$('feedback-form').reset();signature='';});};
  $('compare-versions').onclick=()=>perform(async()=>{const result=await api(`/api/projects/${projectId}/compare?left=${$('compare-left').value}&right=${$('compare-right').value}`);$('comparison').textContent=`${result.sameBuild?'Identical game files.':'Game files differ.'} Changed contributions: ${result.changedRoles.join(', ')||'none'}. Changed settings: ${result.briefChanges.join(', ')||'none'}.`;});
  return {projectId:()=>selector.value,async refresh(run){

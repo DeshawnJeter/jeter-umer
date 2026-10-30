@@ -51,6 +51,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
   assertRequestFits({ ...workerBundle, ...input }, profile.worker.maxContextChars);
   const folder = resolve(directory, role); await mkdir(folder, { recursive: true });
   const workspace=role==='coding'?codeWorkspace(folder):null;
+  if(workspace&&context.seedOwnedSource&&context.previousSource&&!(await workspace.read()))await workspace.stage(context.previousSource);
   const questions = []; let findings = [];
   const prior=role==='coding'?await reviewedRepair(folder,{...workerBundle,...clone(input),findings:[],attempt:1,limits:{maxContextChars:profile.worker.maxContextChars,maxOutputChars:profile.worker.maxOutputChars}},profile.maxAttempts):null;
   if(prior){
