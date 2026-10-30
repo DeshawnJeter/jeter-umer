@@ -15,7 +15,7 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
   try{
     if(signal?.aborted)throw Error('Browser checks cancelled');
     const root=resolve(folder);
-    server=createServer(async(req,res)=>{try{const relative=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname).slice(1)||'index.html',path=resolve(root,relative);if(!path.startsWith(root+sep)||relative.split(/[\\/]/).some(part=>part.startsWith('.')))throw Error('Outside build');const types={'.js':'text/javascript','.json':'application/json','.html':'text/html'};res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'});res.end(await readFile(path));}catch{res.writeHead(404);res.end('Not found');}});
+    server=createServer(async(req,res)=>{try{const relative=decodeURIComponent(new URL(req.url,'http://127.0.0.1').pathname).slice(1)||'index.html',path=resolve(root,relative);if(!path.startsWith(root+sep)||relative.split(/[\\/]/).some(part=>part.startsWith('.')))throw Error('Outside build');const types={'.js':'text/javascript','.json':'application/json','.html':'text/html','.png':'image/png','.wav':'audio/wav'};res.writeHead(200,{'Content-Type':types[extname(path)]||'application/octet-stream','Cache-Control':'no-store'});res.end(await readFile(path));}catch{res.writeHead(404);res.end('Not found');}});
     await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});
     const origin=`http://127.0.0.1:${server.address().port}`;
     const {chromium}=await import('playwright');

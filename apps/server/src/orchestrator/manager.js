@@ -1,3 +1,4 @@
+import {bindAssets} from '../integration/asset-bindings.js';
 import {Assets} from '../storage/assets.js';
 import {buildBudget,estimateBuild} from '../providers/build-budget.js';
 import {feedbackFor} from '../memory/feedback.js';
@@ -84,7 +85,7 @@ export class Manager {
     const budgetLimits=buildBudget(this.runtime.publicConfig,brief.budgetLimits||{});
     const project=brief.projectId?await this.projects.get(brief.projectId):await this.projects.create(validateBrief(brief).title);
     const projectHistory=this.projects.context(project);
-    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, budgetLimits, costEstimate:estimateBuild(this.runtime.publicConfig,validateBrief(brief)), parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
+    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, assetSelection:clone(project.assetSelection||{}),budgetLimits, costEstimate:estimateBuild(this.runtime.publicConfig,validateBrief(brief)), parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
     run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
@@ -136,6 +137,7 @@ export class Manager {
   }
   async execute(run, role) {
     if (run.results[role] || this.blocked(run, role)) return;
+    const projectAssets=run.projectId&&['ui','art','audio'].includes(role)?(await this.projects.get(run.projectId)).assets||[]:[];
     const unresolvedFeedback=run.projectId?feedbackFor(await this.projects.get(run.projectId),role):[];
     const handlers = this.router ? await this.router(role) : await this.runtime.route(role, this.providerHooks(run,role));
     const task = makeTask(role, run.generation);
@@ -144,7 +146,7 @@ export class Manager {
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { unresolvedFeedback,independentAcceptance:(run.acceptanceCases||[]).map(c=>({name:c.name,assertions:c.assertions})),...(run.changeRequest?{changeRequest:clone(run.changeRequest)}:{}),...(role==='coding'&&run.initialSource?{previousSource:run.initialSource,seedOwnedSource:true}:{}),...(run.projectHistory?{projectHistory:clone(run.projectHistory)}:{}),...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { unresolvedFeedback,projectAssets:projectAssets.map(({id,name,kind,width,height,license})=>({id,name,kind,width,height,license})),independentAcceptance:(run.acceptanceCases||[]).map(c=>({name:c.name,assertions:c.assertions})),...(run.changeRequest?{changeRequest:clone(run.changeRequest)}:{}),...(role==='coding'&&run.initialSource?{previousSource:run.initialSource,seedOwnedSource:true}:{}),...(run.projectHistory?{projectHistory:clone(run.projectHistory)}:{}),...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal,{lossDeadlineSeconds:lossDeadlineForBrief(run.brief),acceptanceCases:run.acceptanceCases||[]});recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
@@ -205,12 +207,13 @@ export class Manager {
         const rules=runProjectRules(config);recordTests(run,'qa-rules',rules);
         if(!rules.passed)throw Error('Automatic integration rule checks failed');
       }
+      const copyAssets=await bindAssets(this,run,config);
       run.validation = validateGame(config);
       recordTests(run,'static-integration',run.validation);
       if (!run.validation.passed) throw new Error(`Integration failed: ${run.validation.findings.join('; ')}`);
       await this.event(run, 'Static integration checks passed. Building playable preview.');
       const folder = resolve(this.store.folder(run.id), 'builds', String(run.generation));
-      const sha256 = await buildGame(folder, config); if (run.status !== 'running') return;
+      await buildGame(folder, config);await copyAssets(folder);const sha256=await hashBuild(folder); if (run.status !== 'running') return;
       run.build = { generation: run.generation, sha256, url: `${run.brief.genre==='custom'?`http://127.0.0.1:${Number(process.env.GAME_BUILDER_CODE_PREVIEW_PORT)||((Number(process.env.PORT)||3000)>65400?(Number(process.env.PORT)||3000)-100:(Number(process.env.PORT)||3000)+100)}`:''}/preview/${run.id}/${run.generation}/index.html`, checksRequired: humanChecksFor(run.brief.genre) };
       if(run.browserQaMode==='on'){
         await this.event(run,'Running isolated browser smoke checks against the delivered build.');

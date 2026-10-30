@@ -1,3 +1,4 @@
+import {validateBindings} from './integration/asset-bindings.js';
 import {estimateBuild} from './providers/build-budget.js';
 import {validateBrief} from '../../../shared/contracts/index.js';
 import {exportProject} from './integration/export-project.js';
@@ -21,7 +22,7 @@ const origin = `http://127.0.0.1:${port}`;
 const codePort=Number(process.env.GAME_BUILDER_CODE_PREVIEW_PORT)||(port>65400?port-100:port+100);
 if(!Number.isInteger(codePort)||codePort<1024||codePort>65535||codePort===port)throw Error('Invalid isolated code preview port');
 const codeOrigin=`http://127.0.0.1:${codePort}`;
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png':'image/png', '.wav':'audio/wav' };
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); }
 async function body(req,limit=12000) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new Error('Use application/json');
@@ -47,6 +48,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='assign_assets'){const data=await body(req);return json(res,200,await manager.projects.update(parts[2],project=>{project.assetSelection=validateBindings(project,data.bindings||{});}));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='assets')return json(res,201,await manager.assets.add(parts[2],await body(req,2850000)));
       if(url.pathname==='/api/runs/estimate')return json(res,200,estimateBuild(manager.runtime.publicConfig,validateBrief(await body(req))));
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='repair')return json(res,201,await repairFeedback(manager,parts[2],await body(req)));

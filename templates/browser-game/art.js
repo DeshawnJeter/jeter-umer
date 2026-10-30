@@ -89,6 +89,7 @@ export function createArt(scene, ui) {
   });
 }
 export function drawBackdrop(scene, ui) {
+  if(ui.importedBackground&&scene.textures.exists('imported-background')){scene.add.image(360,240,'imported-background').setDisplaySize(720,480).setDepth(-10);return;}
   scene.add.image(0, 0, `backdrop-${themeOf(ui.theme)}`).setOrigin(0).setDepth(-10);
   const palette = ART_THEMES[themeOf(ui.theme)];
   for (let i = 0; i < (ui.particleCount??12); i++) {

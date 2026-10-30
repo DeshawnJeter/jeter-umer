@@ -31,6 +31,7 @@ export async function work(role,request){const artifact=referenceFor(role,reques
 export async function check(role,request){
   const {artifact,context={}}=request,findings=extensionErrors(role,artifact);
   if(!findings.length){
+    if(role==='art')for(const slot of ['background','player','music']){const id=artifact[slot+'Asset'];if(id&& !['auto','none'].includes(id)&&!(context.projectAssets||[]).some(a=>a.id===id&&a.kind===(slot==='music'?'audio':'image')))findings.push('Imported asset must come from the supplied project catalog');}
     if(role==='vfx'&&artifact.particlesPerBurst>artifact.maxParticles)findings.push('VFX burst must fit the bounded particle pool');
     if(role==='enemies'&&artifact.chaseSpeed<artifact.patrolSpeed)findings.push('Chase speed must not be slower than patrol speed');
     if(role==='enemies'&&!Object.values(enemyFairnessEvidence(artifact)).every(Boolean))findings.push('Enemy warning, cooldown, occlusion or stuck-recovery probes failed');

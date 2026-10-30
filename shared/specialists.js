@@ -17,8 +17,9 @@ export function dependenciesFor(role,genre='collector'){
 export function extensionDefaults(role){return Object.fromEntries(Object.entries(EXTENSION_SPECS[role].fields).map(([key,spec])=>[key,structuredClone(spec.default)]));}
 export function extensionErrors(role,value){
   const spec=EXTENSION_SPECS[role],errors=[];if(!spec||!value||typeof value!=='object'||Array.isArray(value))return ['Invalid specialist artifact'];
-  if(Object.keys(value).sort().join()!==Object.keys(spec.fields).sort().join())errors.push('Unexpected or missing specialist artifact fields');
+  if(Object.keys(value).some(key=>!Object.hasOwn(spec.fields,key))||Object.entries(spec.fields).some(([key,rule])=>!rule.optional&&!Object.hasOwn(value,key)))errors.push('Unexpected or missing specialist artifact fields');
   for(const [key,rule]of Object.entries(spec.fields)){
+    if(rule.optional&&!Object.hasOwn(value,key))continue;
     const v=value[key];let valid;
     if(rule.type==='number'||rule.type==='integer')valid=Number.isFinite(v)&&(rule.type!=='integer'||Number.isInteger(v))&&v>=rule.min&&v<=rule.max;
     else if(rule.type==='array')valid=Array.isArray(v)&&v.length<=16&&new Set(v).size===v.length&&v.every(item=>typeof item==='string'&&rule.enum.includes(item));
@@ -45,3 +46,6 @@ EXTENSION_SPECS.qa={"genres":"all","job":"Review actual trusted rule-test eviden
 EXTENSION_SPECS.vfx={"genres":"all","job":"Respond to immutable gameplay events with bounded hit flashes, spell impacts, explosions, shot trails and camera shake. Choose enabled, maxParticles 0–96, particlesPerBurst 0–12, shake 0–0.006, flashMs 0–120. Bursts must fit the pool. Never modify combat, MP, inventory or warnings; reduced-effects settings take priority.","fields":{"enabled":{"type":"boolean","default":true},"maxParticles":{"type":"integer","default":48,"min":0,"max":96},"particlesPerBurst":{"type":"integer","default":6,"min":0,"max":12},"shake":{"type":"number","default":0.003,"min":0,"max":0.006},"flashMs":{"type":"integer","default":80,"min":0,"max":120}}};
 
 EXTENSION_SPECS.coding={genres:['custom'],job:'Write original JavaScript game rules for the approved prompt using the supplied componentCatalog. Return source and scenarios. Export createGame(api) with start, update(dt,input), inspect. No imports, DOM, network or host access. Include bounded winning and losing input replay scenarios. Do not copy the example when it fails the prompt. Test evidence is computed independently; never invent execution.',fields:{source:{type:'string',default:'',maxLength:6000},scenarios:{type:'string',default:'',maxLength:6000}}};
+
+for(const slot of ['background','player','music'])EXTENSION_SPECS.art.fields[slot+'Asset']={type:'string',default:'auto',optional:true,maxLength:36,pattern:'^(auto|none|[a-f0-9-]{36})$'};
+EXTENSION_SPECS.art.job+=' For imported assets, choose backgroundAsset/playerAsset/musicAsset from context.projectAssets IDs, auto to retain human choices, or none. Never invent IDs. Human assignments take priority.';

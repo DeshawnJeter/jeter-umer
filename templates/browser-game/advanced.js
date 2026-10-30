@@ -1,3 +1,4 @@
+import {preloadAssets,applyAssets} from './imported-assets.js';
 import {createGameEvents} from './game-events.js';
 import {GameVfx} from './vfx.js';
 import {GameAudio} from './audio.js';
@@ -10,7 +11,7 @@ export async function startAdvancedGame(config,genre){
   const profile=advancedProfile(genre),rules=GAME_TYPES[genre],lifecycle=lifecycleFor(genre);
   if(!profile)throw Error('Unsupported advanced game');
   const {createMode}=await import(`./genres/${genre}.js`);
-  const $=selector=>document.querySelector(selector),audio=new GameAudio(config.audio),held=new Set();let scene,mode,ui,events,vfx,last='',clock=0;
+  const $=selector=>document.querySelector(selector),audio=new GameAudio({...config.audio,importedMusic:config.importedAssets?.music}),held=new Set();let scene,mode,ui,events,vfx,last='',clock=0;
   const state={ready:false,genre,phase:'ready',maxHealth:profile.health,health:profile.health,maxMana:profile.mana,mana:profile.mana,score:0,required:config.levels.stars.length,remaining:config.gameplay.timeLimit,objective:rules.objective,progress:genre==='custom'?'0':'1 / 3',abilities:'Basic jump',alert:0,x:0,y:0};
   $('#title').textContent=config.ui.title;document.title=config.ui.title;$('#genre').textContent=rules.name;$('#message').textContent=config.story.intro;
   const panel=document.createElement('section');panel.id='mode-panel';panel.setAttribute('aria-label','Game actions');$('#game').before(panel);
@@ -29,7 +30,8 @@ export async function startAdvancedGame(config,genre){
   }
   ui=new PlayerInterface({config,genre,state,audio,held,onJump:()=>{if(state.phase==='playing')mode?.jump?.();},onAction:action=>{if(state.phase==='playing')mode?.action?.(action);},onControlsChanged:()=>mode?.refreshControls?.(),onEffectsChanged:()=>vfx?.refreshSettings(),onPause:()=>scene?.scene.pause(),onResume:()=>scene?.scene.resume(),onRestart:()=>scene?.scene.restart()});await ui.initialize();
   class AdvancedScene extends Phaser.Scene{
-    create(){scene=this;events=createGameEvents();const sceneEvents=events;this.physics.resume();panel.replaceChildren();clock=0;last='';ui.clearInput();Object.assign(state,{ready:true,phase:'ready',health:profile.health,maxHealth:profile.health,mana:profile.mana,maxMana:profile.mana,score:0,remaining:config.gameplay.timeLimit,objective:rules.objective,alert:0,progress:genre==='custom'?'0':'1 / 3',abilities:'Basic jump',failureReason:null,enemyStates:[],codeSnapshot:null});$('#message').textContent=config.story.intro;createArt(this,config.ui);drawBackdrop(this,{...config.ui,...config.art});vfx=new GameVfx(this,events,config.vfx,()=>ui.settings);const sceneVfx=vfx;mode=createMode(this,ctx);this.events.once('shutdown',()=>{ui.clearInput();audio.setPlaying(false);mode.dispose?.();sceneVfx.dispose();sceneEvents.dispose();});render();}
+    preload(){preloadAssets(this,config);}
+    create(){scene=this;events=createGameEvents();const sceneEvents=events;this.physics.resume();panel.replaceChildren();clock=0;last='';ui.clearInput();Object.assign(state,{ready:true,phase:'ready',health:profile.health,maxHealth:profile.health,mana:profile.mana,maxMana:profile.mana,score:0,remaining:config.gameplay.timeLimit,objective:rules.objective,alert:0,progress:genre==='custom'?'0':'1 / 3',abilities:'Basic jump',failureReason:null,enemyStates:[],codeSnapshot:null});$('#message').textContent=config.story.intro;applyAssets(this);createArt(this,config.ui);drawBackdrop(this,{...config.ui,...config.art,importedBackground:config.importedAssets?.background});vfx=new GameVfx(this,events,config.vfx,()=>ui.settings);const sceneVfx=vfx;mode=createMode(this,ctx);this.events.once('shutdown',()=>{ui.clearInput();audio.setPlaying(false);mode.dispose?.();sceneVfx.dispose();sceneEvents.dispose();});render();}
     update(_,delta){if(!mode)return;if(state.phase==='playing'){clock+=delta/1000;if(lifecycle.timer)state.remaining=Math.max(0,config.gameplay.timeLimit-clock);if(failureReason(genre,state))ctx.end('lost');if(state.phase==='playing')mode.update(delta/1000,clock);if(state.phase==='playing'&&failureReason(genre,state))ctx.end('lost');}vfx?.update(delta/1000);if(mode.player){state.x=mode.player.x;state.y=mode.player.y;}render();}
   }
   new Phaser.Game({type:Phaser.AUTO,width:720,height:480,parent:'game',backgroundColor:config.ui.backgroundColor,physics:{default:'arcade',arcade:{gravity:{x:0,y:0}}},scene:AdvancedScene,audio:{noAudio:true}});

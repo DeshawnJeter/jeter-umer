@@ -22,7 +22,12 @@ export class GameAudio {
     }
     await this.context?.resume();
     if (this.disposed) throw new Error('Audio session disposed');
-    if (this.config.music && this.Tone) {
+    if(this.config.music&&this.config.importedMusic){
+      if(!/^assets\/[a-f0-9-]{36}\.wav$/.test(this.config.importedMusic))throw Error('Invalid local music asset');
+      const response=await fetch(this.config.importedMusic);if(!response.ok)throw Error('Music asset unavailable');const bytes=await response.arrayBuffer();if(bytes.byteLength>2*1024*1024)throw Error('Music asset too large');
+      this.importedBuffer=await this.context.decodeAudioData(bytes);if(this.disposed)throw Error('Audio session disposed');this.importedGain=this.context.createGain();this.importedGain.connect(this.context.destination);
+    }
+    if (this.config.music && !this.config.importedMusic && this.Tone) {
       const T = this.Tone;
       // Blob workers are blocked in isolated game previews. Use Tone's timer
       // scheduler without weakening the game's worker/network policy.
@@ -58,6 +63,7 @@ export class GameAudio {
     if (this.disposed || !this.started) return;
     this.playing = !!playing;
     this.update();
+    if(this.importedBuffer){if(this.playing&&!this.importedSource){const source=this.context.createBufferSource();source.buffer=this.importedBuffer;source.loop=true;source.connect(this.importedGain);source.start();this.importedSource=source;}else if(!this.playing&&this.importedSource){this.importedSource.stop();this.importedSource.disconnect();this.importedSource=null;}}
     if (!this.transport) return;
     if (this.playing && this.transport.state !== 'started') this.transport.start();
     if (!this.playing && this.transport.state !== 'stopped') this.transport.stop();
@@ -66,6 +72,7 @@ export class GameAudio {
     this.volume = safeVolume(this.volume);
     this.musicVolume = Number.isFinite(this.musicVolume) ? Math.max(0, Math.min(1, this.musicVolume)) : 0;
     this.sfxVolume = Number.isFinite(this.sfxVolume) ? Math.max(0, Math.min(1, this.sfxVolume)) : 0;
+    if(this.importedGain)this.importedGain.gain.value=!this.playing||this.muted||this.musicMuted?0:this.volume*0.55*this.musicVolume;
     if (this.gain) this.gain.gain.value = this.muted || this.sfxMuted ? 0 : this.volume * this.sfxVolume;
     if (this.musicGain) this.musicGain.gain.rampTo(!this.playing || this.muted || this.musicMuted ? 0 : this.volume * 0.55 * this.musicVolume, 0.05);
   }
@@ -79,7 +86,7 @@ export class GameAudio {
     oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
   }
   clearMusic() {
-    this.playing = false; this.transport?.stop();
+    this.playing = false;if(this.importedSource){this.importedSource.stop();this.importedSource.disconnect();this.importedSource=null;}this.importedGain?.disconnect();this.importedGain=null;this.importedBuffer=null;this.transport?.stop();
     for (const sequence of this.sequences) sequence.dispose(); this.sequences = [];
     for (const node of this.nodes.reverse()) node.dispose(); this.nodes = []; this.musicGain = null; this.transport = null;
   }
@@ -88,5 +95,5 @@ export class GameAudio {
     if (this.disposed) return;
     this.disposed = true; this.clearMusic(); this.context?.close()?.catch(() => {}); this.started = false;this.closeToneContext();
   }
-  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, instrument: this.instrument, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes, scheduledEffects:this.scheduledEffects||0, ownedNodes:this.nodes.length, sequenceCount:this.sequences.length, clockSource:this.toneContext?.clockSource||null, musicContextState:this.toneContext?.state||null, musicGain:this.musicGain?.gain.value??0, sfxGain:this.gain?.gain.value??0, volume:this.volume, musicVolume:this.musicVolume, sfxVolume:this.sfxVolume, muted:this.muted, musicMuted:this.musicMuted, sfxMuted:this.sfxMuted }; }
+  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain||!!this.importedBuffer, importedMusic:!!this.importedBuffer, style: this.score.style, instrument: this.instrument, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes, scheduledEffects:this.scheduledEffects||0, ownedNodes:this.nodes.length, sequenceCount:this.sequences.length, clockSource:this.toneContext?.clockSource||null, musicContextState:this.toneContext?.state||null, musicGain:this.musicGain?.gain.value??this.importedGain?.gain.value??0, sfxGain:this.gain?.gain.value??0, volume:this.volume, musicVolume:this.musicVolume, sfxVolume:this.sfxVolume, muted:this.muted, musicMuted:this.musicMuted, sfxMuted:this.sfxMuted }; }
 }
