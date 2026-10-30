@@ -19,6 +19,7 @@ export function projectWorkspace({api,perform,selectRun,getRun}){
   $('feedback-submit').disabled=!p.versions.length;$('compare-versions').disabled=p.versions.length<2;
   $('project-versions').replaceChildren();for(const v of p.versions.toReversed()){
    const row=node('article');row.append(node('p',`${v.label||'Saved version'} · ${v.buildHash.slice(0,12)} · ${v.approval?'Human approved these bytes':'Human approval pending'}`));
+   const download=node('a','Download editable project');download.href=`/api/projects/${p.id}/export/${v.id}`;row.append(download);
    const restore=node('button','Restore as a new run');restore.onclick=()=>runAction(`/api/projects/${p.id}/restore`,{versionId:v.id});row.append(restore);
    const name=node('input');name.maxLength=60;name.placeholder='Milestone name';name.setAttribute('aria-label','Milestone name');name.value=v.label;const save=node('button','Name milestone');save.onclick=()=>perform(async()=>{await api(`/api/projects/${p.id}/milestone`,{versionId:v.id,label:name.value});signature='';});row.append(name,save);$('project-versions').append(row);
   }
