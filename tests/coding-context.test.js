@@ -1,3 +1,4 @@
+import {toolStateFor} from '../apps/server/src/providers/tool-policy.js';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';import {buildRequest} from './fixtures/legacy-provider.js';import {providerConfig} from './fixtures/legacy-provider.js';import {DEFAULT_SCENARIOS,DEFAULT_SOURCE} from '../shared/code-game.js';
 test('coding requests keep full prompt, criteria, role rules and skills while removing irrelevant template payload',async()=>{
@@ -8,7 +9,7 @@ test('coding requests keep full prompt, criteria, role rules and skills while re
     const prepared=buildRequest(config,'coding',stage,request),data=JSON.parse(prepared.body.input[0].content[0].text);
     assert.equal(data.brief.prompt,brief.prompt);assert.deepEqual(data.context.plan.acceptance,criteria);assert.equal(data.context.memory.dependencies.planner,'checked-plan');assert.equal(data.context.presentation.theme,'forest');assert.equal(data.hudReference,undefined);assert.equal(data.capabilityProfile,undefined);
     assert.ok(prepared.body.instructions.includes(bundle.focusedCode.roleInstructions));for(const skill of bundle.focusedCode.skills)assert.ok(prepared.body.instructions.includes(skill.instructions));assert.ok(prepared.serialized.length<=16000);
-    if(stage==='worker'){assert.ok(prepared.body.instructions.includes('compact but complete implementation'));assert.ok(prepared.body.instructions.includes('repeat counts'));assert.equal(prepared.body.tool_choice,'none');assert.equal(buildRequest(config,'coding','worker',{...request,findings:['Repair a concrete defect']}).body.tool_choice,'auto');}
+    if(stage==='worker'){assert.ok(prepared.body.instructions.includes('compact but complete implementation'));assert.ok(prepared.body.instructions.includes('repeat counts'));assert.equal(prepared.body.tool_choice,'auto');assert.equal(buildRequest(config,'coding','worker',{...request,findings:['Repair a concrete defect']}).body.tool_choice,'auto');}
   }
 });
 
@@ -56,9 +57,9 @@ test('scenarios-only requests lock source and use structured replays without edi
  const request={...bundle,brief:{genre:'custom',prompt:'Full approved requirements'},context:{sourceReference:{hash:'locked'}},replayRepair:{scope:'scenarios-only',sourceHash:'locked'},tools:{apply_source_patch(){}}};
  const body=buildRequest(config,'coding','worker',request).body;assert.equal(body.tools,undefined);assert.equal(body.max_output_tokens,2048);assert.deepEqual(body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(body.instructions.includes('scenarios-only repair'));
 });
-test('tool budget completion requests a bounded final artifact instead of offering a fifth tool call',async()=>{
+test('verified tool checks request a compact final artifact without further tools',async()=>{
  const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_TOOL_FINAL'}).publicConfig;
- const prepared=buildRequest(config,'coding','worker',{...bundle,brief:{genre:'custom',prompt:'Preserve the current game'},context:{previousSource:DEFAULT_SOURCE},toolTurns:4,tools:{read_source(){},apply_source_patch(){}}});
+ const prepared=buildRequest(config,'coding','worker',{...bundle,brief:{genre:'custom',prompt:'Preserve the current game'},context:{previousSource:DEFAULT_SOURCE},toolState:{...toolStateFor({context:{previousSource:DEFAULT_SOURCE}}),stopReason:'checks_passed',counts:{reads:4,edits:0,tests:1}},tools:{read_source(){},apply_source_patch(){}}});
  assert.equal(prepared.body.tools,undefined);assert.equal(prepared.body.tool_choice,undefined);assert.deepEqual(prepared.body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.equal(prepared.body.max_output_tokens,config.maxOutputTokens);assert.match(prepared.body.instructions,/Submit the structured artifact now/);
 });
 

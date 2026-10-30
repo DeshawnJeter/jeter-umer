@@ -12,6 +12,8 @@ The dashboard identifies Claude / Anthropic, shows calls and reported tokens, an
 
 ## Models and limits
 
+Coding tools use [adaptive per-task limits](adaptive-tool-limits.md), with separate read/edit/test tracking, a reserved validation slot and progress-gated repair extensions. These allowances do not increase the call or token limits below.
+
 `ANTHROPIC_MODEL`, `ANTHROPIC_WORKER_MODEL`, `ANTHROPIC_CHECKER_MODEL` and role overrides such as `ANTHROPIC_CODING_WORKER_MODEL` or `ANTHROPIC_UI_CHECKER_MODEL` select models. OpenAI overrides are ignored in Anthropic mode. The Claude model family was checked against [Anthropic's model catalog](https://platform.claude.com/docs/en/models/overview).
 
 Limits use the existing harness policy: `ANTHROPIC_MAX_CALLS` (default 24, at most 40), `ANTHROPIC_MAX_TOTAL_TOKENS` (default 128000), `ANTHROPIC_MAX_OUTPUT_TOKENS` (2048), `ANTHROPIC_CODING_MAX_OUTPUT_TOKENS` (6144), `ANTHROPIC_MAX_RESPONSE_REPAIRS` (0–2, default 2) and `ANTHROPIC_TIMEOUT_MS` (60000, at most 60000). Claude's default token allowance is larger than OpenAI's 64000: the initial live build used 55613 tokens before the coding pair and hit that smaller limit. Old runs keep their original limits and evidence; they are not silently increased. Coding escalation to Opus is enabled only for the third coding-worker attempt with concrete unresolved findings, within the same run budgets. Set `ANTHROPIC_ENABLE_ESCALATION=false` to disable it. Explicit worker model overrides also disable automatic escalation.

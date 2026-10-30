@@ -16,10 +16,12 @@
 
 ## Coding tools and acceptance
 
-The OpenAI coding worker has explicit function tools for component inspection,
+The Claude coding worker has explicit function tools for component inspection,
 owned-source reading/search, exact text patches and browser-worker rule checks.
-It may use four tool rounds; every model request counts against the existing
-budgets. A patched source can be submitted without repeating its text.
+It uses [adaptive tool limits](../adaptive-tool-limits.md): reads have a separate
+allowance, actions are bounded by task type, and repair extensions need measured
+progress. Every model request counts against existing budgets. A patched source
+can be submitted without repeating its text.
 
 The source is parsed with Acorn and checked before model review. It is never
 imported, evaluated or executed by Node. The harness then runs declared win/loss
