@@ -23,7 +23,7 @@ export function referenceFor(role,{brief,context={}}){
   if(role==='qa'){const report=runProjectRules({...contributions(context),genre});Object.assign(artifact,{passed:report.passed,evidenceHash:hash({manifest:manifestFor(context),report})});}
   return artifact;
 }
-export async function work(role,request){return {artifact:referenceFor(role,request),summary:EXTENSION_SPECS[role].job};}
+export async function work(role,request){const artifact=referenceFor(role,request);return {artifact,summary:`${role}: ${JSON.stringify(artifact)}`.slice(0,500)};}
 export async function check(role,request){
   const {artifact,context={}}=request,findings=extensionErrors(role,artifact);
   if(!findings.length){

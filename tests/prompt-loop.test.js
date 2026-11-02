@@ -1,3 +1,4 @@
+import {activeRoles,CORE_ROLES,EXTENSION_SPECS} from '../shared/specialists.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile } from 'node:fs/promises';
@@ -94,9 +95,9 @@ test('equivalent questions combine requesters and invalidate only the affected r
     return { ...handlers, worker: async input => input.context.decisions['art.mood'] ? handlers.worker(input) : { question: question('art.mood', role) } };
   };
   const m = await makeManager(router); const run = await planned(m); await implement(m, run);
-  assert.equal(run.questions.length, 1); assert.equal(run.questions[0].requesters.length, 2); const levels = run.results.levels;
+  assert.equal(run.questions.length, 1); assert.equal(run.questions[0].requesters.length, 2); const independentAudio = run.results.audio;
   await m.act(run.id, 'answer', { questionId: run.questions[0].id, answer: 'warm' }); await idle(m, run);
-  assert.equal(run.status, 'awaiting_review'); assert.equal(run.results.levels, levels);
+  assert.equal(run.status, 'awaiting_review'); assert.equal(run.results.audio, independentAudio);assert.ok(run.results.levels);
 });
 test('optional questions permit progress without inventing an answer', async () => {
   const router = async role => { const handlers = await route(role); if (role !== 'audio') return handlers; return { ...handlers, worker: async input => ({ ...await handlers.worker(input), ...(input.context.decisions['audio.preference'] ? {} : { question: question('audio.preference', role, { blocking: false }) }) }) }; };
@@ -106,7 +107,7 @@ test('optional questions permit progress without inventing an answer', async () 
 test('concurrent duplicate human decisions cannot launch two copies of the loop', async () => {
   const m = await makeManager(); const run = await planned(m);
   const responses = await Promise.allSettled([m.act(run.id, 'approve_plan', { planHash: run.planHash }), m.act(run.id, 'approve_plan', { planHash: run.planHash })]);
-  await idle(m, run); assert.equal(responses.filter(response => response.status === 'fulfilled').length, 1); assert.equal(run.status, 'awaiting_review'); assert.equal(run.steps, 13);
+  await idle(m, run); assert.equal(responses.filter(response => response.status === 'fulfilled').length, 1); assert.equal(run.status, 'awaiting_review'); assert.equal(run.steps, activeRoles(run.brief.genre).length*2+1);
 });
 test('instruction provenance changes reject stale plan approval', async () => {
   const m = await makeManager(); const run = await planned(m); run.instructions.hash = 'changed';

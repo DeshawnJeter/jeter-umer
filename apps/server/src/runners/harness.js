@@ -9,7 +9,8 @@ function toolsFor(names, input, role, artifact, calls) {
   const available = {
     inspect_context: () => clone(input),
     propose_artifact: proposed => { const errors = validateArtifact(role, proposed); if (errors.length) throw new Error(errors.join('; ')); return { artifact: clone(proposed) }; },
-    inspect_artifact: () => clone(artifact)
+    inspect_artifact: () => clone(artifact),
+    read_project_memory: (section='dependencies') => {if(!['dependencies','decisions','checkpoint','previousHandoff','references'].includes(section))throw Error('Unsupported memory section');return clone(input.context.memory?.[section]??null);}
   };
   return Object.freeze(Object.fromEntries(names.map(name => [name, (...args) => { calls.push(name); return available[name](...args); }])));
 }

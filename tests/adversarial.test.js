@@ -1,3 +1,4 @@
+import {policy} from '../shared/policies/index.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -115,6 +116,6 @@ test('cancelled in-flight work cannot publish an accepted result or build', asyn
   await idle(m, run); assert.equal(run.status, 'cancelled'); assert.equal(run.results.gameplay, undefined); assert.equal(run.build, null);
 });
 test('step exhaustion cannot be reported as completed work', async () => {
-  const m = await manager(), run = await plan(m); run.steps = 40;
-  await build(m, run); assert.equal(run.status, 'stopped'); assert.equal(run.steps, 40); assert.equal(run.approval, undefined); assert.equal(run.build, null);
+  const m = await manager(), run = await plan(m); run.steps = policy.maxSteps;
+  await build(m, run); assert.equal(run.status, 'stopped'); assert.equal(run.steps, policy.maxSteps); assert.equal(run.approval, undefined); assert.equal(run.build, null);
 });

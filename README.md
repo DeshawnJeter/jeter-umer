@@ -102,3 +102,31 @@ The new feature branches are stacked after prompt-only PR #22, all targeting dev
 RPG playtest fixes: battle button hints now follow saved attack/spell/potion key bindings and refresh immediately after remapping or resetting controls. Rejected actions do not play a successful action sound, spend resources or advance a turn. Attack/spell targets must be integer enemy indices, so malformed or prototype-key targets are rejected. Browser testing completed all three encounters and the final portal, potion depletion/full-health rejection, zero-MP rejection, targeting, level-up, party defeat and restart. A fresh real-model build passed all six agent/checker pairs; the full regression suite passes 127 tests. The fixes branch is stacked on expanded-game-validation PR #30. Human approval remains separate from these tests.
 
 
+
+## Conditional specialists and project memory
+
+The existing planner acts as game designer; gameplay, levels, UI, story and audio keep their original jobs. Seven new independently checked jobs are available:
+
+| Specialist | Active for | Checked output used by the game |
+| --- | --- | --- |
+| Combat | Party RPG / front-view battles | Attack/spell power, spell MP cost and enemy damage |
+| Inventory/progression | Party RPG / front-view battles | Shared potion count/healing, XP rewards and one reachable level-up |
+| Enemy behavior | Stealth and scrolling combat/exploration | Patrol/chase speed, detection range/rate and projectile interval |
+| Art/animation | All styles | Bounded original scenery particle counts and animation timing; UI retains theme/colors/HUD |
+| Gameplay implementation | All styles | Approved runtime and capability modules compiled into data-only assembly.js |
+| Integration | All styles | Hash manifest of current checked contributions |
+| QA | All styles | Actual trusted level, HUD, control, combat and checkpoint rule probes, plus independent static/model review |
+
+Each agent has its own profile, worker/checker instructions, skills, contract, tools and generation workspace. This remains a controlled module-assembly system: the implementation agent cannot execute arbitrary generated JavaScript or invent unsupported engine features. QA does not automatically drive a browser or listen to music; it reports rules-and-static scope and explicitly leaves browser testing and final approval to the human.
+
+Routing follows a dependency graph. Combat, inventory and enemies feed gameplay; gameplay feeds level design; art/combat/inventory feed UI. Implementation waits for checked contributions, integration checks their hash manifest, and QA runs after integration. Independent ready jobs remain parallel, at concurrency three. Inapplicable roles are omitted. There are 10 pairs for the original styles, 11 for stealth/shooters/exploration, and 12 for RPG/battles. Prompt-only extraction adds a separate two-call pair. Model call/token limits remain unchanged and are never automatically raised; the plan review shows minimum request counts and configured limits. An insufficient remaining call allowance stops before launching the remaining pairs. Repairs and revisions cost additional calls. The bounded orchestration step limit is now 80 to accommodate the larger graph and revisions; concurrency and context limits are unchanged.
+
+Each run is its own isolated game project. Memory is versioned inside its atomically saved state.json record in the ignored run directory. It survives restarts and revisions, with specification/approval references, provenance-stamped human decisions, accepted artifact hashes, dependency hashes, per-agent checkpoints and ownership, handoff summaries with audit references, invalidations and test evidence. Existing request/checker files remain the detailed working record. There is no vector database or automatic cross-game memory sharing.
+
+Only the orchestrator promotes checked contributions into accepted memory. Changes invalidate the transitive dependents and test records; stale in-flight work is discarded. Workers receive only their relevant decisions, checked dependencies, checkpoint and previous handoff. read_project_memory is a read-only local harness tool with allowlisted sections; it cannot read paths, choose another project, mutate state or approve anything. Real models receive the same focused memory in their structured input; no general file/shell/network tool access is granted. Context remains bounded and fails visibly rather than silently cutting instructions or requirements. A checkpoint restarts an unfinished worker/checker task safely; it does not resume an LLM's hidden state or accept a partial unreviewed patch.
+
+The dashboard shows applicable agent/checker cards and an expandable project-memory history. Full memory records are available through the existing loopback-only server's run memory endpoint. Human questions remain deduplicated, decisions retain human provenance, and checked-plan and exact-build final approvals remain separate.
+
+These branches follow RPG fixes PR #31 and target development in this order: project-memory, specialist-routing, combat-specialist, inventory-progression-specialist, enemy-behavior-specialist, art-animation-specialist, gameplay-implementation-specialist, integration-specialist, qa-specialist, memory-agent-dashboard (each prefixed codex/). Development remains at the initial scaffold until its prerequisite pull requests are merged; preserve stack ancestry or rebase after squashing.
+
+Validation for this stack: 136 automated tests passed, followed by 36 focused tests after final memory admission/summary refinements; JavaScript syntax checks passed. All 11 local adversarial probes passed. Five live-model adversarial cases and one human quality case remain untested in this run. Demo builds and simulated OpenAI worker/checker requests were used; no new paid model calls were made for these changes.

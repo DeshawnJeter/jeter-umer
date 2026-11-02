@@ -26,6 +26,7 @@ export class Manager {
       for(const role of ROLES)if(run.results?.[role]&&!run.memory.artifacts[role])acceptMemory(run,role,run.results[role],role==='planner'?[]:['planner']);
       if (run.providerUsage) recoverUsage(run.providerUsage);
       if (run.version !== 2 && !terminalStates.has(run.status)) {
+        invalidateMemory(run,ROLES,'Legacy run requires fresh checked work');
         run.status = 'paused'; run.generation++; run.results = {}; run.agents = {}; run.questions = []; run.build = null; run.validation = null;
         run.events.push({ at: new Date().toISOString(), message: 'Upgraded unfinished run. Resume to rebuild with checked prompts and human plan approval.' });
       } else if (run.status === 'running' || run.status === 'queued') {
@@ -59,7 +60,7 @@ export class Manager {
   }
   async create(brief) {
     const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
-    ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
+    run.maxSteps=policy.maxSteps;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
     if (this.jobs.has(run.id)) return;
@@ -111,10 +112,12 @@ export class Manager {
     run.tasks[role] = { ...task, status: 'running' };
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
+    const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
     const result = await runPair({ role, task, execution, brief: run.brief, context: { memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
+    if(task.generation!==run.generation||memoryDependencies.some(parent=>run.memory.artifacts[parent]?.stale||run.memory.artifacts[parent]?.hash!==dependencyHashes[parent])){checkpointMemory(run,role,{stage:'stale',attempt:run.agents[role]?.attempt||1});await this.event(run,`${role}: stale in-flight contribution discarded; dependency changed`);return;}
     if (result.status === 'needs_human') {
       await this.addQuestion(run, result.question); run.agents[role].stage = 'awaiting_human'; run.tasks[role].status = 'blocked'; await this.save(run); return;
     }
@@ -139,9 +142,12 @@ export class Manager {
         run.brief={...resolved,inputMode:'prompt'};run.briefResolution=resolution;await this.save(run);
       }
       await this.execute(run, 'planner'); if (run.status !== 'running') return;
+      run.requiredRoles=activeRoles(run.brief.genre);
+      run.minimumModelCalls=run.requiredRoles.length*2+(run.briefResolution?2:0);
       if (!run.results.planner) { this.transition(run, 'awaiting_human'); await this.save(run); return; }
       const planHash = fingerprint({ brief: run.brief, plan: run.results.planner.artifact, instructions: run.instructions.hash, briefResolution:run.briefResolution || null }); run.planHash = planHash;
       if (run.planApproval?.hash !== planHash) { this.transition(run, 'awaiting_plan'); await this.event(run, 'Checked plan ready. Human approval is required before implementation.'); return; }
+      if(run.mode==='openai'&&run.providerConfig.maxCalls-run.providerUsage.calls<run.requiredRoles.filter(role=>!run.results[role]).length*2){this.transition(run,'stopped');await this.event(run,'Remaining model call budget cannot cover every required worker/checker pair. Create a run with an explicitly configured budget; limits were not increased.');return;}
       const required=activeRoles(run.brief.genre).filter(role=>role!=='planner');
       while(required.some(role=>!run.results[role])) {
         const ready=required.filter(role=>!run.results[role]&&!this.blocked(run,role)&&dependenciesFor(role,run.brief.genre).every(parent=>run.results[parent]));
