@@ -8,4 +8,7 @@ Workers produce JSON settings. The trusted Phaser template turns those settings 
 
 Web Audio synthesizes event effects. Optional Tone.js synthesis adds a repeating melody. Both paths follow the same mute/volume settings and initialize after a user gesture. No audio assets or paid services are required.
 
-Future work: model-provider adapter, arbitrary coding tasks inside an OS sandbox, generalized human questions, automated browser playtests, targeted dependency invalidation, project branching, authentication and deployment. Do not treat a JSON validator or an iframe as an OS sandbox for executing untrusted server-side code.
+Future work: model-provider adapter, arbitrary coding tasks inside an OS sandbox, automated browser playtests, project branching, authentication and deployment. General human questions and role-level invalidation now exist in the prompt/human-loop extension below. Do not treat a JSON validator or an iframe as an OS sandbox for executing untrusted server-side code.
+
+## Prompt and human-loop extension
+See prompt-system.md for the two harness layers, instruction/skill manifests, generalized questions, plan approval and migration behavior. Reusable application skills live under skills/. The current system remains deterministic demo mode with no paid API requests.

@@ -1,0 +1,36 @@
+{
+  "provider": "scripted-demo",
+  "checker": {
+    "maxOutputChars": 8000,
+    "skills": [
+      "phaser-scenes",
+      "story-and-ui",
+      "game-events",
+      "playtest-evidence"
+    ],
+    "prompt": "checker.md",
+    "tools": [
+      "inspect_context",
+      "inspect_artifact"
+    ],
+    "maxContextChars": 16000
+  },
+  "maxAttempts": 3,
+  "model": null,
+  "version": 1,
+  "worker": {
+    "maxOutputChars": 8000,
+    "skills": [
+      "phaser-scenes",
+      "story-and-ui",
+      "game-events"
+    ],
+    "prompt": "instructions.md",
+    "tools": [
+      "inspect_context",
+      "propose_artifact"
+    ],
+    "maxContextChars": 16000
+  },
+  "role": "ui"
+}
