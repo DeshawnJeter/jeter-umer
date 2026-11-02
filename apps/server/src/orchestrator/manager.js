@@ -13,6 +13,7 @@ import { createRuntime } from '../providers/runtime.js';
 import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../providers/usage.js';
 import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests} from '../memory/project.js';
 import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
+import {runProjectRules} from '../specialists/rules-tests.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
@@ -119,7 +120,7 @@ export class Manager {
     }
     for (const question of result.questions || []) await this.addQuestion(run, question);
     if (this.blocked(run, role)) { run.tasks[role].status = 'blocked'; return; }
-    run.results[role] = result;acceptMemory(run,role,result,memoryDependencies); run.tasks[role].status = 'accepted'; await this.save(run);
+    run.results[role] = result;acceptMemory(run,role,result,memoryDependencies);if(role==='qa')recordTests(run,'qa-rules',runProjectRules({...Object.fromEntries(Object.entries(run.results).map(([name,value])=>[name,value.artifact])),genre:run.brief.genre})); run.tasks[role].status = 'accepted'; await this.save(run);
   }
   async drive(run) {
     try {
