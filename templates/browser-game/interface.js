@@ -12,7 +12,7 @@ export class PlayerInterface {
     $('#hud').dataset.layout = this.hud.layout;
     for (const stat of this.hud.stats) {
       const card = document.createElement('div'); card.className = 'stat'; card.id = `stat-${stat}`;
-      const label = document.createElement('span'); label.className = 'stat-label'; label.textContent = { health:'Health / shields', stars:this.genre === 'survival' ? 'Healing stars' : this.genre === 'maze' ? 'Bonus stars' : 'Stars collected', time:this.genre === 'survival' ? 'Survive for' : 'Time remaining', objective:'Objective',mana:this.profile?.manaLabel||'MP',alert:'Detection',progress:'Stage',ability:'Abilities' }[stat];
+      const label = document.createElement('span'); label.className = 'stat-label'; label.textContent = { health:'Health / shields', stars:this.genre === 'survival' ? 'Healing stars' : this.genre === 'maze' ? 'Bonus stars' : 'Stars collected', time:this.genre === 'survival' ? 'Survive for' : 'Time remaining', objective:'Objective',mana:this.profile?.manaLabel||'MP',alert:'Detection',progress:this.genre==='custom'?'Score':'Stage',ability:'Abilities' }[stat];
       const value = document.createElement('strong'); value.id = `value-${stat}`; card.append(label, value);
       if (['time','health','mana','alert'].includes(stat)) { const meter = document.createElement('progress'); meter.id = `meter-${stat}`; meter.setAttribute('aria-label', label.textContent); card.append(meter); }
       $('#hud').append(card);

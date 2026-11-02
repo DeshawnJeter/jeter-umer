@@ -5,7 +5,7 @@ export function createMode(scene,ctx){
   function apply(snapshot){
     if(disposed)return;
     if(state.phase==='paused'){deferred=snapshot;return;}
-    state.health=snapshot.health;state.maxHealth=snapshot.maxHealth;state.score=snapshot.score;state.objective=snapshot.objective;state.codeSnapshot=snapshot;
+    state.health=snapshot.health;state.maxHealth=snapshot.maxHealth;state.score=snapshot.score;state.progress=String(snapshot.score);state.objective=snapshot.objective;state.codeSnapshot=snapshot;
     if(snapshot.score>lastScore){ctx.emit('pickup',{x:360,y:240});ctx.audio.tone(ctx.config.audio.pickupFrequency);}lastScore=snapshot.score;
     objects.splice(0).forEach(o=>o.destroy());
     for(const node of snapshot.nodes){objects.push(scene.add.rectangle(node.x,node.y,node.size,node.size,parseInt(node.color.slice(1),16)));objects.push(scene.add.text(node.x,node.y-node.size,node.label,{fontSize:'12px',color:'#ffffff'}).setOrigin(0.5));}

@@ -49,9 +49,12 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     await click('Start game');assert((await state()).phase==='playing','Start did not enter gameplay');
     await click('Pause / settings');const paused=await state();await advance(1000);const frozen=await state();assert(frozen.phase==='paused'&&frozen.health===paused.health&&frozen.x===paused.x&&frozen.y===paused.y&&frozen.remaining===paused.remaining,'Pause changed gameplay state');report.tests.push({name:'pause freezes gameplay',passed:true});await click('Resume game');
     if(config.genre==='custom'){
+      assert(await page.locator('#stat-progress .stat-label').textContent()==='Score'&&await page.locator('#value-progress').innerText()===String((await state()).score),'Custom HUD must show score rather than a stage counter');
+      report.tests.push({name:'custom HUD uses actual game score',passed:true});
       const rules=await runCodeChecks(config.coding,signal);assert(rules.passed,rules.error||'Generated rule replays failed');
       report.tests.push(...rules.tests.map(test=>({...test,name:'isolated rules: '+test.name})));report.codeSourceHash=rules.sourceHash;
-      await click('Restart');await page.waitForFunction(()=>window.gameState?.().ready);assert((await state()).phase==='ready','Custom preview did not reset');
+      await click('Restart');await page.waitForFunction(()=>window.gameState?.().ready&&window.gameState().codeSnapshot?.phase==='ready');await advance(80);assert((await state()).phase==='ready','Custom preview did not reset');
+      assert(await page.locator('#value-progress').innerText()==='0','Custom restart did not reset the displayed score');
       assert(!errors.length,'Custom preview script errors: '+errors.join('; '));report.tests.push({name:'custom preview restart and no script errors',passed:true});report.passed=report.tests.every(test=>test.passed);
       if(reportFolder){await mkdir(reportFolder,{recursive:true});await page.screenshot({path:resolve(reportFolder,'browser-smoke.png'),fullPage:true});}return report;
     }
