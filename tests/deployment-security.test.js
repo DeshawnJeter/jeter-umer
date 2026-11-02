@@ -19,6 +19,10 @@ import {browserQaBudget} from '../apps/server/src/validation/browser-smoke.js';
 import {waitForAudio} from '../apps/server/src/validation/browser-controls.js';
 const password='Fixture team password 4242',secret='a'.repeat(64),backupKey='b'.repeat(64);
 const temp=()=>mkdtemp(join(tmpdir(),'workshop-security-'));
+test('temporary workshop rejects live providers even when a key exists',()=>{
+ assert.throws(()=>deploymentConfig({WORKSHOP_EPHEMERAL:'on',GAME_BUILDER_PROVIDER:'anthropic',ANTHROPIC_API_KEY:'synthetic'}),/demo provider/);
+ assert.ok(deploymentConfig({WORKSHOP_EPHEMERAL:'on',GAME_BUILDER_PROVIDER:'demo'}));
+});
 async function fixture(options={}){const root=await temp(),config={...deploymentConfig({WORKSHOP_AUTH:'on',WORKSHOP_DATA_DIR:root,WORKSHOP_PASSWORD_HASH:await passwordHash(password),WORKSHOP_SESSION_SECRET:secret}),...options};return {root,config,control:await new Control(config,options.clock).initialize()};}
 
 test('production fails closed without HTTPS, separate origins, persistent storage and secrets',async()=>{

@@ -19,6 +19,7 @@ import {EXTENSION_SPECS,activeRoles,dependenciesFor} from '../../../shared/speci
 import {Store} from './storage/store.js';
 import {createRuntime} from './providers/runtime.js';
 import {deploymentConfig} from './deployment/config.js';
+import {trustedPreviewRelay} from './deployment/relay.js';
 import {Control,failure} from './deployment/control.js';
 import {authorize,requireOrigin,securityHeaders,RateLimit,SIGNIN_HTML} from './deployment/access.js';
 import {exclusiveData,storageBytes,snapshot} from './deployment/operations.js';
@@ -60,6 +61,7 @@ async function archive(folder) {
 const server = createServer(async (req, res) => {
   if(req.method==='POST'){mutations++;let counted=true;const done=()=>{if(counted){mutations--;counted=false;}};res.once('finish',done);res.once('close',done);}
   try {
+    if(control&&trustedPreviewRelay(req,process.env.WORKSHOP_PREVIEW_RELAY_SECRET)){req.headers.host=new URL(codeOrigin).host;return await previewRequest(req,res);}
     if(control&&req.headers.host===new URL(codeOrigin).host)return await previewRequest(req,res);
     if(req.url==='/healthz'&&req.method==='GET')return json(res,stopping||backupError||maintenance?503:200,{ready:!stopping&&!backupError&&!maintenance});
     const hosts=deployment.hosted?[new URL(origin).host]:[`127.0.0.1:${port}`,`localhost:${port}`];
