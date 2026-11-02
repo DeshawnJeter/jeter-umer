@@ -57,7 +57,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     if (report.verdict === 'pass' && report.findings.length === 0) {
       await writeFile(resolve(folder, 'accepted.json'), JSON.stringify(artifact, null, 2));
       await onEvent({ role, stage: 'accepted', attempt });
-      return { status: 'accepted', role, artifact, report, questions, audit: { workerHash: workerBundle.hash, checkerHash: checkerBundle.hash, workerSkills: workerBundle.skills, checkerSkills: checkerBundle.skills, execution: clone(execution) } };
+      return { status: 'accepted', role, artifact, report, summary:result.summary, questions, audit: { workerHash: workerBundle.hash, checkerHash: checkerBundle.hash, workerSkills: workerBundle.skills, checkerSkills: checkerBundle.skills, execution: clone(execution) } };
     }
     findings = report.findings.length ? report.findings : ['Checker did not accept the contribution'];
     await onEvent({ role, stage: 'repair', attempt, findings });
