@@ -9,16 +9,18 @@
     "start:openai": "node scripts/start-openai.js",
     "test": "node scripts/test.js",
     "check": "node scripts/check.js",
-    "test:browser": "node scripts/browser-tests.js"
+    "test:browser": "node scripts/browser-tests.js",
+    "export:game": "node scripts/export-game.js"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "dependencies": {
     "acorn": "8.15.0",
     "fflate": "0.8.3",
     "phaser": "3.90.0",
     "playwright": "1.64.1",
-    "tone": "15.1.22"
+    "tone": "15.1.22",
+    "vite": "8.3.5"
   }
 }
