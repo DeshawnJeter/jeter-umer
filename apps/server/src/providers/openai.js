@@ -13,6 +13,7 @@ import {EXTENSION_SPECS} from '../../../../shared/specialists.js';
 import {referenceFor} from '../specialists/jobs.js';
 import {lifecycleFor} from '../../../../shared/lifecycle.js';
 export const ENDPOINT = 'https://api.openai.com/v1/responses';
+export const TOKEN_COUNT_ENDPOINT=ENDPOINT+'/input_tokens';
 const constraints = {
   planner: 'Preserve the exact brief title and difficulty. Describe the selected game type and actual objective, with 3–6 observable acceptance criteria covering the essential mechanics, victory, failure and restart. Do not change the selected type or promise unsupported mechanics.',
   gameplay: 'Speed must be 100–250. Time limit must be 20–180 seconds, or at least 60 for beginners.',
@@ -83,15 +84,32 @@ function usageOf(value) {
   if (!value || !['input_tokens', 'output_tokens', 'total_tokens'].every(key => Number.isSafeInteger(value[key]) && value[key] >= 0) || value.total_tokens !== value.input_tokens + value.output_tokens) return null;
   return { inputTokens: value.input_tokens, outputTokens: value.output_tokens, totalTokens: value.total_tokens };
 }
-export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetch } = {}) {
+export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetch,countInputTokens=fetchImpl===globalThis.fetch } = {}) {
   const maxRepairs = config.maxResponseRepairs ?? 2;
   if (!Number.isInteger(maxRepairs) || maxRepairs < 0 || maxRepairs > 2) throw new Error('Invalid model response repair limit');
   function cancelled() { const error = new Error('Model request cancelled at a run checkpoint'); error.suspended = true; return error; }
+  const counts=new Map();
+  async function reservationFor(prepared,signal){
+    if(!countInputTokens)return {tokens:prepared.reservation,method:'byte-upper-bound'};
+    const hash=createHash('sha256').update(prepared.serialized).digest('hex');
+    if(counts.has(hash))return {tokens:counts.get(hash)+config.maxOutputTokens+512,method:'provider-count'};
+    try{
+      if(signal?.aborted)throw cancelled();
+      const payload=Object.fromEntries(['model','input','instructions','tools','tool_choice','parallel_tool_calls','text','reasoning'].filter(key=>prepared.body[key]!==undefined).map(key=>[key,prepared.body[key]]));
+      const response=await fetchImpl(TOKEN_COUNT_ENDPOINT,{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify(payload),signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000),redirect:'error'});
+      if(!response.ok){await response.body?.cancel();throw Error('Token count unavailable');}
+      const value=await readBounded(response,4096),input=value.input_tokens;
+      if(!Number.isSafeInteger(input)||input<0||input>10000000)throw Error('Invalid input token count');
+      if(counts.size>=64)counts.clear();counts.set(hash,input);
+      return {tokens:input+config.maxOutputTokens+512,method:'provider-count',inputTokens:input};
+    }catch{if(signal?.aborted)throw cancelled();return {tokens:prepared.reservation,method:'byte-upper-bound'};}
+  }
   async function generate(role, stage, request, { signal, reserve = async () => {}, finish = async () => {}, onAttempt = async () => {} } = {}) {
     let repairCode;
     for (let attempt = 1; attempt <= maxRepairs + 1; attempt++) {
       if (signal?.aborted) throw cancelled();
       const prepared = buildRequest(config, role, stage, request, repairCode);
+      const reservation=await reservationFor(prepared,signal);prepared.reservation=reservation.tokens;
       await reserve(prepared.reservation);
       let usage = null, output, failure,continuation;
       const timeout = AbortSignal.timeout(config.timeoutMs);
@@ -124,7 +142,7 @@ export function createOpenAIClient(apiKey, config, { fetchImpl = globalThis.fetc
         failure = signal?.aborted ? cancelled() : timeout.aborted ? new Error('OpenAI request timed out. No automatic retry was made.') : error;
       } finally { await finish(usage, prepared.reservation); }
       if (signal?.aborted) failure = cancelled();
-      await onAttempt({ role, stage, ...(request.operation ? {operation:request.operation} : {}), attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? continuation?'tool_call':'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}), usage });
+      await onAttempt({ role, stage, ...(request.operation ? {operation:request.operation} : {}), attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? continuation?'tool_call':'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}), reservationMethod:reservation.method,reservationTokens:reservation.tokens,usage });
       if (!failure) { if (signal?.aborted) throw cancelled();return continuation?generate(role,stage,continuation,{signal,reserve,finish,onAttempt}):output; }
       if (!(failure instanceof ModelOutputError)) throw failure;
       if (attempt > maxRepairs) throw new Error(`${role} ${stage} model response repair limit reached after ${attempt} request(s): ${failure.message}. Run remains unfinished.`);
