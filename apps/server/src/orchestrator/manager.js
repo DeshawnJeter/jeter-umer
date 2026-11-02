@@ -23,7 +23,7 @@ import {frameworkConfig} from '../integration/framework.js';
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
     if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
-    this.store = store; this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();
+    this.store = store; this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
@@ -57,13 +57,22 @@ export class Manager {
     if (run.mode !== this.runtime.mode || (run.providerConfig && fingerprint(run.providerConfig) !== fingerprint(this.runtime.publicConfig))) throw new Error('Restart with this run’s provider/model configuration, or create a new run. Providers never switch silently.');
   }
   async reserveCall(run, estimate) {
+    for(;;){
     if (run.status !== 'running') { const error = new Error('Run suspended'); error.suspended = true; throw error; }
     try { reserveUsage(run.providerUsage, run.providerConfig, estimate); }
     catch (error) {
+      if(error.budgetPending){await this.waitForUsage(run);continue;}
       if (error.budgetExhausted) { this.transition(run, 'stopped'); this.controllers.get(run.id)?.abort(); await this.event(run, error.message); error.suspended = true; }
       throw error;
     }
-    await this.save(run);
+    await this.save(run);return;
+    }
+  }
+  notifyUsage(id){for(const wake of [...(this.usageWaiters.get(id)||[])])wake();}
+  waitForUsage(run){
+    const signal=this.controllers.get(run.id)?.signal;
+    if(signal?.aborted||run.status!=='running'){const error=Error('Run suspended');error.suspended=true;throw error;}
+    return new Promise(resolve=>{let waiters=this.usageWaiters.get(run.id);if(!waiters){waiters=new Set();this.usageWaiters.set(run.id,waiters);}const wake=()=>{waiters.delete(wake);if(!waiters.size)this.usageWaiters.delete(run.id);signal?.removeEventListener('abort',wake);resolve();};waiters.add(wake);signal?.addEventListener('abort',wake,{once:true});});
   }
   async create(brief) {
     const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
@@ -105,7 +114,7 @@ export class Manager {
         finishUsage(run.providerUsage, usage, estimate);
         run.roleUsage??={};const counters=run.roleUsage[role]??={calls:0,inputTokens:0,outputTokens:0,totalTokens:0,unknownUsageCalls:0};counters.calls++;
         if(usage){counters.inputTokens+=usage.inputTokens;counters.outputTokens+=usage.outputTokens;counters.totalTokens+=usage.totalTokens;}else counters.unknownUsageCalls++;
-        await this.save(run);
+        try{await this.save(run);}finally{this.notifyUsage(run.id);}
       },
       onAttempt: async audit => {
         run.modelResponses ??= [];
