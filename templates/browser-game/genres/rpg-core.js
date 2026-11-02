@@ -26,7 +26,7 @@ export function rpgMode(scene,ctx,{frontView=false}={}){
     });
     sync();
   }
-  function act(action){if(state.phase!=='playing'||!battle||battle.phase!=='player')return;const accepted=battleAction(battle,action);if(accepted)ctx.audio.tone(action==='spell'?720:300);if(battle.phase==='won'){cleared.add(battleIndex);markers[battleIndex]?.destroy();state.score=cleared.size;}if(battle.phase==='lost'){sync();ctx.end('lost');}paint();}
+  function act(action){if(state.phase!=='playing'||!battle||battle.phase!=='player')return;const previousHealth=campaign.party.reduce((sum,member)=>sum+member.hp,0);const accepted=battleAction(battle,action);if(accepted){if(action==='spell')ctx.emit?.('spell_cast',{x:280+battle.target*140,y:190});if(action==='attack')ctx.emit?.('enemy_hit',{x:280+battle.target*140,y:190});const health=campaign.party.reduce((sum,member)=>sum+member.hp,0);if(health<previousHealth)ctx.emit?.('damage_taken',{x:world?.player.x??360,y:world?.player.y??320,amount:previousHealth-health});if(battle.phase==='won')ctx.emit?.('enemy_defeated',{x:360,y:190});}if(accepted)ctx.audio.tone(action==='spell'?720:300);if(battle.phase==='won'){cleared.add(battleIndex);markers[battleIndex]?.destroy();state.score=cleared.size;}if(battle.phase==='lost'){sync();ctx.end('lost');}paint();}
   function engage(index){battleIndex=index;battle=beginBattle(campaign,index);world?.player.setVelocity(0);paint();}
   const markers=frontView?[]:config.levels.stars.map((point,index)=>{
     const marker=scene.physics.add.staticImage(world.center(point.x),world.center(point.y),'enemy');scene.physics.add.overlap(world.player,marker,()=>{if(state.phase==='playing'&&!battle&&!cleared.has(index))engage(index);});return marker;

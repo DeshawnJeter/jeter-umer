@@ -25,7 +25,7 @@ export function createMode(scene,ctx){
       if(oldMode!=='chase'&&result.mode==='chase')alarms++;
       const attack=stepEnemy(guard.combat,{dt,position:guard.sprite,target:player,health:1,maxHealth:1,lineOfSight:result.sees,settings:config.enemies});
       if(attack.telegraph)ctx.emit?.('enemy_attack_warning',{x:guard.sprite.x,y:guard.sprite.y});
-      if(attack.fired&&Phaser.Math.Distance.Between(player.x,player.y,guard.sprite.x,guard.sprite.y)<48&&time-lastHit>1.2){state.health=Math.max(0,state.health-1);lastHit=time;ctx.audio.tone(120);if(!state.health){ctx.end('lost');return;}}
+      if(attack.fired&&Phaser.Math.Distance.Between(player.x,player.y,guard.sprite.x,guard.sprite.y)<48&&time-lastHit>1.2){state.health=Math.max(0,state.health-1);ctx.emit?.('damage_taken',{x:player.x,y:player.y,amount:1});lastHit=time;ctx.audio.tone(120);if(!state.health){ctx.end('lost');return;}}
       const pursuing=result.mode==='investigate'||result.mode==='chase',target=pursuing?result.target:guard.targets[guard.index];guard.repath-=dt;
       if(result.mode==='search'){guard.sprite.setVelocity(0);guard.facing+=dt;guard.path=[];guard.goal='';}
       else if(target){

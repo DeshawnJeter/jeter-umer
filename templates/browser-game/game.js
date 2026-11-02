@@ -1,3 +1,4 @@
+import {createGameEvents} from './game-events.js';
 import { PlayerInterface } from './interface.js';
 import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
@@ -25,7 +26,7 @@ const musicInfo = document.createElement('p'); musicInfo.id = 'music-info'; musi
 document.querySelector('#mute').textContent = audio.muted ? 'Unmute' : 'Mute';
 document.querySelector('#mute').setAttribute('aria-pressed', String(audio.muted));
 const state = { ready: false, genre, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, health: 3, x: 0, y: 0 };
-let scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
+let events,scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
 const held = new Set(); let touchJump = false;
 const ui = new PlayerInterface({ config, genre, state, audio, held, onJump: () => { touchJump = true; },
   onPause: () => { held.clear(); touchJump = false; scene?.scene.pause(); },
@@ -36,7 +37,7 @@ await ui.initialize();
 const size = 48, center = n => n * size + size / 2;
 function end(phase) {
   if (state.phase !== 'playing') return;
-  state.phase = phase; player.body.setVelocity(0); enemies?.setVelocity(0, 0);
+  state.phase = phase;events?.emit(phase==='won'?'victory':'defeat',{x:state.x,y:state.y}); player.body.setVelocity(0); enemies?.setVelocity(0, 0);
   state.failureReason=phase==='lost'?failureReason(genre,state):null;
   message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat']+(state.failureReason?' '+state.failureReason+'. Choose Restart to try again.':'');
   scene.physics.pause();
@@ -44,7 +45,7 @@ function end(phase) {
 }
 class WorkshopGame extends Phaser.Scene {
   create() {
-    scene = this;this.physics.resume(); elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
+    scene = this;events=createGameEvents();const sceneEvents=events;this.physics.resume(); elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
     Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3,failureReason:null });
     message.textContent = config.story.intro;
     createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
@@ -70,7 +71,7 @@ class WorkshopGame extends Phaser.Scene {
     }
     this.physics.add.overlap(player, stars, (_, star) => {
       if (state.phase !== 'playing') return;
-      this.tweens.killTweensOf(star); star.destroy(); state.score++; if (genre === 'survival') state.health = Math.min(3, state.health + 1);
+      this.tweens.killTweensOf(star); star.destroy(); state.score++;events.emit('pickup',{x:player.x,y:player.y}); if (genre === 'survival') state.health = Math.min(3, state.health + 1);
       audio.tone(config.audio.pickupFrequency);
     });
     if (portal) this.physics.add.overlap(player, portal, () => {
@@ -90,12 +91,12 @@ class WorkshopGame extends Phaser.Scene {
       this.physics.add.collider(enemies, walls); this.physics.add.collider(enemies, enemies);
       this.physics.add.overlap(player, enemies, () => {
         if (state.phase !== 'playing' || elapsed - lastDamage < 1.2) return;
-        state.health--; lastDamage = elapsed; audio.tone(120); this.cameras.main.shake(120, 0.006);
+        state.health--;events.emit('damage_taken',{x:player.x,y:player.y,amount:1}); lastDamage = elapsed; audio.tone(120); this.cameras.main.shake(120, 0.006);
         if (state.health <= 0) end('lost');
       });
     }
     ui.render();
-    this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false); });
+    this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false);sceneEvents.dispose(); });
   }
   update(_, delta) {
     if (!player) return;
@@ -141,5 +142,5 @@ for (const button of document.querySelectorAll('[data-control]')) {
 window.addEventListener('blur', () => { held.clear(); ui.clearInput(); if (state.phase === 'playing') ui.pause(); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing') ui.pause(); });
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
-window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
+window.gameState = () => ({ ...state, errors: [...errors],events:events?.inspect()||[], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
 }
