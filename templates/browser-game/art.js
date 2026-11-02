@@ -91,8 +91,8 @@ export function createArt(scene, ui) {
 export function drawBackdrop(scene, ui) {
   scene.add.image(0, 0, `backdrop-${themeOf(ui.theme)}`).setOrigin(0).setDepth(-10);
   const palette = ART_THEMES[themeOf(ui.theme)];
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < (ui.particleCount??12); i++) {
     const mote = scene.add.circle((i * 173 + 39) % 720, (i * 97 + 40) % 480, i % 2 ? 1 : 2, parseInt(palette.glow.slice(1), 16), 0.25).setDepth(-5);
-    scene.tweens.add({ targets: mote, alpha: 0.6, y: mote.y - 10, duration: 1400 + i * 110, yoyo: true, repeat: -1 });
+    scene.tweens.add({ targets: mote, alpha: 0.6, y: mote.y - 10, duration: (ui.animationMs??1400) + i * 110, yoyo: true, repeat: -1 });
   }
 }
