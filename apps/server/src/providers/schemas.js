@@ -45,6 +45,11 @@ export function responseSchema(role, stage) {
 // is not. Encode verdict consistency in the wire schema, not just the prompt.
 export function providerResponseSchema(role, stage) {
   const schema = responseSchema(role, stage);
+  if(stage==='worker'&&role==='coding'){
+    const wire=structuredClone(schema),actions=['left','right','up','down','jump','attack','ability','interact'];
+    wire.properties.artifact.anyOf[0].properties.scenarios={type:'array',minItems:2,maxItems:4,items:object({name:boundedText(50),steps:{type:'array',minItems:1,maxItems:300,items:object({dt:{type:'number',minimum:0,maximum:0.1},actions:{type:'array',maxItems:8,items:{type:'string',enum:actions}},repeat:{type:'integer',minimum:1,maximum:300}})},expect:{type:'string',enum:['won','lost']}})};
+    return wire;
+  }
   if (stage === 'worker') return schema;
   return object({ review: { anyOf: [
     object({ evidence:reportStrings(1), findings:{...reportStrings(0),maxItems:0,description:'No unresolved defects: an empty array.'}, verdict:{type:'string',enum:['pass']}, question:{type:'null'} }),
@@ -60,8 +65,8 @@ function matches(schema, value) {
   if (schema.type === 'object') return record(value) && Object.keys(value).length === schema.required.length && schema.required.every(key => Object.hasOwn(value, key) && matches(schema.properties[key], value[key]));
   if (schema.type === 'array') return Array.isArray(value) && value.length >= (schema.minItems ?? 0) && value.length <= (schema.maxItems ?? Infinity) && value.every(item => matches(schema.items, item));
   if (schema.type === 'string') return typeof value === 'string' && value.length >= (schema.minLength ?? 0) && value.length <= (schema.maxLength ?? Infinity) && (!schema.pattern || new RegExp(schema.pattern).test(value));
-  if (schema.type === 'integer') return Number.isInteger(value);
-  if (schema.type === 'number') return Number.isFinite(value);
+  if (schema.type === 'integer') return Number.isInteger(value)&&value>=(schema.minimum??-Infinity)&&value<=(schema.maximum??Infinity);
+  if (schema.type === 'number') return Number.isFinite(value)&&value>=(schema.minimum??-Infinity)&&value<=(schema.maximum??Infinity);
   return typeof value === schema.type;
 }
 function exactKeys(value, keys) { if (!record(value) || Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) throw new ModelOutputError('shape', 'Model output has unexpected or missing fields'); }
@@ -90,6 +95,12 @@ export function validateModelOutput(role, stage, value) {
   return { verdict: value.verdict, findings: value.findings, evidence: value.evidence, ...(value.question ? { question: value.question } : {}) };
 }
 export function decodeProviderOutput(role, stage, value) {
+  if(stage==='worker'&&role==='coding'){
+    if(!matches(providerResponseSchema(role,stage),value))throw new ModelOutputError('schema');
+    const normalized=structuredClone(value);
+    if(normalized.artifact)normalized.artifact.scenarios=JSON.stringify(normalized.artifact.scenarios.map(c=>({name:c.name,expect:c.expect,steps:c.steps.map(step=>({dt:step.dt,input:Object.fromEntries(step.actions.map(action=>[action,true])),repeat:step.repeat}))})));
+    return validateModelOutput(role,stage,normalized);
+  }
   if (stage === 'worker') return validateModelOutput(role, stage, value);
   exactKeys(value, ['review']);
   const report = validateModelOutput(role, stage, value.review);

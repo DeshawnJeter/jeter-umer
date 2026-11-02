@@ -5,7 +5,7 @@ import { resolve } from 'node:path';
 import { ROLES, clone, validateArtifact } from '../../../../shared/contracts/index.js';
 import { makeTask } from '../../../../shared/contracts/tasks.js';
 import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
-import { loadProfile, instructionBundle, assertRequestFits } from './instructions.js';
+import { loadProfile, instructionBundle, assertRequestFits, fingerprint } from './instructions.js';
 
 function toolsFor(names, input, role, artifact, calls, workspace,verifyProposal) {
   const available = {
@@ -35,16 +35,31 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
   const workspace=role==='coding'?codeWorkspace(folder):null;
   const questions = []; let findings = [];
   const prior=role==='coding'?await reviewedRepair(folder,{...workerBundle,...clone(input),findings:[],attempt:1,limits:{maxContextChars:profile.worker.maxContextChars,maxOutputChars:profile.worker.maxOutputChars}},profile.maxAttempts):null;
-  if(prior)findings=prior.findings;
+  if(prior){
+    findings=prior.findings;
+    if(prior.codeExecution?.passed===false&&verifyProposal){
+      prior.source=await workspace.read();prior.artifact={...prior.artifact,source:prior.source};
+      await onEvent({role,stage:'rechecking_saved_source',attempt:prior.attempt});
+      const refreshed=await verifyProposal(prior.artifact);await writeFile(resolve(folder,'repair-preflight-'+prior.attempt+'.json'),JSON.stringify(refreshed,null,2));prior.codeExecution=refreshed;
+      const actual=(refreshed.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);findings=actual.length?actual:[refreshed.error||'Saved source must pass replay checks'];
+    }
+  }
+  let previousExecution=prior?.codeExecution,previousProposalSource=prior?.source;
   for (let attempt = prior?.attempt??1; attempt <= profile.maxAttempts; attempt++) {
     const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt, limits: { maxContextChars: profile.worker.maxContextChars, maxOutputChars: profile.worker.maxOutputChars } };
-    if(workspace&&attempt>1)workerRequest.context.previousSource=await workspace.read();
+    if(workspace&&attempt>1){
+      const source=await workspace.read(),failures=(previousExecution?.tests||[]).filter(test=>!test.passed);
+      const replayOnly=source===previousProposalSource&&failures.length&&failures.every(test=>test.name==='replay structure')&&previousExecution.tests.some(test=>test.name==='Start without input'&&test.passed);
+      if(replayOnly){workerRequest.replayRepair={scope:'scenarios-only',sourceHash:fingerprint(source)};workerRequest.context.sourceReference={hash:fingerprint(source),characters:source.length};}
+      else workerRequest.context.previousSource=source;
+    }
     const workerSize = assertRequestFits(workerRequest, profile.worker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'working', attempt });
     const workerCalls = [];
     const cached=await pendingProposal(folder,attempt,workerRequest);
     if(cached)await onEvent({role,stage:'reusing_proposal',attempt});
     const result = cached?.result||await worker({ ...clone(workerRequest), tools: toolsFor(profile.worker.tools, input, role, undefined, workerCalls, workspace,verifyProposal) });
+    if(workerRequest.replayRepair&&result.artifact){const current=await workspace.read();if(result.artifact.source!==''||fingerprint(current)!==workerRequest.replayRepair.sourceHash)throw Error('Replay-only repair cannot change its locked source');}
     if(role==='coding'&&result.artifact?.source==='')result.artifact.source=await workspace.read();
     assertOutputFits(result, profile.worker.maxOutputChars);
     await writeFile(resolve(folder, `attempt-${attempt}-worker.json`), JSON.stringify({ request: workerRequest, contextChars: workerSize, toolCalls: workerCalls, result,...(cached?{reusedProposal:true,proposalRequestHash:cached.requestHash}:{}) }, null, 2));
@@ -55,9 +70,10 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     }
     const artifact = result.artifact; const errors = validateArtifact(role, artifact);
     if(role==='coding'&&typeof artifact?.source==='string'&&artifact.source.length<=6000)await workspace.stage(artifact.source);
-    if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact);errors.push(...sourceReport.findings);}
+    if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact,{sourceOnly:!!verifyProposal});errors.push(...sourceReport.findings);}
     let codeExecution;
-    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed)errors.push(codeExecution.error||'Code replay checks failed');}
+    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed){const failures=(codeExecution.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);errors.push(...(failures.length?failures:[codeExecution.error||'Code replay checks failed']));}}
+    previousExecution=codeExecution;previousProposalSource=artifact?.source;
     const checkerRequest = { ...checkerBundle, ...clone(input), ...(codeExecution?{codeExecution}:{}), artifact: clone(artifact), attempt, limits: { maxContextChars: profile.checker.maxContextChars, maxOutputChars: profile.checker.maxOutputChars } };
     const checkerSize = assertRequestFits(checkerRequest, profile.checker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'checking', attempt });

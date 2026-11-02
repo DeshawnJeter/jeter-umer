@@ -38,3 +38,27 @@ test('large repairs omit optional tool schemas rather than cutting source or ins
  const focused=buildRequest(config,'coding','worker',{...request,limits:{maxContextChars:first.serialized.length-100}});
  assert.equal(focused.body.tools,undefined);assert.equal(JSON.parse(focused.body.input[0].content[0].text).context.previousSource,request.context.previousSource);assert.ok(focused.body.instructions.includes(request.instructions));
 });
+
+test('model instructions include an executable lifecycle reference and expanded replay arithmetic',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'});
+ assert.match(bundle.instructions,/Start button calls game.start\(\) with NO arguments/);assert.match(bundle.instructions,/phase='playing'/);assert.match(bundle.instructions,/247 idle frames is 250/);assert.match(bundle.instructions,/Restart creates a NEW instance/);
+});
+
+test('harness counts derived instruction metadata once without hiding distinct requirements',async()=>{
+ const {assertRequestFits}=await import('../apps/server/src/runners/instructions.js'),profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'});
+ const request={...bundle,brief:{prompt:'p'.repeat(2000)},context:{previousSource:'x'.repeat(6000)}};
+ assert.ok(JSON.stringify(request).length>16000);assert.ok(assertRequestFits(request,16000)<=16000);
+ assert.throws(()=>assertRequestFits({...request,focusedCode:{roleInstructions:'UNIQUE REQUIREMENT '.repeat(1000),skills:[]}},16000),/Context exceeds/);
+});
+
+test('scenarios-only requests lock source and use structured replays without editing tools',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_REPLAY_SCOPE'}).publicConfig;
+ const request={...bundle,brief:{genre:'custom',prompt:'Full approved requirements'},context:{sourceReference:{hash:'locked'}},replayRepair:{scope:'scenarios-only',sourceHash:'locked'},tools:{apply_source_patch(){}}};
+ const body=buildRequest(config,'coding','worker',request).body;assert.equal(body.tools,undefined);assert.equal(body.max_output_tokens,2048);assert.deepEqual(body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(body.instructions.includes('scenarios-only repair'));
+});
+
+test('oversized full-source repairs use bounded source windows and focused patches',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_FOCUSED_SOURCE'}).publicConfig;
+ const source=DEFAULT_SOURCE+'/*'+'x'.repeat(5000)+'*/',request={...bundle,brief:{genre:'custom',prompt:'Required game mechanics. '.repeat(65)},context:{previousSource:source},findings:['Initialize arrays before inspect.'],tools:{read_source(){},search_source(){},apply_source_patch(){},inspect_components(){},run_rule_checks(){}}};
+ const prepared=buildRequest(config,'coding','worker',request),data=JSON.parse(prepared.body.input[0].content[0].text);assert.ok(prepared.serialized.length<=16000);assert.ok(data.context.sourceReference);assert.equal(data.context.previousSource,undefined);assert.ok(prepared.body.tools.some(tool=>tool.name==='read_source'));assert.equal(prepared.body.max_output_tokens,2048);assert.deepEqual(prepared.body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(prepared.body.instructions.includes(bundle.focusedCode.roleInstructions));
+});

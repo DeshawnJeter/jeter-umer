@@ -31,3 +31,15 @@ test('repair diagnostics name replay limits, action mappings and unavailable API
  cases[1].steps=[{dt:0.1,input:{j:true}}];assert.match(checkCode({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)}).findings[0],/J maps to attack/);
  const source=DEFAULT_SOURCE.replace('time+=dt;','time+=dt;api.musicStart();');assert.match(checkCode({source,scenarios:DEFAULT_SCENARIOS}).findings[0],/Unavailable api method: musicStart/);
 });
+
+test('snapshot findings identify the exact initialization or render limit defect',()=>{
+ const snapshot={phase:'ready',health:3,maxHealth:3,score:0,objective:'Test',nodes:[]};assert.throws(()=>inspectSnapshot({...snapshot,health:undefined}),/health before Start/);assert.throws(()=>inspectSnapshot({...snapshot,nodes:Array.from({length:65},()=>({}))}),/65 nodes.*64/);assert.throws(()=>inspectSnapshot({...snapshot,score:undefined}),/score before Start/);
+});
+
+test('oversized patches remove only parsed comments while preserving literal tokens and ASI',async()=>{
+ const {compactComments}=await import('../apps/server/src/runners/code-workspace.js');const {tokenizer,parse}=await import('acorn');
+ const source=`export function example(){return/*line\ncomment*/1;} const text='/* literal */'; const template=\`literal // text\`;`;
+ const compacted=compactComments(source);const tokens=text=>Array.from(tokenizer(text,{ecmaVersion:'latest',sourceType:'module'}),token=>text.slice(token.start,token.end));assert.deepEqual(tokens(source),tokens(compacted));assert.equal(parse(compacted,{ecmaVersion:'latest',sourceType:'module'}).body[0].declaration.body.body[0].argument,null);
+ const w=codeWorkspace(await mkdtemp(join(tmpdir(),'comment-fit-')));await w.stage(DEFAULT_SOURCE+'/*'+'x'.repeat(5000)+'*/');const report=await w.patch({path:'generated/rules.js',find:'score=0',replacement:'score=0/*'+'y'.repeat(1000)+'*/'});assert.equal(report.verdict,'pass');assert.ok((await w.read()).length<=6000);assert.ok(report.evidence.some(line=>line.includes('executable tokens')));
+ const before=await w.read(),rejected=await w.patch({path:'generated/rules.js',find:'score=0',replacement:'score=0'+ ' '.repeat(7000)});assert.equal(rejected.verdict,'fail');assert.equal(await w.read(),before);
+});
