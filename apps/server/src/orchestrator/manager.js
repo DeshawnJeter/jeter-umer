@@ -12,6 +12,7 @@ import { validateGame, HUMAN_CHECKS } from '../validation/index.js';
 import { createRuntime } from '../providers/runtime.js';
 import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../providers/usage.js';
 import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests} from '../memory/project.js';
+import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime() } = {}) {
@@ -105,10 +106,10 @@ export class Manager {
     if (run.results[role] || this.blocked(run, role)) return;
     const handlers = this.router ? await this.router(role) : await this.runtime.route(role, this.providerHooks(run,role));
     const task = makeTask(role, run.generation);
-    if (role !== 'planner') task.dependencies = [run.tasks.planner.id, 'human:plan-approval'];
+    if (role !== 'planner') task.dependencies = [...dependenciesFor(role,run.brief.genre).map(parent=>run.tasks[parent]?.id||`${run.generation}:${parent}`), 'human:plan-approval'];
     run.tasks[role] = { ...task, status: 'running' };
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
-    const memoryDependencies=role==='planner'?[]:['planner'];
+    const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const result = await runPair({ role, task, execution, brief: run.brief, context: { memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
@@ -140,14 +141,16 @@ export class Manager {
       if (!run.results.planner) { this.transition(run, 'awaiting_human'); await this.save(run); return; }
       const planHash = fingerprint({ brief: run.brief, plan: run.results.planner.artifact, instructions: run.instructions.hash, briefResolution:run.briefResolution || null }); run.planHash = planHash;
       if (run.planApproval?.hash !== planHash) { this.transition(run, 'awaiting_plan'); await this.event(run, 'Checked plan ready. Human approval is required before implementation.'); return; }
-      const ready = SPECIALISTS.filter(role => !run.results[role] && !this.blocked(run, role));
-      for (let i = 0; i < ready.length; i += policy.concurrency) {
-        const outcomes = await Promise.allSettled(ready.slice(i, i + policy.concurrency).map(role => this.execute(run, role)));
+      const required=activeRoles(run.brief.genre).filter(role=>role!=='planner');
+      while(required.some(role=>!run.results[role])) {
+        const ready=required.filter(role=>!run.results[role]&&!this.blocked(run,role)&&dependenciesFor(role,run.brief.genre).every(parent=>run.results[parent]));
+        if(!ready.length)break;
+        const outcomes = await Promise.allSettled(ready.slice(0,policy.concurrency).map(role => this.execute(run, role)));
         const failure = outcomes.find(outcome => outcome.status === 'rejected' && !outcome.reason.suspended);
         if (failure) throw failure.reason;
         if (run.status !== 'running') return;
       }
-      if (run.questions.some(question => question.blocking) || SPECIALISTS.some(role => !run.results[role])) {
+      if (run.questions.some(question => question.blocking) || required.some(role => !run.results[role])) {
         this.transition(run, 'awaiting_human'); await this.event(run, 'Independent ready tasks finished. Waiting for context needed by blocked roles.'); return;
       }
       await this.checkpoint(run);
