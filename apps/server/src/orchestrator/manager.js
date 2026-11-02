@@ -82,11 +82,10 @@ export class Manager {
     const affected = roles.includes('planner') ? ROLES : roles;
     for (const role of affected) { delete run.results[role]; delete run.agents[role]; delete run.tasks[role]; }
     run.generation++; run.build = null; run.validation = null; delete run.approval;
-    if (affected.includes('planner')) { run.planHash = null; run.planApproval = null; }
+    if (affected.includes('planner')) { run.planHash = null; run.planApproval = null; if(run.brief.inputMode==='prompt')run.briefResolution=null; }
   }
-  async execute(run, role) {
-    if (run.results[role] || this.blocked(run, role)) return;
-    const handlers = this.router ? await this.router(role) : await this.runtime.route(role, {
+  providerHooks(run,role) {
+    return {
       signal: this.controllers.get(run.id)?.signal,
       reserve: estimate => this.reserveCall(run, estimate),
       finish: async (usage, estimate) => { finishUsage(run.providerUsage, usage, estimate); await this.save(run); },
@@ -97,12 +96,16 @@ export class Manager {
         else if (audit.outcome === 'accepted' && audit.attempt > 1) await this.event(run, `${role} ${audit.stage}: response format recovered on request ${audit.attempt}.`);
         else await this.save(run);
       }
-    });
+    };
+  }
+  async execute(run, role) {
+    if (run.results[role] || this.blocked(run, role)) return;
+    const handlers = this.router ? await this.router(role) : await this.runtime.route(role, this.providerHooks(run,role));
     const task = makeTask(role, run.generation);
     if (role !== 'planner') task.dependencies = [run.tasks.planner.id, 'human:plan-approval'];
     run.tasks[role] = { ...task, status: 'running' };
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions) }, ...handlers,
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
@@ -123,9 +126,15 @@ export class Manager {
         await this.event(run, 'Instructions or profiles changed. Prior results and approvals require fresh checks.');
       }
       run.instructions = instructions;
+      if(run.brief.inputMode==='prompt'&&!run.briefResolution){
+        const resolution=await this.runtime.resolveBrief({brief:clone(run.brief),decisions:clone(run.decisions),hooks:this.providerHooks(run,'planner'),directory:resolve(this.store.folder(run.id),'workspaces',`generation-${run.generation}`),beforeStep:()=>this.checkpoint(run),onEvent:async event=>{run.agents.planner={role:'planner',...event};await this.event(run,`Planner: ${event.stage.replaceAll('_',' ')} (attempt ${event.attempt})`);}});
+        if(run.status!=='running')return;
+        const resolved=validateBrief({...resolution.proposal,prompt:run.brief.prompt,inputMode:'manual'});
+        run.brief={...resolved,inputMode:'prompt'};run.briefResolution=resolution;await this.save(run);
+      }
       await this.execute(run, 'planner'); if (run.status !== 'running') return;
       if (!run.results.planner) { this.transition(run, 'awaiting_human'); await this.save(run); return; }
-      const planHash = fingerprint({ brief: run.brief, plan: run.results.planner.artifact, instructions: run.instructions.hash }); run.planHash = planHash;
+      const planHash = fingerprint({ brief: run.brief, plan: run.results.planner.artifact, instructions: run.instructions.hash, briefResolution:run.briefResolution || null }); run.planHash = planHash;
       if (run.planApproval?.hash !== planHash) { this.transition(run, 'awaiting_plan'); await this.event(run, 'Checked plan ready. Human approval is required before implementation.'); return; }
       const ready = SPECIALISTS.filter(role => !run.results[role] && !this.blocked(run, role));
       for (let i = 0; i < ready.length; i += policy.concurrency) {
@@ -166,7 +175,8 @@ export class Manager {
     if (action === 'approve_plan') {
       if (run.status !== 'awaiting_plan' || !run.planHash || data.planHash !== run.planHash) throw new Error('Approve the current checked plan');
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
-      run.planApproval = { hash: run.planHash, at: new Date().toISOString(), source: 'human' };
+      if(run.briefResolution?.proposal.unsupportedRequests.length&&data.acceptUnsupported!==true)throw new Error('Acknowledge the unsupported requests before approving the supported plan, or edit the prompt/settings.');
+      run.planApproval = { hash: run.planHash, at: new Date().toISOString(), source: 'human', ...(run.briefResolution?.proposal.unsupportedRequests.length?{unsupportedAcknowledged:true}:{}) };
       this.transition(run, 'running'); await this.event(run, 'Human approved the checked plan'); this.launch(run); return run;
     }
     if (action === 'answer') {
@@ -183,8 +193,8 @@ export class Manager {
     }
     if (action === 'revise' || action === 'revise_plan') {
       if (!['awaiting_plan', 'awaiting_review'].includes(run.status)) throw new Error('Revisions require a checked plan or reviewable build');
-      const updated = validateBrief({ ...run.brief, ...data });
-      if (!updated.difficulty) throw new Error('Select difficulty for the revision');
+      const updated = validateBrief({ ...run.brief, ...data, inputMode:data.inputMode ?? 'manual' });
+      if (updated.inputMode!=='prompt'&&!updated.difficulty) throw new Error('Select difficulty for the revision');
       run.brief = updated; run.questions = [];
       if (Object.hasOwn(run.decisions, 'brief.difficulty')) run.decisions['brief.difficulty'] = updated.difficulty;
       this.invalidate(run, ROLES);

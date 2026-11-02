@@ -76,6 +76,8 @@ Mocked tests cover all six model worker/checker pairs, schema boundaries, instru
 
 The response-recovery branch is stacked on HUD/pause-menu PR #20 and its prerequisites, targeting development. Restart the app to load the provider changes and create a new run; older saved provider configurations are not silently upgraded to a new retry policy.
 
+Prompt-only creation adds a separate planner extraction and independent review before the normal planner pair. These calls use the same configured planner worker/checker models and share the run's budgets and format-recovery policy. They are marked `resolve_brief` in response audits. Missing choices become disclosed suggestions; supported identifiers remain schema-bound and unsupported omissions require human acknowledgement before specialists run. See [prompt-only workflow](prompt-only-workflow.md).
+
 ## Official references
 
 - [Structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
