@@ -12,9 +12,9 @@ The system manifest fingerprints master instructions, profiles, role prompts, an
 
 The manager is the system harness: role dependencies, parallel batches, saved state, retry/budget checkpoints, question routing, integration and approval rules. The shared pair runner is the agent harness: full instruction bundles, task contracts, cloned inputs, narrow tools, contract validation, retries and separate checker requests.
 
-The worker interface offers `inspect_context` and `propose_artifact`. The checker interface offers `inspect_context` and `inspect_artifact`, with no repair tool. Scripted modules remain trusted JavaScript and can import Node modules. Tool configuration is not OS isolation. A future model adapter must execute requests only through validated capabilities and retain the same evidence rules.
+The scripted worker interface offers `inspect_context` and `propose_artifact`. The checker interface offers `inspect_context` and `inspect_artifact`, with no repair tool. Scripted modules remain trusted JavaScript and can import Node modules. Tool configuration is not OS isolation. The OpenAI adapter exposes no arbitrary tools: it returns strict role-specific artifact or question JSON for the harness to validate.
 
-Context checks count full serialized instructions, selected skills, tasks, human decisions, findings and artifacts before each call. This is a character limit for the scripted demo, not a model tokenizer or token-window guarantee. Nothing is silently truncated. Real model integration must add tokenizer-aware accounting, response reserves and provider-specific limits.
+Context checks count full serialized instructions, selected skills, tasks, human decisions, findings and artifacts before each call. The OpenAI adapter additionally bounds the complete API body, including its output schema, disables truncation, limits output tokens, and reserves estimated input/output usage. Estimates are based on bytes rather than a model tokenizer and are not a guaranteed billing ceiling. Nothing is silently truncated.
 
 Each role workspace records worker and checker request audits, context character counts, tool-call names and reports. Repair attempts rebuild instructions from durable sources. A role receives applicable durable decisions as data, not as higher-priority system instructions.
 
@@ -32,4 +32,4 @@ State writes serialize per run. Human actions also serialize so double submissio
 
 ## Current limitations
 
-No model/API calls, API-key loading, autonomous code generation, automatic browser playtesting, or OS sandbox are added. Prompts are ready for a later model adapter; deterministic scripts continue producing bounded game settings. The reusable template supplies the JavaScript game implementation.
+OpenAI mode now supports real model calls using a server-side environment key. Demo/tests/local red-team probes remain no-key. Neither mode adds autonomous executable code generation, automatic browser playtesting or an OS sandbox. The reusable template supplies the JavaScript implementation. See openai-provider.md for setup and verification boundaries.

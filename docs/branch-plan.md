@@ -34,3 +34,7 @@ These new branches share the tested `codex/basic-integration` prerequisite, whic
 8. `codex/prompt-loop-verification`: updated regressions and operating documentation. Requires the assembled changes.
 
 `codex/prompt-loop-integration` combines the new changes for running and review. None of these branches enables paid API calls.
+
+## OpenAI provider
+
+`codex/openai-provider` adds optional real model workers/checkers, strict structured outputs, deterministic verification, usage/cancellation limits, provider-aware dashboard labels and mocked tests. It is based on the tested local combination of PR #10 (prompt loop), #11 (adversarial fixes) and #12 (red-team suite). Development remains unchanged. See openai-provider.md for setup. Tests and the local red-team suite never make paid calls.

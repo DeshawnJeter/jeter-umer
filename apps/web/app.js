@@ -46,7 +46,7 @@ function renderQuestions(run) {
 }
 function render(run) {
   current = run; $('#empty').hidden = true; $('#run').hidden = false;
-  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/40 steps${run.error ? ' · ' + run.error : ''}`;
+  $('#run-title').textContent = run.brief.title; $('#run-status').textContent = `${run.status.replaceAll('_', ' ')} · ${run.steps}/40 steps · ${run.mode === 'openai' ? `OpenAI: ${run.providerUsage?.calls || 0} calls, ${run.providerUsage?.totalTokens || 0} reported tokens` : 'local demo'}${run.error ? ' · ' + run.error : ''}`;
   $('#controls').replaceChildren();
   const buttons = run.status === 'running' ? [['Pause', 'pause'], ['Cancel', 'cancel']] : run.status === 'paused' ? [['Resume', 'resume'], ['Cancel', 'cancel']] : ['awaiting_human', 'awaiting_plan', 'awaiting_review'].includes(run.status) ? [['Cancel', 'cancel']] : [];
   for (const [label, command] of buttons) { const button = element('button', label, 'secondary'); button.onclick = () => perform(() => action(command)); $('#controls').append(button); }
@@ -80,5 +80,5 @@ async function refresh() {
   try { const runs = await api('/api/runs'); $('#history').replaceChildren(); for (const run of runs) { const button = element('button', `${run.brief.title} · ${run.status.replaceAll('_', ' ')}`); button.onclick = () => { selected = run.id; refresh(); }; $('#history').append(button); } if (!selected && runs.length) selected = runs[0].id; if (selected) render(await api(`/api/runs/${selected}`)); }
   finally { refreshing = false; }
 }
-refresh().catch(error => { $('#error').textContent = error.message; });
+api('/api/config').then(config => { $('#provider-status').textContent = config.mode === 'openai' ? 'OpenAI mode · API usage is billed' : 'Local demo · no API calls'; $('#create-run').textContent = config.mode === 'openai' ? 'Build with OpenAI' : 'Build a game'; $('#create-run').disabled = false; return refresh(); }).catch(error => { $('#error').textContent = error.message; });
 setInterval(() => refresh().catch(error => { $('#error').textContent = error.message; }), 1500);

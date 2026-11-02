@@ -17,16 +17,16 @@ function assertOutputFits(output, limit) {
   const serialized = JSON.stringify(output);
   if (!serialized || serialized.length > limit) throw new Error('Agent output exceeds the configured limit or is missing');
 }
-export async function runPair({ role, brief, context = {}, task = makeTask(role), worker, checker, directory, beforeStep = async () => {}, onEvent = async () => {} }) {
+export async function runPair({ role, brief, context = {}, task = makeTask(role), execution = { provider: 'scripted-demo' }, worker, checker, directory, beforeStep = async () => {}, onEvent = async () => {} }) {
   if (!ROLES.includes(role) || task.role !== role) throw new Error('Unknown agent role or mismatched task');
   const profile = await loadProfile(role);
   const [workerBundle, checkerBundle] = await Promise.all([instructionBundle(role, 'worker', profile), instructionBundle(role, 'checker', profile)]);
-  const input = { brief: clone(brief), context: clone(context), task: clone(task) };
+  const input = { brief: clone(brief), context: clone(context), task: clone(task), execution: clone(execution) };
   assertRequestFits({ ...workerBundle, ...input }, profile.worker.maxContextChars);
   const folder = resolve(directory, role); await mkdir(folder, { recursive: true });
   const questions = []; let findings = [];
   for (let attempt = 1; attempt <= profile.maxAttempts; attempt++) {
-    const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt };
+    const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt, limits: { maxContextChars: profile.worker.maxContextChars, maxOutputChars: profile.worker.maxOutputChars } };
     const workerSize = assertRequestFits(workerRequest, profile.worker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'working', attempt });
     const workerCalls = [];
@@ -39,7 +39,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
       questions.push(question);
     }
     const artifact = result.artifact; const errors = validateArtifact(role, artifact);
-    const checkerRequest = { ...checkerBundle, ...clone(input), artifact: clone(artifact), attempt };
+    const checkerRequest = { ...checkerBundle, ...clone(input), artifact: clone(artifact), attempt, limits: { maxContextChars: profile.checker.maxContextChars, maxOutputChars: profile.checker.maxOutputChars } };
     const checkerSize = assertRequestFits(checkerRequest, profile.checker.maxContextChars);
     await beforeStep(); await onEvent({ role, stage: 'checking', attempt });
     const checkerCalls = [];
@@ -57,7 +57,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     if (report.verdict === 'pass' && report.findings.length === 0) {
       await writeFile(resolve(folder, 'accepted.json'), JSON.stringify(artifact, null, 2));
       await onEvent({ role, stage: 'accepted', attempt });
-      return { status: 'accepted', role, artifact, report, questions, audit: { workerHash: workerBundle.hash, checkerHash: checkerBundle.hash, workerSkills: workerBundle.skills, checkerSkills: checkerBundle.skills } };
+      return { status: 'accepted', role, artifact, report, questions, audit: { workerHash: workerBundle.hash, checkerHash: checkerBundle.hash, workerSkills: workerBundle.skills, checkerSkills: checkerBundle.skills, execution: clone(execution) } };
     }
     findings = report.findings.length ? report.findings : ['Checker did not accept the contribution'];
     await onEvent({ role, stage: 'repair', attempt, findings });
