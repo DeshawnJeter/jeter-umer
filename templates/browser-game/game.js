@@ -1,3 +1,4 @@
+import {preloadAssets,applyAssets} from './imported-assets.js';
 import {createGameEvents} from './game-events.js';
 import {GameVfx} from './vfx.js';
 import { PlayerInterface } from './interface.js';
@@ -17,7 +18,7 @@ const config = await response.json(), genre = genreOf(config.genre), rules = GAM
 if(assembly.runtime!==genre)throw Error('Game assembly/runtime mismatch');
 if(!advancedProfile(genre)){const failureNote=document.createElement('p');failureNote.id='failure-rules';failureNote.textContent='Failure: '+lifecycleFor(genre).failure+' Restart is always available.';document.querySelector('#game').before(failureNote);}
 if(advancedProfile(genre)){const {startAdvancedGame}=await import('./advanced.js');await startAdvancedGame(config,genre);}else{
-const audio = new GameAudio(config.audio);
+const audio = new GameAudio({...config.audio,importedMusic:config.importedAssets?.music});
 const title = document.querySelector('#title'), message = document.querySelector('#message'), status = document.querySelector('#status');
 title.textContent = config.ui.title; document.title = config.ui.title; message.textContent = config.story.intro;
 document.querySelector('#instructions').textContent = rules.controls;
@@ -46,11 +47,12 @@ function end(phase) {
   audio.tone(phase === 'won' ? config.audio.winFrequency : 140); audio.setPlaying?.(false);
 }
 class WorkshopGame extends Phaser.Scene {
+  preload(){preloadAssets(this,config);}
   create() {
     scene = this;events=createGameEvents();const sceneEvents=events;this.physics.resume(); elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
     Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3,failureReason:null });
     message.textContent = config.story.intro;
-    vfx=new GameVfx(this,events,config.vfx,()=>ui.settings);const sceneVfx=vfx;createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art});
+    vfx=new GameVfx(this,events,config.vfx,()=>ui.settings);const sceneVfx=vfx;applyAssets(this);createArt(this, config.ui); drawBackdrop(this, {...config.ui,...config.art,importedBackground:config.importedAssets?.background});
     const walls = this.physics.add.staticGroup();
     for (const wall of config.levels.walls) {
       const box = this.add.image(center(wall.x), center(wall.y), 'wall');

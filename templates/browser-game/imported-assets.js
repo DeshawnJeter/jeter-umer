@@ -1,0 +1,3 @@
+const pathFor=(value,extension)=>typeof value==='string'&&new RegExp('^assets/[a-f0-9-]{36}\\.'+extension+'$').test(value)?value:null;
+export function preloadAssets(scene,config){for(const slot of ['background','player']){const path=pathFor(config.importedAssets?.[slot],'png');if(path)scene.load.image('imported-'+slot,path);}}
+export function applyAssets(scene){if(scene.textures.exists('imported-player'))for(const key of ['player','player-run-1','player-run-2'])if(!scene.textures.exists(key))scene.textures.addImage(key,scene.textures.get('imported-player').getSourceImage());}
