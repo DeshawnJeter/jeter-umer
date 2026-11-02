@@ -1,4 +1,5 @@
 import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../../../../shared/code-game.js';
+import {frameworkConfig} from '../integration/framework.js';
 import {createHash} from 'node:crypto';
 import {EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../../../../shared/specialists.js';
 import {genreOf} from '../../../../shared/game-types.js';
@@ -23,7 +24,7 @@ export function referenceFor(role,{brief,context={}}){
   if(role==='combat')artifact.enemyDamage=brief.difficulty==='experienced'?3:2;
   if(role==='implementation')Object.assign(artifact,{runtime:genre,modules:modulesFor(genre)});
   if(role==='integration')artifact.manifestHash=manifestFor(context);
-  if(role==='qa'){const report=runProjectRules({...contributions(context),genre});Object.assign(artifact,{passed:report.passed,evidenceHash:hash({manifest:manifestFor(context),report})});}
+  if(role==='qa'){const report=runProjectRules(frameworkConfig(genre,contributions(context)));Object.assign(artifact,{passed:report.passed,evidenceHash:hash({manifest:manifestFor(context),report})});}
   return artifact;
 }
 export async function work(role,request){const artifact=referenceFor(role,request);return {artifact,summary:`${role}: ${JSON.stringify(artifact)}`.slice(0,500)};}

@@ -27,5 +27,9 @@ test('dashboard module dependencies load over HTTP and expose the current game c
     await visit('/app.js');assert.ok(seen.has('/advanced-games.js'),'HUD profiles must load through the dashboard preference module');
     const catalog=await (await fetch(origin+'/api/game-catalog')).json();assert.deepEqual(catalog.map(row=>row.value),Object.keys(GAME_TYPES));
     assert.equal((await fetch(origin+'/.env/local.env')).status,404,'Serving a shared module must not expose other repository files');
+    const codePort=port>65400?port-100:port+100,codeOrigin=`http://127.0.0.1:${codePort}`;
+    assert.equal((await fetch(codeOrigin+'/api/runs')).status,404,'Generated-code origin must not expose workshop state');
+    assert.equal((await fetch(codeOrigin+'/.env/local.env')).status,404,'Generated-code origin must not expose credentials');
+    assert.equal((await fetch(codeOrigin+'/api/runs',{method:'POST'})).status,403,'Generated-code origin must reject mutations');
   }finally{server.kill();await once(server,'exit').catch(()=>{});}
 });

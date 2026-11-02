@@ -18,6 +18,7 @@ import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
 import {changedRoles} from './change-scope.js';
 import {runCodeChecks} from '../validation/code-checks.js';
+import {frameworkConfig} from '../integration/framework.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
@@ -138,7 +139,7 @@ export class Manager {
     }
     for (const question of result.questions || []) await this.addQuestion(run, question);
     if (this.blocked(run, role)) { run.tasks[role].status = 'blocked'; return; }
-    run.results[role] = result;acceptMemory(run,role,result,memoryDependencies);if(role==='qa')recordTests(run,'qa-rules',runProjectRules({...Object.fromEntries(Object.entries(run.results).map(([name,value])=>[name,value.artifact])),genre:run.brief.genre})); run.tasks[role].status = 'accepted'; await this.save(run);
+    run.results[role] = result;acceptMemory(run,role,result,memoryDependencies);if(role==='qa')recordTests(run,'qa-rules',runProjectRules(frameworkConfig(run.brief.genre,Object.fromEntries(Object.entries(run.results).map(([name,value])=>[name,value.artifact]))))); run.tasks[role].status = 'accepted'; await this.save(run);
   }
   async drive(run) {
     try {
@@ -180,7 +181,7 @@ export class Manager {
         this.transition(run, 'awaiting_human'); await this.event(run, 'Independent ready tasks finished. Waiting for context needed by blocked roles.'); return;
       }
       await this.checkpoint(run);
-      const config = { ...Object.fromEntries(Object.entries(run.results).map(([role, result]) => [role, result.artifact])), genre: run.brief.genre ?? 'collector' };
+      const config = frameworkConfig(run.brief.genre??'collector',Object.fromEntries(Object.entries(run.results).map(([role,result])=>[role,result.artifact])));
       run.validation = validateGame(config);
       recordTests(run,'static-integration',run.validation);
       if (!run.validation.passed) throw new Error(`Integration failed: ${run.validation.findings.join('; ')}`);

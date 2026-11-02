@@ -2,6 +2,8 @@
 export const EXTENSION_SPECS={};
 export const CORE_ROLES=['planner','gameplay','levels','ui','story','audio'];
 export function activeRoles(genre='collector'){
+  if(genre==='custom')return ['planner','ui','story','audio','coding','integration','qa'];
+  if(['campaign','roguelike'].includes(genre))return ['planner','combat','progression','art','ui','story','audio','integration','qa'];
   return [...CORE_ROLES,...Object.entries(EXTENSION_SPECS).filter(([,s])=>s.genres==='all'||s.genres.includes(genre)).map(([role])=>role)];
 }
 export function dependenciesFor(role,genre='collector'){
