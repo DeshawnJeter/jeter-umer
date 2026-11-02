@@ -42,6 +42,6 @@ export async function startAdvancedGame(config,genre){
 export function topDownWorld(scene,ctx){
   const center=n=>n*48+24,walls=scene.physics.add.staticGroup();
   for(const point of ctx.config.levels.walls)walls.create(center(point.x),center(point.y),'wall');
-  const player=scene.physics.add.sprite(center(ctx.config.levels.spawn.x),center(ctx.config.levels.spawn.y),'player').setCollideWorldBounds(true);player.body.setSize(24,28).setOffset(4,2);scene.physics.add.collider(player,walls);
-  return {player,walls,center};
+  const player=scene.physics.add.sprite(center(ctx.config.levels.spawn.x),center(ctx.config.levels.spawn.y),'player').setCollideWorldBounds(true);player.body.setSize(24,28).setOffset(4,2);const collider=scene.physics.add.collider(player,walls);
+  return {player,walls,center,dispose(){collider.destroy();player.destroy();walls.clear(true,true);walls.destroy();}};
 }
