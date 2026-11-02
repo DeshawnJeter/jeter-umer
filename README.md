@@ -1,5 +1,7 @@
 # Game Workshop
 
+Private hosted deployment: [setup, security controls and recovery](docs/deployment.md). Production requires team authentication, separate workshop/game hostnames and persistent storage. The Render Blueprint starts in demo mode; fresh model credentials and hosted verification remain launch requirements.
+
 Current indie workflow, branch dependencies, and limitations: [Indie workflow](docs/indie-workflow.md). Model policy: [Role models](docs/role-model-policy.md). Earlier feature descriptions below include the project’s incremental history.
 
 A local hub-and-spoke game builder with a no-key demo and an opt-in Claude / Anthropic provider. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser game for human review. Choose from ten game styles, including six small RPG, stealth, battle, shooter and exploration templates.

@@ -2,9 +2,9 @@ import { providerConfig } from './config.js';
 import { createAnthropicClient } from './anthropic.js';
 import { route } from '../router/index.js';
 import { resolvePromptBrief } from '../runners/brief.js';
-export function createRuntime({ env = process.env, fetchImpl,countInputTokens } = {}) {
+export function createRuntime({ env = process.env, fetchImpl,countInputTokens,sharedBudget } = {}) {
   const selected = providerConfig(env);
-  const client = selected.mode==='anthropic' ? createAnthropicClient(selected.apiKey, selected.publicConfig, { fetchImpl,...(countInputTokens===undefined?{}:{countInputTokens}) }) : null;
+  const client = selected.mode==='anthropic' ? createAnthropicClient(selected.apiKey, selected.publicConfig, { fetchImpl,sharedBudget,...(countInputTokens===undefined?{}:{countInputTokens}) }) : null;
   return createRoutedRuntime(selected,client);
 }
 export function createRoutedRuntime(selected,client) {

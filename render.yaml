@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: team-game-workshop
+    runtime: docker
+    repo: https://github.com/DeshawnJeter/jeter-umer
+    branch: development
+    plan: 0.5c-512mb
+    numInstances: 1
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    disk:
+      name: workshop-data
+      mountPath: /var/data
+      sizeGB: 5
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: WORKSHOP_DATA_DIR
+        value: /var/data/workshop
+      - key: WORKSHOP_PUBLIC_ORIGIN
+        sync: false
+      - key: WORKSHOP_PREVIEW_ORIGIN
+        sync: false
+      - key: WORKSHOP_PASSWORD_HASH
+        sync: false
+      - key: WORKSHOP_SESSION_SECRET
+        generateValue: true
+      - key: WORKSHOP_BACKUP_KEY
+        sync: false
+      - key: GAME_BUILDER_PROVIDER
+        value: demo
+      - key: GAME_BUILDER_BROWSER_QA
+        value: "on"
+      - key: WORKSHOP_DAILY_CALL_LIMIT
+        value: "100"
+      - key: WORKSHOP_DAILY_TOKEN_LIMIT
+        value: "500000"
+      - key: WORKSHOP_TOTAL_TOKEN_LIMIT
+        value: "2000000"
+      - key: WORKSHOP_MAX_DATA_BYTES
+        value: "250000000"
+      - key: WORKSHOP_MAX_RUNS
+        value: "100"
+      - key: WORKSHOP_MAX_PROJECTS
+        value: "100"

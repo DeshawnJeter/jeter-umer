@@ -27,9 +27,12 @@ import {inspectWholeGame,requiresInGameHud} from '../validation/whole-game-accep
 import {changedRoles} from './change-scope.js';
 import {runCodeChecks,lossDeadlineForBrief} from '../validation/code-checks.js';
 import {frameworkConfig} from '../integration/framework.js';
+import {RunGate} from '../deployment/run-gate.js';
 
 export class Manager {
-  constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
+  constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on',admitCreate=async()=>{},runConcurrency } = {}) {
+    this.admitCreate=admitCreate;this.creationQueue=Promise.resolve();
+    this.runGate=runConcurrency===undefined?null:new RunGate(runConcurrency);
     if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
     this.store = store; this.projects=new Projects(store.root); this.versions=new Versions(store.root,this.projects);this.assets=new Assets(store.root,this.projects); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
   }
@@ -83,7 +86,10 @@ export class Manager {
     if(signal?.aborted||run.status!=='running'){const error=Error('Run suspended');error.suspended=true;throw error;}
     return new Promise(resolve=>{let waiters=this.usageWaiters.get(run.id);if(!waiters){waiters=new Set();this.usageWaiters.set(run.id,waiters);}const wake=()=>{waiters.delete(wake);if(!waiters.size)this.usageWaiters.delete(run.id);signal?.removeEventListener('abort',wake);resolve();};waiters.add(wake);signal?.addEventListener('abort',wake,{once:true});});
   }
-  async create(brief,options={}) {
+  create(brief,options={}) {
+    const next=this.creationQueue.catch(()=>{}).then(async()=>{await this.admitCreate(brief);return this.createAccepted(brief,options);});this.creationQueue=next;return next;
+  }
+  async createAccepted(brief,options={}) {
     const budgetLimits=buildBudget(this.runtime.publicConfig,brief.budgetLimits||{});
     const project=brief.projectId?await this.projects.get(brief.projectId):await this.projects.create(validateBrief(brief).title);
     const projectHistory=this.projects.context(project),inherited=inheritedProjectDecisions(project);
@@ -93,7 +99,7 @@ export class Manager {
   launch(run) {
     if (this.jobs.has(run.id)) return;
     this.controllers.set(run.id, new AbortController());
-    const job = Promise.resolve().then(() => this.drive(run)).catch(async error => {
+    const job = Promise.resolve().then(async() => {let release;try{release=await this.runGate?.acquire(this.controllers.get(run.id)?.signal);}catch(error){if(error.suspended)return;throw error;}try{return await this.drive(run);}finally{release?.();}}).catch(async error => {
       if (!terminalStates.has(run.status)) { run.status = 'failed'; run.error = error.message; await this.event(run, error.message); }
     }).finally(() => { this.jobs.delete(run.id); this.controllers.delete(run.id); });
     this.jobs.set(run.id, job);

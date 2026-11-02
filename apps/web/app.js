@@ -1,3 +1,4 @@
+import './session.js';
 import {isModelProvider,providerLabel} from './providers.js';
 import {projectWorkspace} from './project-workspace.js';
 import './preferences.js';
