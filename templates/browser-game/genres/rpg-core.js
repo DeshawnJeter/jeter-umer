@@ -29,7 +29,7 @@ export function rpgMode(scene,ctx,{frontView=false,multiLevel=false,randomized=f
     sync();
   }
   function act(action){if(state.phase!=='playing'||!battle||battle.phase!=='player')return;const previousHealth=campaign.party.reduce((sum,member)=>sum+member.hp,0);const accepted=battleAction(battle,action);if(accepted){if(action==='spell')ctx.emit?.('spell_cast',{x:280+battle.target*140,y:190});if(action==='attack')ctx.emit?.('enemy_hit',{x:280+battle.target*140,y:190});const health=campaign.party.reduce((sum,member)=>sum+member.hp,0);if(health<previousHealth)ctx.emit?.('damage_taken',{x:world?.player.x??360,y:world?.player.y??320,amount:previousHealth-health});if(battle.phase==='won')ctx.emit?.('enemy_defeated',{x:360,y:190});}if(accepted)ctx.audio.tone(action==='spell'?720:300);if(battle.phase==='won'){cleared.add(multiLevel?expedition.room:battleIndex);markers[battleIndex]?.destroy();if(multiLevel)clearRoom(expedition);state.score=cleared.size;}if(battle.phase==='lost'){sync();ctx.end('lost');}paint();}
-  function engage(index){battleIndex=index;battle=beginBattle(campaign,multiLevel?expedition.maps[expedition.room].enemy:index);world?.player.setVelocity(0);paint();}
+  function engage(index){battleIndex=index;battle=beginBattle(campaign,multiLevel?expedition.maps[expedition.room].enemy:index);if(randomized&&expedition.room<total-1)battle.enemies[0].name=expedition.maps[expedition.room].enemyName;world?.player.setVelocity(0);paint();}
   function loadWorld(){
     markers.forEach(marker=>marker.destroy());exit?.destroy();world?.dispose?.();
     world=frontView?null:topDownWorld(scene,{...ctx,config:roomConfig()});

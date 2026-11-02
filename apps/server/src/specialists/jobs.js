@@ -8,7 +8,7 @@ export const contributions=context=>Object.fromEntries((context.memory?.dependen
 export const manifestFor=context=>hash((context.memory?.dependencies||[]).map(record=>[record.role,record.hash]));
 export function modulesFor(genre){
   const modules=['movement','hud','settings','audio','failure-state','game-events','vfx'];
-  if(['rpg','front_battle','campaign'].includes(genre))modules.push('turn-combat','party-items');
+  if(['rpg','front_battle','campaign','roguelike'].includes(genre))modules.push('turn-combat','party-items');
   if(genre==='stealth')modules.push('patrols','vision');
   if(['run_gun','jump_shooter','metroidvania'].includes(genre))modules.push('projectiles');
   if(genre==='metroidvania')modules.push('ability-gates','checkpoints');

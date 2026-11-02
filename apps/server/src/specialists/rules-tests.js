@@ -29,7 +29,7 @@ export function runProjectRules(config){
   probe('remapped preferences remain valid',()=>validSettings(remap(defaultSettings(),'attack','KeyL')));
   if(config.enemies)probe('enemy warnings cooldowns occlusion and recovery',()=>Object.values(enemyFairnessEvidence(config.enemies)).every(Boolean));
   probe('explicit reachable failure condition',()=>{const rules=lifecycleFor(config.genre),playing={health:20,remaining:30};return !failureReason(config.genre,playing)&&!!failureReason(config.genre,{health:rules.health?0:20,remaining:rules.timer&&!rules.surviveTimer?0:30});});
-  if(['rpg','front_battle','campaign'].includes(config.genre)){
+  if(['rpg','front_battle','campaign','roguelike'].includes(config.genre)){
     probe('party defeat ends combat',()=>{const c=newCampaign(config.planner.difficulty,{combat:config.combat,progression:config.progression}),battle=beginBattle(c,2);for(let i=0;i<100&&battle.phase==='player';i++)battleAction(battle,'guard');return battle.phase==='lost'&&c.party.every(member=>member.hp===0);});
     probe('full-health potion preserves inventory and turn',()=>{const c=newCampaign(config.planner.difficulty,{combat:config.combat,progression:config.progression}),b=beginBattle(c,2),before=JSON.stringify(c);return !battleAction(b,'potion')&&JSON.stringify(c)===before&&b.round===0;});
     probe('spell spends configured MP and health stays bounded',()=>{const c=newCampaign(config.planner.difficulty,{combat:config.combat,progression:config.progression}),b=beginBattle(c,2);battleAction(b,'guard');const mp=c.party[1].mp;return battleAction(b,'spell')&&c.party[1].mp===mp-c.rules.spellCost&&c.party.every(p=>p.hp>=0&&p.hp<=p.maxHp);});
