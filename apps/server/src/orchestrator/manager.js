@@ -16,6 +16,7 @@ import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
+import {changedRoles} from './change-scope.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
@@ -233,10 +234,13 @@ export class Manager {
       if(run.browserChecks?.passed===false)run.lastBrowserFailure={buildHash:run.browserChecks.buildHash,generation:run.generation,reason:run.browserChecks.error||'Browser acceptance failed',failedChecks:(run.browserChecks.tests||[]).filter(check=>!check.passed).map(check=>({name:check.name,error:check.error||''}))};
       const updated = validateBrief({ ...run.brief, ...data, inputMode:data.inputMode ?? 'manual' });
       if (updated.inputMode!=='prompt'&&!updated.difficulty) throw new Error('Select difficulty for the revision');
+      const affected=changedRoles(run.brief,updated);
       run.brief = updated; run.questions = [];
       if (Object.hasOwn(run.decisions, 'brief.difficulty')) run.decisions['brief.difficulty'] = updated.difficulty;
-      this.invalidate(run, ROLES);
-      this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Plan approval and final approval require renewal.'); this.launch(run); return run;
+      // Failed builds need fresh integration/QA even when settings did not change.
+      this.invalidate(run, affected.length?affected:['implementation','integration','qa']);
+      run.planHash=null;run.planApproval=null;run.memory.specification=null;
+      this.transition(run, 'running'); await this.event(run, 'Human revised requirements. Unchanged checked contributions are retained; plan and build approvals require renewal.'); this.launch(run); return run;
     }
     if (action === 'approve') {
       if(run.browserQaMode==='on'&&(!run.browserChecks?.passed||run.browserChecks.buildHash!==run.build?.sha256))throw Error('Current build must pass browser checks before human approval');
