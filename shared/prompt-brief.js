@@ -1,13 +1,17 @@
 import { validateBrief } from './contracts/index.js';
+import {GAME_TYPES} from './game-types.js';
 export const SETTING_KEYS = ['title','genre','theme','difficulty','music','musicStyle','musicInstrument'];
 export const PROMPT_DEFAULTS = Object.freeze({title:'My Prompt Game',genre:'collector',theme:'space',difficulty:'beginner',music:false,musicStyle:'adventure',musicInstrument:'auto'});
 const unsupportedPatterns = [
-  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'Turn-based RPG, party and battle systems are not supported yet.'],
-  [/\bstealth\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?metal gear\b/i,'Stealth, patrol vision and detection systems are not supported yet.'],
-  [/\b(?:shoot(?:ing|er)?|projectiles?|weapons?)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:contra|mega\s?man)\b/i,'Shooting, weapons and projectile combat are not supported yet.'],
-  [/\bmetroidvania\b/i,'Metroidvania progression and connected-room exploration are not supported yet.'],
-  [/\b(first[- ]person|3d)\b/i,'First-person exploration and battle views are not supported yet.'],
-  [/\b(inventory|crafting|boss(?:es)?)\b/i,'Inventory, crafting and boss systems are not supported yet.']
+  [/\b(rpg|role[- ]playing|turn[- ]based)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:final fantasy|dragon warrior)\b/i,'RPG battles require the party RPG or front-view battle template.',['rpg','front_battle']],
+  [/\bstealth\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?metal gear\b/i,'Stealth requires the stealth mission template.',['stealth']],
+  [/\b(?:shoot(?:ing|er)?|projectiles?|weapons?)\b|\b(?:like|inspired by|similar to)\s+(?:(?:the\s+)?original\s+)?(?:contra|mega\s?man)\b/i,'Shooting requires a shooter or exploration template.',['run_gun','jump_shooter','metroidvania']],
+  [/\bmetroidvania\b/i,'Ability-gated exploration requires the metroidvania template.',['metroidvania']],
+  [/\b(?:3d|first[- ]person exploration)\b/i,'3D and first-person exploration are not supported.'],
+  [/\binventory\b/i,'Inventory is limited to party potions in the RPG/battle templates.',['rpg','front_battle']],
+  [/\bcrafting\b/i,'Crafting is not supported.'],
+  [/\bboss(?:es)?\b/i,'Boss encounters require an RPG or shooter template.',['rpg','front_battle','run_gun','jump_shooter']],
+  [/\bmultiplayer\b/i,'Multiplayer is not supported.']
 ];
 export function featureRequestText(prompt) {
   let text=prompt.replace(/\b(?:title(?:d)?|name(?:d)?|called)\s*:?\s*["“][^"”]*["”]/gi,' ').replace(/\b(?:title(?:d)?|name(?:d)?|called)\s*:?\s*'[^']*'/gi,' ');
@@ -18,12 +22,12 @@ export function featureRequestText(prompt) {
   text=text.replace(/\b(?:do\s+not\s+(?:include|add|use|enable|implement|want)|don't\s+(?:include|add|use|enable|implement|want)|never\s+(?:include|add|use|enable|implement)|without|no|avoid|not\s+(?:a|an))\b[^.!?;\n]*?(?=[.!?;\n]|\b(?:but|however|instead|except|yet|then|rather|just|add|include|enable|use|make|create|with)\b|$)/gi,' ');
   return text;
 }
-export function unsupportedIn(prompt) {
+export function unsupportedIn(prompt,genre) {
   const positive=featureRequestText(prompt);
-  return unsupportedPatterns.filter(([pattern])=>pattern.test(positive)).map(([,text])=>text);
+  return unsupportedPatterns.filter(([pattern,,genres])=>pattern.test(positive)&&!(genres||[]).some(id=>Object.hasOwn(GAME_TYPES,id)&&(!genre||genre===id))).map(([,text])=>text);
 }
 export function reviewResolutionIntent(proposal,prompt) {
-  const requested=unsupportedIn(prompt),findings=[];
+  const requested=unsupportedIn(prompt,proposal.genre),findings=[];
   for(const note of proposal.unsupportedRequests){
     const categories=unsupportedPatterns.filter(([pattern])=>pattern.test(note)).map(([,text])=>text);
     if(categories.some(category=>!requested.includes(category)))findings.push('An unsupported warning refers to a mechanic absent from positive requests (it may be excluded or only mentioned in a title). Remove that false warning; preserve actual requested unsupported features.');
@@ -41,7 +45,7 @@ export function validateResolution(value) {
 }
 export function finalizeResolution(value,prompt) {
   const proposal=validateResolution(value);
-  proposal.unsupportedRequests=[...new Set([...proposal.unsupportedRequests,...unsupportedIn(prompt)])];
+  proposal.unsupportedRequests=[...new Set([...proposal.unsupportedRequests,...unsupportedIn(prompt,proposal.genre)])];
   return proposal;
 }
 // Demo mode intentionally recognizes supported labels/keywords, not arbitrary
@@ -57,7 +61,7 @@ export function demoResolve(prompt) {
     if(matches.length)result[key]=matches[0][0];
     if(matches.length!==1)result.assumptions.push(matches.length?'Conflicting '+key+' cues; suggested '+result[key]+'.':fallbackNote);
   };
-  select('genre',[['platformer',/platform|jump/i],['maze',/maze|labyrinth/i],['survival',/surviv|arena|dodge.*drones/i],['collector',/collect|stars/i]],'No clear supported game type; suggested star collector.');
+  select('genre',[['front_battle',/front[- _]?(?:view|battle)|dragon warrior/i],['metroidvania',/metroidvania/i],['jump_shooter',/jump[- _]?(?:and[- _]?)?shoot|mega\s?man/i],['run_gun',/run[- _]?(?:and[- _]?)?gun|side[- ]scroll.*shoot|contra/i],['stealth',/stealth|metal gear/i],['rpg',/rpg|role[- ]playing|turn[- ]based|final fantasy/i],['platformer',/platform|jump/i],['maze',/maze|labyrinth/i],['survival',/surviv|arena|dodge.*drones/i],['collector',/collect|stars/i]].filter(([id])=>Object.hasOwn(GAME_TYPES,id)),'No clear supported game type; suggested star collector.');
   select('theme',[['neon',/neon|cyber/i],['forest',/forest|woodland|garden/i],['space',/space|astral|cosmic/i]],'No clear supported art theme; suggested space.');
   select('difficulty',[['experienced',/experienced|expert|hard|challenging/i],['beginner',/beginner|easy|friendly/i]],'No difficulty specified; suggested beginner.');
   select('musicStyle',[['chiptune',/chiptune|retro|8[- ]bit/i],['lofi',/lo[- ]?fi/i],['mysterious',/mysterious|mystery/i],['cinematic',/cinematic/i],['dance',/dance|electronic/i],['arcade',/arcade|energetic/i],['calm',/calm|ambient/i],['adventure',/adventure/i]],'No music style specified; suggested adventure if music is enabled.');

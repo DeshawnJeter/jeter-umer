@@ -50,16 +50,16 @@ test('demo recognizes all selected settings and explicit no music; resolutions r
   const value=demoResolve(prompt);assert.deepEqual(Object.fromEntries(Object.keys(PROMPT_DEFAULTS).map(key=>[key,value[key]])),{title:'Neon Rescue',genre:'survival',theme:'neon',difficulty:'experienced',music:true,musicStyle:'dance',musicInstrument:'fm'});
   assert.equal(demoResolve(prompt+' No music.').music,false);
   assert.ok(demoResolve('A little game').assumptions.length);
-  for(const change of [{genre:'rpg'},{genre:null},{theme:'../../file'},{music:'false'},{path:'.env'},{assumptions:['x'.repeat(241)]}])assert.throws(()=>validateResolution({...value,...change}));
+  for(const change of [{genre:'unsupported_type'},{genre:null},{theme:'../../file'},{music:'false'},{path:'.env'},{assumptions:['x'.repeat(241)]}])assert.throws(()=>validateResolution({...value,...change}));
 });
 test('independent unsupported detection cannot be omitted by a model proposal',()=>{
   const value=finalizeResolution({...PROMPT_DEFAULTS,assumptions:[],unsupportedRequests:[]},'Make a turn-based RPG with stealth, shooting and metroidvania progression.');assert.ok(value.unsupportedRequests.length>=4);
 });
 test('feature warnings distinguish negative lists and named titles from later positive requests',()=>{
   for(const text of ['Do not include shooting, stealth, RPG combat, inventory or bosses.','No shooting and no stealth.','Avoid RPG combat, crafting and bosses.','Make a collector titled "Contra Constellations". Contra is only a title; no shooting.','Title: Metal Gear Garden; Game type: collector; no stealth.'])assert.deepEqual(unsupportedIn(text),[],text);
-  const later=unsupportedIn('No shooting or inventory, but add stealth and RPG battles.');assert.equal(later.length,2);assert.ok(later.some(s=>s.includes('Stealth')));assert.ok(later.some(s=>s.includes('RPG')));
-  assert.ok(unsupportedIn('Do not include stealth; add shooting.').some(s=>s.includes('Shooting')));
-  assert.ok(unsupportedIn('Make a shooter like Contra.').some(s=>s.includes('Shooting')));
+  const later=unsupportedIn('No shooting or inventory, but add stealth and RPG battles.','collector');assert.equal(later.length,2);assert.ok(later.some(s=>s.includes('Stealth')));assert.ok(later.some(s=>s.includes('RPG')));
+  assert.ok(unsupportedIn('Do not include stealth; add shooting.','collector').some(s=>s.includes('Shooting')));
+  assert.ok(unsupportedIn('Make a shooter like Contra.','collector').some(s=>s.includes('Shooting')));
 });
 test('intent checks reject false warnings without clearing genuine requested omissions',()=>{
   const proposal={...PROMPT_DEFAULTS,assumptions:[],unsupportedRequests:['shooting']};
