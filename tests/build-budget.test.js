@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {buildBudget,estimateBuild} from '../apps/server/src/providers/build-budget.js';import {providerConfig} from '../apps/server/src/providers/config.js';
+test('user budgets only lower server ceilings and estimates disclose unknown model pricing',()=>{
+ const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'synthetic'}).publicConfig;assert.equal(buildBudget(config,{maxCalls:10}).maxCalls,10);assert.throws(()=>buildBudget(config,{maxCalls:41}),/server limit/);assert.throws(()=>buildBudget(config,{maxTotalTokens:-1}),/server limit/);assert.equal(buildBudget({mode:'scripted-demo'},{}),null);
+ const estimate=estimateBuild(config,{genre:'custom',inputMode:'manual'});assert.equal(estimate.calls,10);assert.ok(estimate.estimatedDollars>0);assert.match(estimate.assumptions,/not a dollar/);config.models.audio.worker='unpriced-model';assert.equal(estimateBuild(config,{genre:'custom'}).estimatedDollars,null);
+});

@@ -1,3 +1,4 @@
+import {buildBudget,estimateBuild} from '../providers/build-budget.js';
 import {feedbackFor} from '../memory/feedback.js';
 import {Versions} from '../storage/versions.js';
 import { randomUUID } from 'node:crypto';
@@ -63,7 +64,7 @@ export class Manager {
   async reserveCall(run, estimate) {
     for(;;){
     if (run.status !== 'running') { const error = new Error('Run suspended'); error.suspended = true; throw error; }
-    try { reserveUsage(run.providerUsage, run.providerConfig, estimate); }
+    try { reserveUsage(run.providerUsage, {...run.providerConfig,...run.budgetLimits}, estimate); }
     catch (error) {
       if(error.budgetPending){await this.waitForUsage(run);continue;}
       if (error.budgetExhausted) { this.transition(run, 'stopped'); this.controllers.get(run.id)?.abort(); await this.event(run, error.message); error.suspended = true; }
@@ -79,9 +80,10 @@ export class Manager {
     return new Promise(resolve=>{let waiters=this.usageWaiters.get(run.id);if(!waiters){waiters=new Set();this.usageWaiters.set(run.id,waiters);}const wake=()=>{waiters.delete(wake);if(!waiters.size)this.usageWaiters.delete(run.id);signal?.removeEventListener('abort',wake);resolve();};waiters.add(wake);signal?.addEventListener('abort',wake,{once:true});});
   }
   async create(brief,options={}) {
+    const budgetLimits=buildBudget(this.runtime.publicConfig,brief.budgetLimits||{});
     const project=brief.projectId?await this.projects.get(brief.projectId):await this.projects.create(validateBrief(brief).title);
     const projectHistory=this.projects.context(project);
-    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
+    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, budgetLimits, costEstimate:estimateBuild(this.runtime.publicConfig,validateBrief(brief)), parentVersionId:options.parentVersionId||null,changeRequest:options.changeRequest||null,initialSource:options.initialSource||null,acceptanceCases:clone(project.acceptanceCases||[]), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
     run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
@@ -183,7 +185,7 @@ export class Manager {
       if (!run.results.planner) { this.transition(run, 'awaiting_human'); await this.save(run); return; }
       const planHash = fingerprint({ brief: run.brief, plan: run.results.planner.artifact, instructions: run.instructions.hash, briefResolution:run.briefResolution || null,acceptanceCases:run.acceptanceCases||[] }); run.planHash = planHash;
       if (run.planApproval?.hash !== planHash) { this.transition(run, 'awaiting_plan'); await this.event(run, 'Checked plan ready. Human approval is required before implementation.'); return; }
-      if(run.mode==='openai'&&run.providerConfig.maxCalls-run.providerUsage.calls<run.requiredRoles.filter(role=>!run.results[role]).length*2){this.transition(run,'stopped');await this.event(run,'Remaining model call budget cannot cover every required worker/checker pair. Create a run with an explicitly configured budget; limits were not increased.');return;}
+      if(run.mode==='openai'&&(run.budgetLimits?.maxCalls||run.providerConfig.maxCalls)-run.providerUsage.calls<run.requiredRoles.filter(role=>!run.results[role]).length*2){this.transition(run,'stopped');await this.event(run,'Remaining model call budget cannot cover every required worker/checker pair. Create a run with an explicitly configured budget; limits were not increased.');return;}
       const required=activeRoles(run.brief.genre).filter(role=>role!=='planner');
       while(required.some(role=>!run.results[role])) {
         const ready=required.filter(role=>!run.results[role]&&!this.blocked(run,role)&&dependenciesFor(role,run.brief.genre).every(parent=>run.results[parent]));

@@ -19,7 +19,7 @@ $('#prompt-only').onchange = () => {
 };
 $('#brief').onsubmit = event => { event.preventDefault(); perform(async () => {
   const data=$('#prompt-only').checked?{inputMode:'prompt',prompt:$('#prompt').value}:{inputMode:'manual',title:$('#title').value,prompt:$('#prompt').value,genre:$('#genre').value,theme:$('#theme').value,musicStyle:$('#music-style').value,musicInstrument:$('#music-instrument').value,difficulty:$('#difficulty').value,music:$('#music').checked,askStory:$('#ask-story').checked};
-  data.projectId=workspace.projectId()||undefined;const run=await api('/api/runs',data);selected=run.id;
+  data.budgetLimits={...($('#budget-calls').value?{maxCalls:Number($('#budget-calls').value)}:{}),...($('#budget-tokens').value?{maxTotalTokens:Number($('#budget-tokens').value)}:{})};data.projectId=workspace.projectId()||undefined;const run=await api('/api/runs',data);selected=run.id;
 }); };
 function renderPlan(run) {
   $('#plan').hidden = run.status !== 'awaiting_plan';
@@ -27,6 +27,7 @@ function renderPlan(run) {
   if (signature === planSignature) return; planSignature = signature; $('#plan').replaceChildren();
   if (run.status !== 'awaiting_plan') return;
   const plan = run.results.planner.artifact;
+  if(run.costEstimate)$('#plan').append(element('p',`Estimated first pass: ${run.costEstimate.calls} model requests${run.costEstimate.estimatedDollars===null?'':` · about ${run.costEstimate.estimatedDollars}`}. ${run.costEstimate.assumptions||run.costEstimate.note} ${run.budgetLimits?`Limits: ${run.budgetLimits.maxCalls} calls / ${run.budgetLimits.maxTotalTokens} tokens.`:''}`));
   if(plan.acceptance){const list=element('ul');list.append(...plan.acceptance.map(item=>element('li',item)));$('#plan').append(element('h4','What we will test'),list);}
   if(run.brief.genre==='custom'&&run.mode!=='openai')$('#plan').append(element('p','Local demo uses a small example game. OpenAI mode is required to write new mechanics from your description.'));
   $('#plan').append(element('h3', 'Review the checked plan'), element('p', `${plan.title}: ${plan.objective}`), element('p', `Game type: ${choiceLabel('#genre',run.brief.genre || 'collector')}. Art: ${choiceLabel('#theme',run.brief.theme || 'space')}. Difficulty: ${plan.difficulty}. Music: ${run.brief.music ? `${choiceLabel('#music-style',run.brief.musicStyle || 'adventure')} · ${choiceLabel('#music-instrument',run.brief.musicInstrument || 'auto')}` : 'disabled'}.`), element('p', 'The planner checker passed. Specialists will start after you approve this plan.'));
