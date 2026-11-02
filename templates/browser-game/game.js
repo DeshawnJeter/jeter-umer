@@ -1,5 +1,6 @@
 import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
+import { createArt, drawBackdrop } from './art.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
@@ -22,42 +23,35 @@ function end(phase) {
   message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat'];
   audio.tone(phase === 'won' ? config.audio.winFrequency : 140); audio.setPlaying?.(false);
 }
-function texture(s, name, color, radius) {
-  const g = s.make.graphics({ x: 0, y: 0 }); g.fillStyle(color); g.fillCircle(16, 16, radius); g.generateTexture(name, 32, 32); g.destroy();
-}
-function drawBackdrop(s) {
-  const g = s.add.graphics(); g.lineStyle(1, 0x293950);
-  for (let x = 0; x <= 15; x++) g.lineBetween(x * size, 0, x * size, 480);
-  for (let y = 0; y <= 10; y++) g.lineBetween(0, y * size, 720, y * size);
-}
 class WorkshopGame extends Phaser.Scene {
   create() {
     scene = this; elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
     Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3 });
     message.textContent = config.story.intro;
-    drawBackdrop(this);
-    if (!this.textures.exists('player')) {
-      texture(this, 'player', Phaser.Display.Color.HexStringToColor(config.ui.playerColor).color, 13);
-      texture(this, 'star', 0xffd275, 9); texture(this, 'enemy', 0xff657c, 12);
-    }
+    createArt(this, config.ui); drawBackdrop(this, config.ui);
     const walls = this.physics.add.staticGroup();
     for (const wall of config.levels.walls) {
-      const box = this.add.rectangle(center(wall.x), center(wall.y), size, size, 0x486078);
+      const box = this.add.image(center(wall.x), center(wall.y), 'wall');
       this.physics.add.existing(box, true); walls.add(box);
     }
     if (genre !== 'survival') {
-      portal = this.add.rectangle(center(config.levels.exit.x), center(config.levels.exit.y), 36, 36, 0xae82ff);
+      portal = this.add.image(center(config.levels.exit.x), center(config.levels.exit.y), 'portal');
       this.physics.add.existing(portal, true);
+      portal.body.setSize(28, 36).setOffset(10, 6);
+      this.tweens.add({ targets: portal, alpha: 0.6, duration: 1100, yoyo: true, repeat: -1 });
     } else portal = null;
     player = this.physics.add.sprite(center(config.levels.spawn.x), center(config.levels.spawn.y), 'player');
     player.setCollideWorldBounds(true); player.body.setSize(24, 28).setOffset(4, 2);
     player.body.setGravityY(genre === 'platformer' ? 1000 : 0);
     this.physics.add.collider(player, walls);
     stars = this.physics.add.staticGroup();
-    for (const star of config.levels.stars) stars.create(center(star.x), center(star.y), 'star');
+    for (const star of config.levels.stars) {
+      const pickup = stars.create(center(star.x), center(star.y), 'star');
+      this.tweens.add({ targets: pickup, alpha: 0.6, duration: 900 + star.x * 40, yoyo: true, repeat: -1 });
+    }
     this.physics.add.overlap(player, stars, (_, star) => {
       if (state.phase !== 'playing') return;
-      star.destroy(); state.score++; if (genre === 'survival') state.health = Math.min(3, state.health + 1);
+      this.tweens.killTweensOf(star); star.destroy(); state.score++; if (genre === 'survival') state.health = Math.min(3, state.health + 1);
       audio.tone(config.audio.pickupFrequency);
     });
     if (portal) this.physics.add.overlap(player, portal, () => {
@@ -102,6 +96,9 @@ class WorkshopGame extends Phaser.Scene {
         this.physics.moveToObject(enemy, player, speed);
       }
       player.setAlpha(genre === 'survival' && elapsed - lastDamage < 1.2 ? 0.5 : 1);
+      const moving = Math.abs(player.body.velocity.x) + Math.abs(player.body.velocity.y) > 5;
+      player.setTexture(moving ? `player-run-${Math.floor(elapsed * 9) % 2 + 1}` : 'player');
+      if (x) player.setFlipX(x < 0);
       const outcome = roundOutcome(state); if (outcome !== 'playing') end(outcome);
     } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
     state.x = player.x; state.y = player.y;

@@ -1,7 +1,7 @@
 import { mkdir, writeFile, readFile, rename, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 export class Store {
-  constructor(root = '.local/runs') { this.root = resolve(root); }
+  constructor(root = process.env.GAME_BUILDER_RUNS_DIR || '.local/runs') { this.root = resolve(root); }
   folder(id) { if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid run ID'); return resolve(this.root, id); }
   async save(run) {
     const folder = this.folder(run.id); await mkdir(folder, { recursive: true });
