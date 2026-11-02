@@ -4,7 +4,7 @@ export function validateBindings(project,bindings){
 }
 export async function bindAssets(manager,run,config){
  const project=await manager.projects.get(run.projectId),bindings={...run.assetSelection};
- for(const slot of ['background','player','music']){const choice=config.art?.[slot+'Asset'];if(choice==='none')delete bindings[slot];else if(choice&&choice!=='auto'&&!bindings[slot])bindings[slot]=choice;}
+ for(const slot of ['background','player','music']){if(bindings[slot])continue;const choice=config.art?.[slot+'Asset'];if(choice&&choice!=='auto'&&choice!=='none')bindings[slot]=choice;}
  const selected=validateBindings(project,bindings),records=[];config.importedAssets={};
  for(const [slot,id]of Object.entries(selected)){const {asset,bytes}=await manager.assets.bytes(project.id,id);const path=`assets/${id}.${asset.extension}`;config.importedAssets[slot]=path;records.push({slot,path,asset,bytes});}
  return async folder=>{await mkdir(resolve(folder,'assets'),{recursive:true});for(const record of records)await writeFile(resolve(folder,record.path),record.bytes);await writeFile(resolve(folder,'imported-assets-manifest.json'),JSON.stringify(records.map(({bytes,...record})=>record),null,2));};

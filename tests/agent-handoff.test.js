@@ -27,6 +27,7 @@ for(const genre of Object.keys(GAME_TYPES))test(`${genre}: every active model pa
     let value;
     if(stage==='worker'){
       const proposal=await (await route(role)).worker(data);
+      if(role==='coding')proposal.artifact.scenarios=JSON.parse(proposal.artifact.scenarios).map(c=>({name:c.name,expect:c.expect,steps:c.steps.map(step=>({dt:step.dt,actions:Object.entries(step.input).filter(([,value])=>value).map(([key])=>key),repeat:step.repeat??1}))}));
       value={kind:'artifact',artifact:proposal.artifact,question:null,summary:'Synthetic model transport fixture'};
     }else value={review:{verdict:'pass',findings:[],evidence:['Synthetic static comparison'],question:null}};
     return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(value)}]}],usage:{input_tokens:100,output_tokens:50,total_tokens:150}}));

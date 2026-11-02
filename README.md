@@ -1,5 +1,7 @@
 # Game Workshop
 
+Current indie workflow, branch dependencies, and limitations: [Indie workflow](docs/indie-workflow.md). Model policy: [Role models](docs/role-model-policy.md). Earlier feature descriptions below include the project’s incremental history.
+
 A local hub-and-spoke game builder with a no-key demo and an opt-in OpenAI provider. A planner and five specialists propose structured game settings. Independent checkers validate each proposal. An orchestrator runs independent tasks in parallel, integrates accepted artifacts, and serves a playable Phaser game for human review. Choose from ten game styles, including six small RPG, stealth, battle, shooter and exploration templates.
 
 ## Run
@@ -36,9 +38,9 @@ For real model workers/checkers, privately set a fresh `OPENAI_API_KEY` in the s
 
 ## Boundaries
 
-**Demo mode is free of API calls. OpenAI mode uses real models for bounded game configuration and static review.** Neither mode executes arbitrary model-generated JavaScript. The reusable Phaser template supplies the game code. Demo workers use explicit settings; real workers receive the brief and relevant task context as untrusted data.
+**Demo mode is free of API calls. OpenAI mode uses real models for bounded game configuration and static review.** Template styles use trusted Phaser code. Custom mode accepts bounded model-written JavaScript rules, parses them without server execution, and runs them only in isolated browser workers. It does not provide unrestricted project or host access. Demo workers use explicit settings; real workers receive the brief and relevant task context as untrusted data.
 
-OpenAI checkers reason independently about supplied artifacts, then deterministic role checks still run. Integration checks are static. They do not claim to automatically play the game or judge creative quality. Human playtesting supplies the behavioral approval. Prompt files are loaded and audited; only real model workers interpret them. Tool allowlists constrain the harness interface, and the API provider exposes no file/shell tools. Trusted JavaScript worker modules are not OS-isolated.
+OpenAI checkers reason independently about supplied artifacts, then deterministic role checks still run. Static integration and isolated browser checks are separate. Browser QA is enabled by default, but smoke checks do not establish complete mechanic coverage or creative quality. Human playtesting supplies the behavioral approval. Prompt files are loaded and audited; only real model workers interpret them. Tool allowlists constrain the harness interface, and the API provider exposes no file/shell tools. Trusted JavaScript worker modules are not OS-isolated.
 
 Runtime state lives in ignored `.local/runs/`. The existing `.env/` directory stays ignored. Do not commit secrets. This server binds only to loopback and is a development tool without multi-user authentication. Do not expose it publicly.
 
@@ -70,7 +72,7 @@ Use merge commits to preserve this stack’s ancestry. If you squash a prerequis
 
 ## Branches
 
-See [docs/branch-plan.md](docs/branch-plan.md). Each feature branch starts from development and contains one scoped slice. The integration branch assembles dependencies for a runnable demo. Development remains unchanged until reviewed changes merge.
+See [docs/branch-plan.md](docs/branch-plan.md). Feature branches contain scoped commits and may depend on earlier unmerged branches; inspect the documented dependency order. The integration branch assembles dependencies for a runnable demo. Development remains unchanged until reviewed changes merge.
 
 The prompt/human-loop update uses new scoped branches based on the working `codex/basic-integration` prerequisite, which already descends from development. `codex/prompt-loop-integration` assembles these new branches. See [docs/prompt-system.md](docs/prompt-system.md) for configuration and boundaries.
 
