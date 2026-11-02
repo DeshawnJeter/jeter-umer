@@ -3,15 +3,16 @@ export const CHECKER_COMPONENT_CATALOG=REUSABLE_API+"API: clamp(value,min,max); 
 export const COMPONENT_CATALOG=REUSABLE_API+'Available api: clamp(value,min,max); damage(actor,amount); give(inventory,item,count); move(actor,dx,dy,speed,dt); distance(a,b); pathNodes(start,end,color="#596b65") returns at most 16 decorative path nodes (use it instead of dense path-dot loops). Initialize every value and array used by inspect during createGame, before Start. Write export function createGame(api) returning {start(),update(dt,input),inspect()}. Lifecycle: createGame returns ready; start() is called without arguments and immediately enters playing, with no input needed. Restart constructs a new ready instance. update must freeze all state when won/lost. Only the listed api methods exist; music/audio belong to the framework. Read-only fresh-per-step input: left/right/up/down/jump/attack/ability/interact booleans. inspect returns {phase:ready|playing|won|lost,health:0..100,maxHealth:1..100,score:0..100000,objective:string<=180,nodes:[{x:0..720,y:0..480,color:#RRGGBB,size:2..80,label:string}]}. Maximum 64 nodes. No DOM, imports, network, storage or host access. Keep simulation deterministic; dt is seconds, at most 0.1. Own only generated/rules.js. Include JSON scenarios: [{name,steps:[{dt:0..0.1,input:{...}}],expect:won|lost}]. At least one win and one loss scenario, each at most 300 EXPANDED steps total, counting every repeat and setup frame. The harness already called start() before replay; J is input.attack. A step may include repeat:1..300 to compress repeated input. Browser worker executes rules; Phaser renders nodes; shared UI owns pause/settings/restart/audio.';
 export const DEFAULT_SOURCE=`export function createGame(api){
   let phase='ready',score=0,health=3,time=0;
+  const buttons={};
   const player={x:360,y:380};
   return {start(){phase='playing';},update(dt,input){
     if(phase!=='playing')return;time+=dt;
     api.move(player,Number(!!input.right)-Number(!!input.left),Number(!!input.down)-Number(!!input.up),180,dt);
-    if(input.attack){score++;if(score>=5)phase='won';}
+    if(api.pressed(buttons,'attack',!!input.attack)){score++;if(score>=5)phase='won';}
     if(time>=10){health=0;phase='lost';}
   },inspect(){return {phase,health,maxHealth:3,score,objective:'Press J five times before ten seconds expire.',nodes:[{x:player.x,y:player.y,color:'#66e3bd',size:24,label:'Player'}]};}};
 }`;
-export const DEFAULT_SCENARIOS=JSON.stringify([{name:'win',steps:[{dt:0.1,input:{attack:true},repeat:5}],expect:'won'},{name:'loss',steps:[{dt:0.1,input:{},repeat:110}],expect:'lost'}]);
+export const DEFAULT_SCENARIOS=JSON.stringify([{name:'win',steps:Array.from({length:9},(_,i)=>({dt:0.1,input:i%2?{}:{attack:true}})),expect:'won'},{name:'loss',steps:[{dt:0.1,input:{},repeat:110}],expect:'lost'}]);
 export function pathNodes(start,end,color='#596b65'){
   if(!start||!end||![start.x,start.y,end.x,end.y].every(Number.isFinite)||[start,end].some(p=>p.x<0||p.x>720||p.y<0||p.y>480)||!/^#[0-9a-f]{6}$/i.test(color))throw new SnapshotContractError('pathNodes requires finite points inside 720x480 and a #RRGGBB color.');
   const segments=Math.max(1,Math.min(15,Math.ceil(Math.hypot(end.x-start.x,end.y-start.y)/48)));

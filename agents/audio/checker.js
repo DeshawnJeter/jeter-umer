@@ -2,6 +2,7 @@ import { musicStyleOf, instrumentOf, validateScore } from '../../shared/music.js
 export async function check({ artifact, brief }) {
   const findings = [];
   if (artifact.music !== brief.music) findings.push('Music choice differs from the human brief');
+  if(brief.music&&(!artifact.enabled||artifact.volume<=0))findings.push('Requested music needs an enabled, audible default; saved player mute preferences remain separate');
   if (artifact.volume > 0.3) findings.push('Default volume must be no more than 0.3');
   if (artifact.pickupFrequency === artifact.winFrequency) findings.push('Pickup and victory effects should differ');
   if (artifact.score) {

@@ -1,4 +1,5 @@
 import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../../../../shared/code-game.js';
+import {requestedBattleBackdrop} from '../../../../shared/explicit-intent.js';
 import {frameworkConfig} from '../integration/framework.js';
 import {createHash} from 'node:crypto';
 import {EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../../../../shared/specialists.js';
@@ -20,7 +21,7 @@ export function modulesFor(genre){
 export function referenceFor(role,{brief,context={}}){
   const artifact=extensionDefaults(role),genre=genreOf(brief.genre);
   if(role==='coding')Object.assign(artifact,{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS});
-  if(role==='art'){const match=brief.prompt?.match(/(?:battle|combat)\s+(?:background|backdrop)[^.;\n]{0,30}\b(ruins|cavern|forest|space|neon)\b/i);if(match)artifact.battleBackdrop=match[1].toLowerCase();}
+  if(role==='art'){const requested=requestedBattleBackdrop(brief,context);if(requested)artifact.battleBackdrop=requested;}
   if(role==='combat')artifact.enemyDamage=brief.difficulty==='experienced'?3:2;
   if(role==='implementation')Object.assign(artifact,{runtime:genre,modules:modulesFor(genre)});
   if(role==='integration')artifact.manifestHash=manifestFor(context);
@@ -31,6 +32,7 @@ export async function work(role,request){const artifact=referenceFor(role,reques
 export async function check(role,request){
   const {artifact,context={}}=request,findings=extensionErrors(role,artifact);
   if(!findings.length){
+    if(role==='art'&&['rpg','front_battle','campaign','roguelike'].includes(request.brief.genre)){const requested=requestedBattleBackdrop(request.brief,context);if(requested&&artifact.battleBackdrop!==requested)findings.push('Battle backdrop must preserve the explicit requested style: '+requested);}
     if(role==='art')for(const slot of ['background','player','music']){const id=artifact[slot+'Asset'];if(id&& !['auto','none'].includes(id)&&!(context.projectAssets||[]).some(a=>a.id===id&&a.kind===(slot==='music'?'audio':'image')))findings.push('Imported asset must come from the supplied project catalog');}
     if(role==='vfx'&&artifact.particlesPerBurst>artifact.maxParticles)findings.push('VFX burst must fit the bounded particle pool');
     if(role==='enemies'&&artifact.chaseSpeed<artifact.patrolSpeed)findings.push('Chase speed must not be slower than patrol speed');
