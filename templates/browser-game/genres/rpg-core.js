@@ -2,6 +2,7 @@ import {topDownWorld} from '../advanced.js';
 import {newCampaign,beginBattle,battleAction} from '../turn-combat.js';
 import {createExpedition,clearRoom,advanceRoom} from '../campaign.js';
 import {keyLabel} from '../player-ui.js';
+import {createBattleBackdrop} from '../battle-backdrop.js';
 export function rpgMode(scene,ctx,{frontView=false,multiLevel=false,randomized=false}={}){
   const {state,config,panel}=ctx,expedition=multiLevel?createExpedition({difficulty:config.planner.difficulty,combat:config.combat,progression:config.progression,rooms:randomized?5:3,randomized,seed:randomized?Math.floor(Math.random()*4294967296):1}):null,campaign=expedition?.party||newCampaign(config.planner.difficulty,{combat:config.combat,progression:config.progression}),cleared=new Set();let world=null,battle=null,battleIndex=0,portraits=[],markers=[],exit=null;
   const roomConfig=()=>multiLevel?{...config,levels:expedition.maps[expedition.room]}:config;
@@ -10,7 +11,11 @@ export function rpgMode(scene,ctx,{frontView=false,multiLevel=false,randomized=f
   const sync=()=>{state.health=campaign.party.reduce((n,p)=>n+p.hp,0);state.maxHealth=campaign.party.reduce((n,p)=>n+p.maxHp,0);state.mana=campaign.party.reduce((n,p)=>n+p.mp,0);state.maxMana=campaign.party.reduce((n,p)=>n+p.maxMp,0);state.room=expedition?.room??0;state.roomMap=roomConfig().levels;state.potions=campaign.potions;state.party=campaign.party.map(p=>({...p}));state.seed=expedition?.seed;state.progress=multiLevel?`Level ${expedition.room+1} / ${total}`:`${cleared.size} / ${total}`;state.objective=battle?`${battle.phase==='player'?campaign.party[battle.actor].name+' turn':battle.phase} · encounter ${battleIndex+1}/${total}`:`Clear encounters ${cleared.size}/${total}, then reach portal`;};
   const text=(tag,value)=>{const el=document.createElement(tag);el.textContent=value;panel.append(el);return el;};
   const shortcut=action=>ctx.keys().settings.bindings[action].map(keyLabel).join(' / ');
+  let battleBackdrop=null;
   function paint(){
+    state.presentation=battle?'battle':'overworld';
+    if(battle&&!battleBackdrop)battleBackdrop=createBattleBackdrop(scene,config.ui.theme,config.art?.battleBackdrop);
+    if(!battle&&battleBackdrop){battleBackdrop.destroy();battleBackdrop=null;}
     panel.replaceChildren();portraits.forEach(p=>p.destroy());portraits=[];
     text('p',`Party level ${campaign.level} · XP ${campaign.xp} · Potions ${campaign.potions}`);
     text('p',campaign.party.map(p=>`${p.name}: HP ${p.hp}/${p.maxHp}${p.maxMp?' · MP '+p.mp+'/'+p.maxMp:''}`).join(' | '));
