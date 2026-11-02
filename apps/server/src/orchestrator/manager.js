@@ -17,6 +17,7 @@ import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
 import {runBrowserSmoke,assertBrowserInstalled} from '../validation/browser-smoke.js';
 import {changedRoles} from './change-scope.js';
+import {runCodeChecks} from '../validation/code-checks.js';
 
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
@@ -119,7 +120,7 @@ export class Manager {
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
     const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
-      directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
+      directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal);recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
     // Revalidate the complete handoff chain after asynchronous worker/checker
@@ -181,7 +182,7 @@ export class Manager {
       await this.event(run, 'Static integration checks passed. Building playable preview.');
       const folder = resolve(this.store.folder(run.id), 'builds', String(run.generation));
       const sha256 = await buildGame(folder, config); if (run.status !== 'running') return;
-      run.build = { generation: run.generation, sha256, url: `/preview/${run.id}/${run.generation}/index.html`, checksRequired: humanChecksFor(run.brief.genre) };
+      run.build = { generation: run.generation, sha256, url: `${run.brief.genre==='custom'?`http://127.0.0.1:${Number(process.env.GAME_BUILDER_CODE_PREVIEW_PORT)||((Number(process.env.PORT)||3000)>65400?(Number(process.env.PORT)||3000)-100:(Number(process.env.PORT)||3000)+100)}`:''}/preview/${run.id}/${run.generation}/index.html`, checksRequired: humanChecksFor(run.brief.genre) };
       if(run.browserQaMode==='on'){
         await this.event(run,'Running isolated browser smoke checks against the delivered build.');
         const report=await this.browserRunner({folder,config,buildHash:sha256,reportFolder:resolve(this.store.folder(run.id),'browser-checks',`generation-${run.generation}`),signal:this.controllers.get(run.id)?.signal});

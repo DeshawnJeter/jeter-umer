@@ -40,7 +40,7 @@ for(const genre of Object.keys(GAME_TYPES))test(`${genre}: every active model pa
     for(const role of ready){
       const dependencies=dependenciesFor(role,genre),memory=readMemory(run,role,dependencies);
       assert.deepEqual(memory.dependencies.map(entry=>entry.role),dependencies);
-      for(const entry of memory.dependencies)assert.deepEqual(entry.artifact,run.results[entry.role].artifact);
+      for(const entry of memory.dependencies)if(entry.role==='coding'&&role!=='coding'){assert.equal(entry.artifact.sourceReference.hash,run.memory.artifacts.coding.hash);assert.equal(entry.artifact.sourceReference.path,'generated/rules.js');}else assert.deepEqual(entry.artifact,run.results[entry.role].artifact);
       const result=await runPair({role,brief,task:makeTask(role),context:{memory,decisions:{},...(role==='planner'?{}:{plan:run.results.planner.artifact})},directory,...await runtime.route(role,{})});
       assert.equal(result.status,'accepted',role);
       assert.deepEqual(result.report.reviewSources,['openai','deterministic']);

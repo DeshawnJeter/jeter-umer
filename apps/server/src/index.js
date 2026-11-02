@@ -10,20 +10,23 @@ const manager = new Manager(); await manager.initialize();
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be 1024–65535');
 const origin = `http://127.0.0.1:${port}`;
+const codePort=Number(process.env.GAME_BUILDER_CODE_PREVIEW_PORT)||(port>65400?port-100:port+100);
+if(!Number.isInteger(codePort)||codePort<1024||codePort>65535||codePort===port)throw Error('Invalid isolated code preview port');
+const codeOrigin=`http://127.0.0.1:${codePort}`;
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8' };
 function json(res, status, data) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(data)); }
 async function body(req) {
   if (!req.headers['content-type']?.startsWith('application/json')) throw new Error('Use application/json');
   let text = ''; for await (const chunk of req) { text += chunk; if (Buffer.byteLength(text) > 12000) throw new Error('Request too large'); } return JSON.parse(text || '{}');
 }
-async function serve(res, base, relative, preview = false) {
+async function serve(res, base, relative, preview = false, isolated = false) {
   const file = resolve(base, relative); const root = resolve(base);
   if (!file.startsWith(root + sep) || relative.split(/[\\/]/).some(part => part.startsWith('.'))) { json(res, 404, { error: 'Not found' }); return; }
   if (!(await stat(file)).isFile()) throw new Error('Not a file');
   // The preview keeps an opaque sandbox origin. Explicit local asset origins let
   // its modules/config load without granting allow-same-origin to generated games.
-  const assetOrigins = `${origin} http://localhost:${port}`;
-  res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(preview ? { 'Access-Control-Allow-Origin': '*', 'Content-Security-Policy': `default-src 'none'; script-src ${assetOrigins} 'unsafe-inline'; style-src ${assetOrigins} 'unsafe-inline'; connect-src ${assetOrigins}; img-src ${assetOrigins} data: blob:; media-src ${assetOrigins} blob:; object-src 'none'; base-uri 'none'` } : {}) }); res.end(await readFile(file));
+  const assetOrigins = isolated?codeOrigin:`${origin} http://localhost:${port}`;
+  res.writeHead(200, { 'Content-Type': mime[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', ...(isolated?{'Content-Security-Policy':`default-src 'none'; script-src ${codeOrigin}; style-src ${codeOrigin} 'unsafe-inline'; connect-src ${relative==='code-worker.js'?"'none'":codeOrigin}; worker-src ${relative==='code-worker.js'?"'none'":codeOrigin}; img-src ${codeOrigin} data: blob:; object-src 'none'; base-uri 'none'`}:{}), ...(!isolated && preview ? { 'Access-Control-Allow-Origin': '*', 'Content-Security-Policy': `default-src 'none'; script-src ${assetOrigins} 'unsafe-inline'; style-src ${assetOrigins} 'unsafe-inline'; connect-src ${assetOrigins}; img-src ${assetOrigins} data: blob:; media-src ${assetOrigins} blob:; object-src 'none'; base-uri 'none'` } : {}) }); res.end(await readFile(file));
 }
 async function archive(folder) {
   const { zipSync } = await import('fflate'); const files = {};
@@ -59,7 +62,7 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/zip', 'Content-Disposition': 'attachment; filename="star-collector.zip"' }); return res.end(bytes);
     }
     if (parts[0] === 'preview' && parts.length >= 4) {
-      const run = manager.get(parts[1]); if (!/^\d+$/.test(parts[2]) || !run.build || Number(parts[2]) !== run.build.generation) return json(res, 404, { error: 'Build unavailable' });
+      const run = manager.get(parts[1]); if(run.brief.genre==='custom'){res.writeHead(302,{Location:codeOrigin+url.pathname});res.end();return;} if (!/^\d+$/.test(parts[2]) || !run.build || Number(parts[2]) !== run.build.generation) return json(res, 404, { error: 'Build unavailable' });
       return await serve(res, resolve(manager.store.folder(run.id), 'builds', parts[2]), parts.slice(3).join('/'), true);
     }
     if (url.pathname === '/') return await serve(res, 'apps/web', 'index.html');
@@ -70,3 +73,12 @@ const server = createServer(async (req, res) => {
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }
 });
 server.listen(port, '127.0.0.1', () => console.log(`Game builder: ${origin} (${manager.runtime.mode === 'openai' ? 'OpenAI mode; API usage is billed' : 'scripted demo; no API calls'})`));
+
+const codeServer=createServer(async(req,res)=>{try{
+  if(req.method!=='GET'||req.headers.host!==new URL(codeOrigin).host)return json(res,403,{error:'Read-only game origin'});
+  const parts=decodeURIComponent(new URL(req.url,codeOrigin).pathname).split('/').filter(Boolean);
+  if(parts[0]!=='preview'||parts.length<4) return json(res,404,{error:'Game asset not found'});
+  const run=manager.get(parts[1]);if(run.brief.genre!=='custom'||!run.build||String(run.build.generation)!==parts[2])return json(res,404,{error:'Build unavailable'});
+  await serve(res,resolve(manager.store.folder(run.id),'builds',parts[2]),parts.slice(3).join('/'),false,true);
+}catch{json(res,404,{error:'Game asset not found'});}});
+codeServer.listen(codePort,'127.0.0.1');

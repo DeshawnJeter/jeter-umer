@@ -3,6 +3,7 @@ import {readFile,mkdir,access} from 'node:fs/promises';
 import {resolve,sep,extname} from 'node:path';
 import {gridPath} from '../../../../shared/stealth-rules.js';
 import {lifecycleFor} from '../../../../shared/lifecycle.js';
+import {runCodeChecks} from './code-checks.js';
 let queue=Promise.resolve();
 export async function assertBrowserInstalled(){const {chromium}=await import('playwright');const paths=process.platform==='win32'?['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe']:[chromium.executablePath()];for(const path of paths)try{await access(path);return;}catch{/* Try the next standard installation. */}throw Error('Browser QA needs an installed Edge browser on Windows or Playwright Chromium on other systems. Install it before using paid model runs, or explicitly configure manual-only browser QA.');}
 export function runBrowserSmoke(options){const job=queue.catch(()=>{}).then(()=>execute(options));queue=job.catch(()=>{});return job;}
@@ -33,7 +34,7 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     const drive=async(targetFor,steps=80)=>{
       for(let i=0;i<steps;i++){const s=await state();collect(s);if(s.phase!=='playing')return s;const target=targetFor(s);if(!target)return s;
         if(Math.hypot(target.x-s.x,target.y-s.y)<24){await advance(250);continue;}
-        let next=target;if(!['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)){const path=gridPath(config.levels,{x:s.x,y:s.y},target);if(path===null)throw Error('Input replay target is unreachable');next=path[0]||target;}
+        let next=target;if(!['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)){const path=gridPath(s.roomMap||config.levels,{x:s.x,y:s.y},target);if(path===null)throw Error('Input replay target is unreachable');next=path[0]||target;}
         const dx=next.x-s.x,dy=next.y-s.y,key=['run_gun','jump_shooter','metroidvania','platformer'].includes(config.genre)?(dx<0?'ArrowLeft':'ArrowRight'):Math.abs(dx)>Math.abs(dy)?(dx<0?'ArrowLeft':'ArrowRight'):(dy<0?'ArrowUp':'ArrowDown');
         await page.keyboard.down(key);await advance(Math.min(200,Math.max(40,Math.max(Math.abs(dx),Math.abs(dy))/config.gameplay.speed*1000)));await page.keyboard.up(key);
       }return state();
@@ -41,6 +42,13 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     report.tests.push({name:'build boot',passed:!!await page.locator('canvas').count()});
     await click('Start game');assert((await state()).phase==='playing','Start did not enter gameplay');
     await click('Pause / settings');const paused=await state();await advance(1000);const frozen=await state();assert(frozen.phase==='paused'&&frozen.health===paused.health&&frozen.x===paused.x&&frozen.y===paused.y&&frozen.remaining===paused.remaining,'Pause changed gameplay state');report.tests.push({name:'pause freezes gameplay',passed:true});await click('Resume game');
+    if(config.genre==='custom'){
+      const rules=await runCodeChecks(config.coding,signal);assert(rules.passed,rules.error||'Generated rule replays failed');
+      report.tests.push(...rules.tests.map(test=>({...test,name:'isolated rules: '+test.name})));report.codeSourceHash=rules.sourceHash;
+      await click('Restart');await page.waitForFunction(()=>window.gameState?.().ready);assert((await state()).phase==='ready','Custom preview did not reset');
+      assert(!errors.length,'Custom preview script errors: '+errors.join('; '));report.tests.push({name:'custom preview restart and no script errors',passed:true});report.passed=report.tests.every(test=>test.passed);
+      if(reportFolder){await mkdir(reportFolder,{recursive:true});await page.screenshot({path:resolve(reportFolder,'browser-smoke.png'),fullPage:true});}return report;
+    }
     if(['run_gun','jump_shooter','metroidvania'].includes(config.genre)){
       await page.keyboard.down('KeyJ');await advance(650);await page.keyboard.up('KeyJ');const shots=await state();assert((shots.events||[]).some(event=>event.type==='player_shot'&&event.x>shots.x+30),'Projectiles did not publish moving trail events');
       if(config.genre==='jump_shooter'){await advance(500);const beforePower=await state();await page.keyboard.press('KeyK');await advance(40);assert((await state()).mana===beforePower.mana-2,'Powered shot did not spend weapon energy');}
