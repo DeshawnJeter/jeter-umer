@@ -102,8 +102,8 @@ async function refresh() {
   finally { refreshing = false; }
 }
 function musicOptions(id,options,value) { const select=$(id);select.replaceChildren(...options.map(item=>{const option=element('option',item.label);option.value=item.value;return option;}));select.value=value; }
-Promise.all([api('/api/config'),api('/api/music-catalog')]).then(([config,catalog]) => {
-  providerMode=config.mode;
+Promise.all([api('/api/config'),api('/api/music-catalog'),api('/api/game-catalog')]).then(([config,catalog,games]) => {
+  providerMode=config.mode;for(const id of ['#genre','#revision-genre'])musicOptions(id,games,'collector');
   for(const id of ['#music-style','#revision-music-style'])musicOptions(id,catalog.styles,'adventure');
   for(const id of ['#music-instrument','#revision-music-instrument'])musicOptions(id,catalog.instruments,'auto');
   $('#provider-status').textContent = config.mode === 'openai' ? 'OpenAI mode · API usage is billed' : 'Local demo · no API calls'; $('#create-run').textContent = config.mode === 'openai' ? 'Build with OpenAI' : 'Build a game'; $('#create-run').disabled = false; return refresh();

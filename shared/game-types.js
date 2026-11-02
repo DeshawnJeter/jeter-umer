@@ -1,9 +1,11 @@
 // Delivered with the game as rules.js. Keep this module browser-compatible.
+import {EXTRA_GAME_TYPES} from './extra-game-types.js';
 export const GAME_TYPES = Object.freeze({
   collector: { name: 'Star collector', objective: 'Collect every star and reach the exit.', controls: 'Arrow keys or WASD to move. Collect every star, then enter the portal.', intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
   maze: { name: 'Maze escape', objective: 'Find a route through the maze and reach the exit before time runs out.', controls: 'Arrow keys or WASD to move. Find the portal before time runs out. Stars are optional bonuses.', intro: 'Find your way through the maze to the exit. Stars are optional bonuses.', victory: 'You escaped the maze!', defeat: 'The maze timer ran out. Try another route!' },
   platformer: { name: 'Platform adventure', objective: 'Jump between platforms, collect every star, and reach the exit.', controls: 'Left/right or A/D to move. Space, Up or W to jump. Collect every star, then reach the portal.', intro: 'Jump onto platforms, recover every star, and reach the portal.', victory: 'Every star recovered. You cleared the platforms!', defeat: 'Time ran out. Restart and try your jumps again!' },
-  survival: { name: 'Survival arena', objective: 'Survive the arena until the timer ends while avoiding the pursuing enemies.', controls: 'Arrow keys or WASD to move. Dodge the drones until time runs out. Stars restore one shield.', intro: 'Survive until the timer ends. Avoid drones; stars restore a shield.', victory: 'You survived the arena!', defeat: 'Your shields ran out. Restart and keep moving!' }
+  survival: { name: 'Survival arena', objective: 'Survive the arena until the timer ends while avoiding the pursuing enemies.', controls: 'Arrow keys or WASD to move. Dodge the drones until time runs out. Stars restore one shield.', intro: 'Survive until the timer ends. Avoid drones; stars restore a shield.', victory: 'You survived the arena!', defeat: 'Your shields ran out. Restart and keep moving!' },
+  ...EXTRA_GAME_TYPES
 });
 export const genreOf = value => {
   const genre = value ?? 'collector';

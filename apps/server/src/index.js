@@ -4,6 +4,7 @@ import { resolve, extname, sep } from 'node:path';
 import { Manager } from './orchestrator/manager.js';
 import { terminalStates } from '../../../shared/policies/index.js';
 import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../shared/music.js';
+import {GAME_TYPES} from '../../../shared/game-types.js';
 const manager = new Manager(); await manager.initialize();
 const port = Number(process.env.PORT || 3000);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('PORT must be 1024–65535');
@@ -44,6 +45,7 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: 'Not found' });
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+    if(url.pathname==='/api/game-catalog'&&req.method==='GET')return json(res,200,Object.entries(GAME_TYPES).map(([value,game])=>({value,label:game.name})));
     if (url.pathname === '/api/config') return json(res, 200, manager.runtime.publicConfig);
     if (url.pathname === '/api/music-catalog') return json(res, 200, { styles:Object.entries(MUSIC_STYLES).map(([value,entry])=>({value,label:entry.name})), instruments:[{value:'auto',label:'Let the agent choose'},...Object.entries(MUSIC_INSTRUMENTS).map(([value,entry])=>({value,label:entry.name}))] });
     if (url.pathname === '/api/runs') return json(res, 200, [...manager.runs.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)));
@@ -59,6 +61,7 @@ const server = createServer(async (req, res) => {
     }
     if (url.pathname === '/') return await serve(res, 'apps/web', 'index.html');
     if (url.pathname === '/player-ui.js') return await serve(res, 'shared', 'player-ui.js');
+    if (url.pathname === '/advanced-games.js') return await serve(res, 'shared', 'advanced-games.js');
     if (url.pathname === '/app.js' || url.pathname === '/preferences.js' || url.pathname === '/style.css') return await serve(res, 'apps/web', parts[0]);
     json(res, 404, { error: 'Not found' });
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }
