@@ -20,7 +20,7 @@ test('model coding tools inspect and patch owned source, then submit without rep
     return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({review:{verdict:'pass',findings:[],evidence:['Synthetic independent static comparison'],question:null}})}]}]);
   }});
   const handlers=await runtime.route('coding',{finish:async tokens=>{usage+=tokens.totalTokens;}});
-  const result=await runPair({role:'coding',brief:{title:'Tool fixture',prompt:'A custom rules fixture',genre:'custom',difficulty:'beginner'},directory,...handlers});
+  const result=await runPair({role:'coding',brief:{title:'Tool fixture',prompt:'A custom rules fixture',genre:'custom',difficulty:'beginner'},context:{previousSource:'// Existing work can request focused tools.'},directory,...handlers});
   assert.equal(result.artifact.source,DEFAULT_SOURCE);assert.equal(await readFile(join(directory,'coding/generated/rules.js'),'utf8'),DEFAULT_SOURCE);assert.equal(usage,600);assert.equal(bodies.length,4);
   for(const body of bodies){assert.equal(body.store,false);assert.equal(body.truncation,'disabled');}
 });
