@@ -8,13 +8,14 @@ import {runCodeChecks} from './code-checks.js';
 import {inspectWholeGame,gameplaySnapshot} from './whole-game-acceptance.js';
 import {checkBrowserControls,checkHud as inspectHud} from './browser-controls.js';
 let queue=Promise.resolve();
+export function browserQaBudget(config){const seconds=config?.gameplay?.timeLimit;return config?.genre==='custom'||!Number.isFinite(seconds)||seconds<0?60000:Math.min(180000,Math.max(60000,(seconds+30)*1000));}
 export async function assertBrowserInstalled(){const {chromium}=await import('playwright');const paths=process.platform==='win32'?['C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe','C:/Program Files/Microsoft/Edge/Application/msedge.exe']:[chromium.executablePath()];for(const path of paths)try{await access(path);return;}catch{/* Try the next standard installation. */}throw Error('Browser QA needs an installed Edge browser on Windows or Playwright Chromium on other systems. Install it before using paid model runs, or explicitly configure manual-only browser QA.');}
 export function runBrowserSmoke(options){const job=queue.catch(()=>{}).then(()=>execute(options));queue=job.catch(()=>{});return job;}
 async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCases=[],requireInGameHud=true}){
-  const report={scope:'browser-smoke',buildHash,passed:false,tests:[],browserTested:false,fullPlaythrough:false,listeningTested:false,humanApproved:false,virtualTime:true};
+  const report={scope:'browser-smoke',buildHash,passed:false,tests:[],browserTested:false,fullPlaythrough:false,listeningTested:false,humanApproved:false,virtualTime:true,timeBudgetMs:browserQaBudget(config)};
   let browser,server,page,timedOut=false;const errors=[];
   const checkHud=(page,state,assert)=>inspectHud(page,state,assert,requireInGameHud);
-  const deadline=setTimeout(()=>{timedOut=true;browser?.close().catch(()=>{});},60000);deadline.unref();
+  const deadline=setTimeout(()=>{timedOut=true;browser?.close().catch(()=>{});},report.timeBudgetMs);deadline.unref();
   const abort=()=>browser?.close().catch(()=>{});signal?.addEventListener('abort',abort,{once:true});
   try{
     if(signal?.aborted)throw Error('Browser checks cancelled');

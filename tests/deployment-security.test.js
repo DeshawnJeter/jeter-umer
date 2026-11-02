@@ -15,6 +15,7 @@ import {checkCode} from '../apps/server/src/runners/code-workspace.js';
 import {browserEnvironment} from '../apps/server/src/validation/browser-environment.js';
 import {RunGate} from '../apps/server/src/deployment/run-gate.js';
 import {exportProject} from '../apps/server/src/integration/export-project.js';
+import {browserQaBudget} from '../apps/server/src/validation/browser-smoke.js';
 const password='Fixture team password 4242',secret='a'.repeat(64),backupKey='b'.repeat(64);
 const temp=()=>mkdtemp(join(tmpdir(),'workshop-security-'));
 async function fixture(options={}){const root=await temp(),config={...deploymentConfig({WORKSHOP_AUTH:'on',WORKSHOP_DATA_DIR:root,WORKSHOP_PASSWORD_HASH:await passwordHash(password),WORKSHOP_SESSION_SECRET:secret}),...options};return {root,config,control:await new Control(config,options.clock).initialize()};}
@@ -65,3 +66,4 @@ test('persistent storage has one writer and hosted headers restrict parent, netw
 test('a stale same-PID local lock can recover, but a currently held lock cannot',async()=>{const root=await temp();await writeFile(join(root,'server.lock'),String(process.pid));const release=await exclusiveData(root);await assert.rejects(exclusiveData(root),/already in use/);await release();});
 test('editable export stops before reading files beyond the configured byte allowance',async()=>{const root=await temp();await mkdir(join(root,'build'));await writeFile(join(root,'build','oversize.bin'),'0123456789abcdef!');await assert.rejects(exportProject({get:async()=>({brief:{title:'Fixture'},buildHash:'unused'}),folder:()=>root},'project','version',{maxBytes:16}),error=>error.status===413);});
 test('code checker rejects direct and literal computed constructor traversal',()=>{for(const expression of ['({}).constructor','(()=>{})["constructor"]','({})["__proto__"]'])assert.equal(checkCode({source:`export function createGame(api){${expression};return {};}`},{sourceOnly:true}).verdict,'fail');});
+test('native browser QA has an explicit bounded game-duration allowance without increasing custom budgets',()=>{assert.equal(browserQaBudget({genre:'collector',gameplay:{timeLimit:20}}),60000);assert.equal(browserQaBudget({genre:'collector',gameplay:{timeLimit:90}}),120000);assert.equal(browserQaBudget({genre:'collector',gameplay:{timeLimit:10000}}),180000);assert.equal(browserQaBudget({genre:'custom',gameplay:{timeLimit:10000}}),60000);assert.equal(browserQaBudget({}),60000);});
