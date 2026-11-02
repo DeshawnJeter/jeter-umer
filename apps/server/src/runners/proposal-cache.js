@@ -28,7 +28,10 @@ export async function reviewedRepair(folder,request,maxAttempts){
    const workerText=await readFile(resolve(folder,`attempt-${attempt}-worker.json`),'utf8'),checkerText=await readFile(resolve(folder,`attempt-${attempt}-checker.json`),'utf8');
    if(workerText.length>100000||checkerText.length>100000)break;
    const worker=JSON.parse(workerText),checker=JSON.parse(checkerText),report=checker.report;
-   if(repairIdentity(worker.request)!==repairIdentity(request)||fingerprint(worker.result?.artifact)!==fingerprint(checker.request?.artifact)||report?.verdict!=='fail'||report.question||!report.findings?.length||report.findings.some(value=>typeof value!=='string'||!value.trim()))break;
+   const execution=checker.request?.codeExecution,original=worker.result?.artifact;
+   const normalized=execution?.passed&&execution.effectiveScenarios&&execution.originalArtifactHash===fingerprint(original)?{...original,scenarios:execution.effectiveScenarios}:original;
+   const expected=normalized!==original&&fingerprint(normalized)===execution.sourceHash?normalized:original;
+   if(repairIdentity(worker.request)!==repairIdentity(request)||fingerprint(expected)!==fingerprint(checker.request?.artifact)||report?.verdict!=='fail'||report.question||!report.findings?.length||report.findings.some(value=>typeof value!=='string'||!value.trim()))break;
    found={attempt:attempt+1,findings:report.findings,codeExecution:checker.request.codeExecution,source:worker.result.artifact?.source,artifact:worker.result.artifact};
   }catch{break;}
  }

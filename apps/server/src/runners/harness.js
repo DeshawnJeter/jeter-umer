@@ -1,6 +1,6 @@
-import {codeWorkspace} from './code-workspace.js';
+import {codeWorkspace,checkCode} from './code-workspace.js';
 import {pendingProposal,reviewedRepair} from './proposal-cache.js';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { ROLES, clone, validateArtifact } from '../../../../shared/contracts/index.js';
 import { makeTask } from '../../../../shared/contracts/tasks.js';
@@ -25,6 +25,24 @@ function assertOutputFits(output, limit) {
   const serialized = JSON.stringify(output);
   if (!serialized || serialized.length > limit) throw new Error('Agent output exceeds the configured limit or is missing');
 }
+async function reviewVerifiedCandidate({prior,role,input,profile,workerBundle,checkerBundle,workspace,folder,checker,beforeStep,onEvent}){
+  const artifact=clone(prior.artifact),codeExecution=prior.codeExecution,attempt=profile.maxAttempts;
+  artifact.scenarios=codeExecution.effectiveScenarios;
+  if(validateArtifact(role,artifact).length||checkCode(artifact).verdict!=='pass'||fingerprint(artifact)!==codeExecution.sourceHash||artifact.source!==await workspace.read())throw Error('Verified candidate does not match the owned source');
+  const request={...checkerBundle,...clone(input),artifact:clone(artifact),codeExecution,attempt,limits:{maxContextChars:profile.checker.maxContextChars,maxOutputChars:profile.checker.maxOutputChars}};
+  const reviewKey=fingerprint({artifact,brief:input.brief,decisions:input.context.decisions,plan:input.context.plan,execution:input.execution,checkerHash:checkerBundle.hash});
+  try{const saved=JSON.parse(await readFile(resolve(folder,'revalidated-proposal-checker.json'),'utf8'));if(saved.reviewKey===reviewKey&&saved.report.verdict==='fail')throw Error('This verified candidate was already rejected by its independent checker. Change the source or requirements before another review.');}catch(error){if(error.code!=='ENOENT'&&!(error instanceof SyntaxError))throw error;}
+  assertRequestFits(request,profile.checker.maxContextChars);await beforeStep();await onEvent({role,stage:'checking_revalidated_proposal',attempt});
+  const calls=[],report=await checker({...clone(request),tools:toolsFor(profile.checker.tools,input,role,artifact,calls,workspace)});
+  assertOutputFits(report,profile.checker.maxOutputChars);
+  if(!['pass','fail','needs_human'].includes(report.verdict)||!Array.isArray(report.findings)||!Array.isArray(report.evidence)||!report.evidence.length||[...report.findings,...report.evidence].some(value=>typeof value!=='string'||!value.trim()))throw Error('Invalid checker report');
+  await writeFile(resolve(folder,'revalidated-proposal-checker.json'),JSON.stringify({reviewKey,originalWorkerAudit:'attempt-'+attempt+'-worker.json',request,report,toolCalls:calls},null,2));
+  if(report.question||report.verdict==='needs_human'){const question=normalizeQuestion(report.question,role,'checker');if(question.blocking)return {status:'needs_human',role,question};}
+  if(report.verdict!=='pass'||report.findings.length)throw Error('Existing coding proposal did not pass independent review: '+report.findings.join('; '));
+  if(artifact.source!==await workspace.read())throw Error('Owned source changed during independent review');
+  await writeFile(resolve(folder,'accepted.json'),JSON.stringify(artifact,null,2));await onEvent({role,stage:'accepted',attempt});
+  return {status:'accepted',role,artifact,report,questions:[],summary:'Existing real-model source revalidated with an audited idle replay continuation, then independently reviewed.',audit:{workerHash:workerBundle.hash,checkerHash:checkerBundle.hash,workerSkills:workerBundle.skills,checkerSkills:checkerBundle.skills,execution:clone(input.execution),revalidatedProposal:true,originalWorkerAttempt:attempt,verificationHash:fingerprint(codeExecution)}};
+}
 export async function runPair({ role, brief, context = {}, task = makeTask(role), execution = { provider: 'scripted-demo' }, worker, checker, directory, verifyProposal, beforeStep = async () => {}, onEvent = async () => {} }) {
   if (!ROLES.includes(role) || task.role !== role) throw new Error('Unknown agent role or mismatched task');
   const profile = await loadProfile(role);
@@ -44,6 +62,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
       const actual=(refreshed.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);findings=actual.length?actual:[refreshed.error||'Saved source must pass replay checks'];
     }
   }
+  if(prior?.attempt>profile.maxAttempts&&prior.codeExecution?.passed&&prior.codeExecution.effectiveScenarios)return reviewVerifiedCandidate({prior,role,input,profile,workerBundle,checkerBundle,workspace,folder,checker,beforeStep,onEvent});
   let previousExecution=prior?.codeExecution,previousProposalSource=prior?.source;
   for (let attempt = prior?.attempt??1; attempt <= profile.maxAttempts; attempt++) {
     const workerRequest = { ...workerBundle, ...clone(input), findings: clone(findings), attempt, limits: { maxContextChars: profile.worker.maxContextChars, maxOutputChars: profile.worker.maxOutputChars } };
@@ -72,7 +91,7 @@ export async function runPair({ role, brief, context = {}, task = makeTask(role)
     if(role==='coding'&&typeof artifact?.source==='string'&&artifact.source.length<=6000)await workspace.stage(artifact.source);
     if(role==='coding'&&!errors.length){const sourceReport=await workspace.apply(artifact,{sourceOnly:!!verifyProposal});errors.push(...sourceReport.findings);}
     let codeExecution;
-    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(!codeExecution.passed){const failures=(codeExecution.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);errors.push(...(failures.length?failures:[codeExecution.error||'Code replay checks failed']));}}
+    if(role==='coding'&&!errors.length&&verifyProposal){codeExecution=await verifyProposal(artifact);if(codeExecution.passed&&codeExecution.effectiveScenarios){artifact.scenarios=codeExecution.effectiveScenarios;if(fingerprint(artifact)!==codeExecution.sourceHash||checkCode(artifact).verdict!=='pass')throw Error('Verified replay correction does not match the current artifact');await writeFile(resolve(folder,'replay-correction-'+attempt+'.json'),JSON.stringify(codeExecution,null,2));}if(!codeExecution.passed){const failures=(codeExecution.tests||[]).filter(test=>!test.passed).map(test=>test.error).filter(Boolean);errors.push(...(failures.length?failures:[codeExecution.error||'Code replay checks failed']));}}
     previousExecution=codeExecution;previousProposalSource=artifact?.source;
     const checkerRequest = { ...checkerBundle, ...clone(input), ...(codeExecution?{codeExecution}:{}), artifact: clone(artifact), attempt, limits: { maxContextChars: profile.checker.maxContextChars, maxOutputChars: profile.checker.maxOutputChars } };
     const checkerSize = assertRequestFits(checkerRequest, profile.checker.maxContextChars);
