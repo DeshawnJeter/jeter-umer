@@ -6,7 +6,7 @@ const diagnoses = Object.freeze({
   schema: 'Follow every required field, type, enum, length and array bound in the structured schema.',
   summary: 'Supply a nonblank worker summary of at most 500 characters.',
   proposal: 'Use kind artifact with artifact populated and question null, or kind question with artifact null and a valid blocking question.',
-  question: 'Supply a valid blocking human question with bounded text, unique trimmed options and a matching recommendation.',
+  question: 'Supply a blocking question: lowercase key matching ^[a-z][a-z0-9_.-]{0,79}$ (no constructor/prototype/__proto__ segments); text 1–400 characters; reason 1–600; at most 6 unique trimmed options of 1–100 characters; maxLength an integer 1–1000 large enough for every option and recommendation (use 500); recommended empty or an exact offered option; affectedRoles only known role IDs. Do not invent human answers.',
   checker: 'Supply nonempty static evidence and bounded, nonblank findings/evidence strings.',
   contradiction: 'A pass requires findings=[] and question=null. A fail requires actual repair findings and question=null. needs_human requires a valid blocking question. Never turn unresolved defects into a pass.'
 });

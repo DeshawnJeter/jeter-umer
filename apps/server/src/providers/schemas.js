@@ -33,7 +33,15 @@ const artifacts = {
   story: object({ intro: boundedText(180), victory: boundedText(180), defeat: boundedText(180) }),
   audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: Object.keys(MUSIC_STYLES) }, instrument: { type:'string', enum:Object.keys(MUSIC_INSTRUMENTS) }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
 };
-export const questionSchema = object({ key: string, text: string, reason: string, options: array(string), recommended: string, blocking: boolean, affectedRoles: array({ type: 'string', enum: ROLES }), maxLength: { type: 'integer' } });
+export const questionSchema = object({
+  key: { type:'string', minLength:1, maxLength:80, pattern:'^[a-z][a-z0-9_.-]{0,79}$', description:'Stable lowercase decision key. No constructor, prototype or __proto__ path segments.' },
+  text: boundedText(400), reason: boundedText(600),
+  options: { type:'array', maxItems:6, items:{type:'string',minLength:1,maxLength:100,pattern:'^\\S(?:[\\s\\S]*\\S)?$'}, description:'Unique exact answer strings, with no leading/trailing whitespace. Each must fit maxLength. Empty array allows free text.' },
+  recommended: { type:'string',maxLength:1000,description:'Empty string for no recommendation. Otherwise copy one offered option exactly; for free text, fit maxLength.' },
+  blocking: {type:'boolean',enum:[true]},
+  affectedRoles: {type:'array',maxItems:ROLES.length,items:{type:'string',enum:ROLES}},
+  maxLength: {type:'integer',minimum:1,maximum:1000,description:'Maximum answer length in characters, not number of options. Use 500 unless a smaller bound is needed; must fit every option and recommendation.'}
+});
 for(const [role,spec]of Object.entries(EXTENSION_SPECS))artifacts[role]=object(Object.fromEntries(Object.entries(spec.fields).map(([key,rule])=>[key,rule.type==='array'?array({type:'string',enum:rule.enum}):{type:rule.type,...(rule.enum?{enum:rule.enum}:{})}])));
 export function responseSchema(role, stage) {
   if (!ROLES.includes(role) || !['worker', 'checker'].includes(stage)) throw new Error('Invalid model role or stage');
