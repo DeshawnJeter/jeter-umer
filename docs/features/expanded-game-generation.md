@@ -84,3 +84,9 @@ generation. Final human playtesting remains required.
 The feature branches are stacked after `codex/agent-handoff-audit` (PR #53) and
 target `development`. Merge prerequisites preserving ancestry, or rebase after
 squash merges. Branches are not merged automatically.
+
+Approved plans include 3–6 observable acceptance criteria. They are displayed
+before approval and supplied to workers/checkers. The full plan appears once in
+each request; dependency records point to that exact checked plan/hash rather
+than duplicating its text. Natural custom objectives are not required to copy
+keywords from a fixed template.

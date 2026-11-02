@@ -6,7 +6,7 @@ import {genreOf} from '../../../../shared/game-types.js';
 import {advancedProfile} from '../../../../shared/advanced-games.js';
 import {runProjectRules,stealthBehaviorEvidence,enemyFairnessEvidence} from './rules-tests.js';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
-export const contributions=context=>Object.fromEntries((context.memory?.dependencies||[]).map(record=>[record.role,record.artifact]));
+export const contributions=context=>Object.fromEntries((context.memory?.dependencies||[]).map(record=>[record.role,record.role==='planner'&&record.artifact.planReference?context.plan:record.artifact]));
 export const manifestFor=context=>hash((context.memory?.dependencies||[]).map(record=>[record.role,record.hash]));
 export function modulesFor(genre){
   const modules=['movement','hud','settings','audio','failure-state','game-events','vfx'];

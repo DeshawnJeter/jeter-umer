@@ -6,7 +6,7 @@ import {CORE_ROLES,EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../s
 export const ROLES = [...CORE_ROLES,...Object.keys(EXTENSION_SPECS)];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
-  planner: { title: 'Star Collector', objective: 'Collect every star and reach the exit.', difficulty: 'beginner' },
+  planner: { title: 'Star Collector', objective: 'Collect every star and reach the exit.', difficulty: 'beginner',acceptance:['The objective can be completed and produces victory.','The failure condition is reachable and freezes gameplay.','Restart restores the initial game state.'] },
   gameplay: { speed: 190, timeLimit: 60 },
   levels: { spawn: { x: 1, y: 1 }, exit: { x: 13, y: 8 }, stars: [{ x: 3, y: 2 }, { x: 8, y: 3 }, { x: 11, y: 6 }], walls: [{ x: 5, y: 4 }, { x: 6, y: 4 }, { x: 7, y: 4 }] },
   ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30', theme: 'space', hud: hudFor() },
@@ -30,6 +30,7 @@ export function validateArtifact(role, value) {
     check(string(value.title, 60), 'A short game title is required');
     check(string(value.objective), 'A game objective is required');
     check(['beginner', 'experienced'].includes(value.difficulty), 'Difficulty must be beginner or experienced');
+    check(Array.isArray(value.acceptance)&&value.acceptance.length>=3&&value.acceptance.length<=6&&value.acceptance.every(item=>string(item,180)), 'Provide 3–6 compact acceptance criteria');
   }
   if (role === 'gameplay') { check(number(value.speed, 100, 300), 'Speed must be 100–300'); check(number(value.timeLimit, 20, 180), 'Time limit must be 20–180 seconds'); }
   if (role === 'levels') {

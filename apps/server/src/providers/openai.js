@@ -14,7 +14,7 @@ import {referenceFor} from '../specialists/jobs.js';
 import {lifecycleFor} from '../../../../shared/lifecycle.js';
 export const ENDPOINT = 'https://api.openai.com/v1/responses';
 const constraints = {
-  planner: 'Preserve the exact brief title and difficulty. Describe the selected game type and its supplied objective. Do not change the selected type or promise unsupported mechanics.',
+  planner: 'Preserve the exact brief title and difficulty. Describe the selected game type and actual objective, with 3–6 observable acceptance criteria covering the essential mechanics, victory, failure and restart. Do not change the selected type or promise unsupported mechanics.',
   gameplay: 'Speed must be 100–250. Time limit must be 20–180 seconds, or at least 60 for beginners.',
   levels: '15 by 10 grid. Integer x 0–14, y 0–9. One spawn and exit, 1–12 stars, at most 60 walls. Required objects are distinct, never overlap walls and are reachable from spawn.',
   ui: 'Title must equal the checked plan. Colors are six-digit #RRGGBB strings. Player/background contrast must be at least 3:1. Preserve brief.theme (space, forest, neon; default space). The procedural asset catalog supplies original themed sprites, tiles and scenery. Supply hud.layout cards or compact and hud.stats exactly health,time,stars for survival; stars,time,objective for collector, maze and platformer (order may vary). Never invent mana/MP without a supported mechanic. The trusted template provides pausing, keyboard remapping and independent sound/music settings. Return only these typed HUD choices, colors, title and the allowlisted theme, never URLs, file paths or executable drawing code.',
@@ -34,6 +34,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   data.hudReference=hudFor(genre);data.capabilityProfile=advancedProfile(genre);
   data.lifecycle=lifecycleFor(genre);
   if (stage === 'checker' && request.deterministicReview) data.deterministicReview = request.deterministicReview;
+  if(role==='coding'&&stage==='checker')data.artifactReference={interface:'createGame(api): start/update/inspect'};
   if(role==='coding'&&request.codeExecution)data.codeExecution=request.codeExecution;
   const resolving = request.operation === 'resolve_brief';
   const requestData = resolving ? {task:request.task,sourcePrompt:request.brief.prompt,gameCatalog:Object.entries(GAME_TYPES).map(([id,type])=>({id,name:type.name,objective:type.objective,capabilities:type.capabilities||type.controls})),featureIntent:request.featureIntent,decisions:request.context?.decisions || {},...(stage==='worker'?{repairFindings:request.findings||[]}:{proposal:request.artifact,deterministicReview:request.deterministicReview})} : data;
@@ -44,7 +45,7 @@ export function buildRequest(config, role, stage, request, repairCode) {
   const serialized = JSON.stringify(body), bytes = Buffer.byteLength(serialized);
   const roleLimit = request.limits?.maxContextChars ?? policy.maxContextChars;
   if (!Number.isInteger(roleLimit) || roleLimit < 1) throw new Error('Invalid model request context limit');
-  if (serialized.length > Math.min(roleLimit, policy.maxContextChars) || bytes > config.maxRequestBytes) throw new Error('OpenAI request exceeds the context limit; no instructions or schema were truncated');
+  if (serialized.length > Math.min(roleLimit, policy.maxContextChars) || bytes > config.maxRequestBytes) throw new Error('OpenAI request exceeds the context limit; no instructions or schema were truncated ('+role+'/'+stage+': '+serialized.length+' / '+roleLimit+' characters)');
   // Reserve conservatively using serialized UTF-8 bytes plus output allowance and protocol overhead.
   // This is a budget estimate, not a provider tokenizer or a guaranteed billing ceiling.
   return { body, serialized, reservation: bytes + config.maxOutputTokens + 512 };

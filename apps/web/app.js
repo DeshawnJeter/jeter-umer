@@ -26,8 +26,10 @@ function renderPlan(run) {
   if (signature === planSignature) return; planSignature = signature; $('#plan').replaceChildren();
   if (run.status !== 'awaiting_plan') return;
   const plan = run.results.planner.artifact;
+  if(plan.acceptance){const list=element('ul');list.append(...plan.acceptance.map(item=>element('li',item)));$('#plan').append(element('h4','What we will test'),list);}
   if(run.brief.genre==='custom'&&run.mode!=='openai')$('#plan').append(element('p','Local demo uses a small example game. OpenAI mode is required to write new mechanics from your description.'));
   $('#plan').append(element('h3', 'Review the checked plan'), element('p', `${plan.title}: ${plan.objective}`), element('p', `Game type: ${choiceLabel('#genre',run.brief.genre || 'collector')}. Art: ${choiceLabel('#theme',run.brief.theme || 'space')}. Difficulty: ${plan.difficulty}. Music: ${run.brief.music ? `${choiceLabel('#music-style',run.brief.musicStyle || 'adventure')} · ${choiceLabel('#music-instrument',run.brief.musicInstrument || 'auto')}` : 'disabled'}.`), element('p', 'The planner checker passed. Specialists will start after you approve this plan.'));
+  if(plan.acceptance){const list=element('ul');list.append(...plan.acceptance.map(item=>element('li',item)));$('#plan').append(element('h4','What we will test'),list);}
   const resolution=run.briefResolution?.proposal;
   if(resolution){
     $('#plan').append(element('p',run.brief.inputMode==='prompt'?'Settings were extracted from your prompt and independently checked.':'The prompt settings were manually edited. This checked plan uses your edits.'));
