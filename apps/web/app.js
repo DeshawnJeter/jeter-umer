@@ -91,6 +91,7 @@ function render(run) {
     const agent = run.agents[role], result = run.results[role]; const box = element('div', undefined, `agent ${result ? 'accepted' : ''}`);
     box.append(element('strong', role), element('p', agent ? `${agent.stage} · attempt ${agent.attempt}` : 'Waiting for dependencies'));
     if (run.roleUsage?.[role]) box.append(element('small', `${run.roleUsage[role].calls} model requests · ${run.roleUsage[role].totalTokens} reported tokens${run.roleUsage[role].unknownUsageCalls?' · some usage unreported':''}`));
+    if (run.roleToolUsage?.[role]) { const tools=run.roleToolUsage[role]; box.append(element('small',`Tools: ${tools.reads} reads · ${tools.edits} edits · ${tools.tests} tests${tools.policy?.extended?' · progress earned extra repair steps':''}`)); }
     if (result) { box.append(element('small', 'Independent checker: pass')); const details = element('details'); details.append(element('summary', 'Evidence'), element('p', result.report.evidence.join('. '))); box.append(details); }
     $('#agents').append(box);
   }
