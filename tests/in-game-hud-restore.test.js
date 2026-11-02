@@ -1,0 +1,14 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {mkdtemp,cp,readFile,writeFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';import {restoreVersion} from '../apps/server/src/orchestrator/project-actions.js';import {hashBuild} from '../apps/server/src/integration/build.js';import {runBrowserSmoke} from '../apps/server/src/validation/browser-smoke.js';import {passingBrowserReport} from './fixtures/browser-report.js';
+test('a verified historical version without the overlay still restores exact bytes and passes real browser playtests',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'in-game-hud-restore-'));
+ try{
+  const manager=new Manager(new Store(join(root,'runs')),{runtime:createRuntime({env:{}}),browserMode:'on',browserRunner:async({buildHash})=>passingBrowserReport(buildHash)});await manager.initialize();const run=await manager.create({title:'Historical HUD',prompt:'Collect stars',difficulty:'beginner'});await manager.jobs.get(run.id);await manager.act(run.id,'approve_plan',{planHash:run.planHash});await manager.jobs.get(run.id);assert.equal(run.status,'awaiting_review',run.error);
+  const legacy=join(root,'historical-build');await cp(join(manager.store.folder(run.id),'builds','0'),legacy,{recursive:true});
+  const file=join(legacy,'interface.js');let ui=await readFile(file,'utf8');ui=ui.replace("import {InGameHud} from './in-game-hud.js';",'').replace("    this.inGameHud=new InGameHud($('#in-game-hud'),()=>this.pause());",'').replace('    this.inGameHud?.render(this.state,this.genre,this.hud);','');await writeFile(file,ui);
+  const html=join(legacy,'index.html');await writeFile(html,(await readFile(html,'utf8')).replace(/<div id="in-game-hud" hidden>.*?<\/button><\/div>/,''));await rm(join(legacy,'in-game-hud.js'));
+  const historical=structuredClone(run);historical.generation=1;historical.build={...run.build,generation:1,sha256:await hashBuild(legacy)};await manager.versions.capture(historical,legacy);const version=(await manager.projects.get(run.projectId)).versions.at(-1);
+  manager.browserRunner=runBrowserSmoke;const restored=await restoreVersion(manager,run.projectId,version.id);assert.equal(restored.status,'awaiting_plan',restored.browserChecks?.error);assert.equal(restored.build.sha256,historical.build.sha256);assert.equal(restored.restoredFrom.legacyHud,true);assert.equal(restored.browserChecks.passed,true);assert.equal(restored.browserChecks.tests.some(t=>t.name==='in-game HUD matches live resources'),false);assert.equal(restored.approval,undefined);
+ }finally{if(root.startsWith(join(tmpdir(),'in-game-hud-restore-')))await rm(root,{recursive:true,force:true,maxRetries:3});}
+});

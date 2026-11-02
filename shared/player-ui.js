@@ -1,5 +1,6 @@
 // Shared by workers, checkers, the workshop and exported games. No browser globals.
 import {advancedProfile} from './advanced-games.js';
+import {lifecycleFor} from './lifecycle.js';
 export const HUD_STATS = Object.freeze(['health', 'stars', 'time', 'objective','mana','alert','progress','ability']);
 export function hudFor(genre = 'collector') {
   return { layout: 'cards', stats: advancedProfile(genre)?.hud || (genre === 'survival' ? ['health', 'time', 'stars'] : ['stars', 'time', 'objective']) };
@@ -8,6 +9,30 @@ export function validateHud(hud, genre) {
   if (!hud || typeof hud !== 'object' || Array.isArray(hud) || Object.keys(hud).sort().join() !== 'layout,stats' || !['cards', 'compact'].includes(hud.layout) || !Array.isArray(hud.stats) || hud.stats.length !== 3 || new Set(hud.stats).size !== 3 || hud.stats.some(stat => !HUD_STATS.includes(stat))) return ['Invalid HUD layout or stats'];
   if (genre && hudFor(genre).stats.some(stat => !hud.stats.includes(stat))) return ['HUD must show the stats supported by the selected game type'];
   return [];
+}
+// A read-only view: never create counters, run a clock or change gameplay here.
+export function inGameHudModel(genre='collector',hud=hudFor(genre),state={}){
+  const selected=new Set(hud.stats.filter(stat=>stat!=='objective'));
+  if(genre==='custom'){
+    selected.delete('time');selected.delete('mana');
+    if(Number.isFinite(state.codeSnapshot?.remaining))selected.add('time');
+    if(state.codeSnapshot?.maxMana>0)selected.add('mana');
+  }else if(lifecycleFor(genre).timer)selected.add('time');
+  if(['rpg','front_battle','campaign','roguelike'].includes(genre))selected.add('score');
+  const result=[];
+  for(const id of selected){
+    let label,text,low=false;
+    if(id==='health'){label='HP';const max=state.maxHealth||3;text=`${Math.max(0,state.health)} / ${max}`;low=state.health<=Math.max(1,max/4);}
+    if(id==='mana'&&state.maxMana>0){label=genre==='jump_shooter'?'Energy':'MP';text=`${state.mana} / ${state.maxMana}`;low=state.mana===0;}
+    if(id==='time'&&Number.isFinite(state.remaining)){label='Time';text=`${Math.ceil(state.remaining)}s`;low=state.remaining<=10;}
+    if(id==='stars'){label=genre==='stealth'?'Intel':'Stars';text=`${state.score} / ${state.required}`;}
+    if(id==='score'){label='Encounters';text=`${state.score} / ${state.required}`;}
+    if(id==='progress'){label=genre==='custom'?'Score':'Stage';text=genre==='custom'?String(state.score):state.progress||'1 / 3';}
+    if(id==='alert'){label='Detection';text=`${Math.round(state.alert||0)}%`;low=(state.alert||0)>=75;}
+    if(id==='ability'){label='Abilities';text=state.abilities||'Basic jump';}
+    if(text!==undefined)result.push({id,label,text,low});
+  }
+  return result;
 }
 export const ACTIONS = Object.freeze(['left', 'right', 'up', 'down', 'jump','attack','ability','interact']);
 export const KEY_CODES = Object.freeze(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', ...Array.from({length:26}, (_, i) => `Key${String.fromCharCode(65+i)}`), ...Array.from({length:10}, (_, i) => `Digit${i}`)]);

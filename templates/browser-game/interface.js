@@ -1,6 +1,7 @@
 import { hudFor, validateHud, defaultSettings, remap, KEY_CODES, keyLabel,upgradeSettings } from './player-ui.js';
 import {advancedProfile} from './advanced-games.js';
 import { loadPreferences, savePreferences } from './preferences.js';
+import {InGameHud} from './in-game-hud.js';
 const $ = selector => document.querySelector(selector);
 export class PlayerInterface {
   constructor(options) { Object.assign(this, options); this.keys = new Set(); this.previousPhase = null; this.capture = null; }
@@ -9,6 +10,7 @@ export class PlayerInterface {
     const loaded = await loadPreferences(fallback);
     this.settings = upgradeSettings(loaded.settings,fallback.reducedEffects); this.storage = loaded.storage;this.profile=advancedProfile(this.genre);
     this.hud = validateHud(this.config.ui.hud, this.genre).length ? hudFor(this.genre) : this.config.ui.hud;
+    this.inGameHud=new InGameHud($('#in-game-hud'),()=>this.pause());
     $('#hud').dataset.layout = this.hud.layout;
     for (const stat of this.hud.stats) {
       const card = document.createElement('div'); card.className = 'stat'; card.id = `stat-${stat}`;
@@ -109,5 +111,6 @@ export class PlayerInterface {
       if(stat==='progress')value.textContent=this.state.progress||'1 / 3';
       if(stat==='ability')value.textContent=this.state.abilities||'Basic jump';
     }
+    this.inGameHud?.render(this.state,this.genre,this.hud);
   }
 }

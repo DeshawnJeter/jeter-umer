@@ -1,0 +1,11 @@
+#game{position:relative;max-width:720px;margin-inline:auto;isolation:isolate}
+#in-game-hud{position:absolute;inset:6px 6px auto;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:5px;pointer-events:none;text-align:left}
+#in-game-hud[hidden]{display:none}
+[data-play-stats]{display:flex;flex-wrap:wrap;gap:4px;min-width:0}
+.play-stat{display:flex;gap:5px;align-items:baseline;padding:5px 7px;border:1px solid #7794ad;border-radius:6px;background:#0b1428ed;color:#fff;font-size:clamp(10px,2.5vw,13px);line-height:1.2;max-width:14em}
+.play-stat>span{color:#c4d4e7;white-space:nowrap}
+.play-stat strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.play-stat[data-low=true]{border-color:#ffca7a}
+.play-stat[data-low=true] strong{color:#ffda9c}
+#play-pause{pointer-events:auto;margin:0;padding:5px 8px;font-size:clamp(11px,2.5vw,13px);line-height:1.2;background:#0b1428ed;color:#fff;border-color:#7794ad;flex-shrink:0}
+@media(max-width:400px){#in-game-hud{inset:4px 4px auto}.play-stat{padding:4px;gap:3px}#play-pause{padding:4px}}

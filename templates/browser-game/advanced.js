@@ -16,7 +16,7 @@ export async function startAdvancedGame(config,genre){
   $('#title').textContent=config.ui.title;document.title=config.ui.title;$('#genre').textContent=rules.name;$('#message').textContent=config.story.intro;
   const panel=document.createElement('section');panel.id='mode-panel';panel.setAttribute('aria-label','Game actions');$('#game').before(panel);
   const failureNote=document.createElement('p');failureNote.id='failure-rules';failureNote.textContent='Failure: '+lifecycle.failure+' Restart is always available.';panel.before(failureNote);
-  const ctx={config,genre,profile,state,audio,held,panel,keys:()=>ui,emit:(type,details)=>events?.emit(type,details),
+  const ctx={config,genre,profile,state,audio,held,panel,keys:()=>ui,refreshHud:()=>render(),emit:(type,details)=>events?.emit(type,details),
     end(phase){if(state.phase!=='playing')return;state.failureReason=phase==='lost'?(failureReason(genre,state)||'Mission failed'):null;if(mode?.player){state.x=mode.player.x;state.y=mode.player.y;}state.phase=phase;events?.emit(phase==='won'?'victory':'defeat',{x:state.x,y:state.y});scene.physics.pause();mode?.onEnd?.(phase);audio.tone(phase==='won'?config.audio.winFrequency:140);audio.setPlaying(false);$('#message').textContent=config.story[phase==='won'?'victory':'defeat']+(state.failureReason?' '+state.failureReason+'. Choose Restart to try again.':'');render();},
     focus(){ $('#game').focus(); },
     note(text){$('#message').textContent=text;},
@@ -24,7 +24,7 @@ export async function startAdvancedGame(config,genre){
     move(player,platform=false){const x=Number(ui.isDown('right'))-Number(ui.isDown('left')),y=Number(ui.isDown('down'))-Number(ui.isDown('up'));if(platform)player.setVelocityX(x*config.gameplay.speed);else{player.setVelocity(x,y);if(x||y)player.body.velocity.normalize().scale(config.gameplay.speed);}if(x)player.setFlipX(x<0);return {x,y};}
   };
   function render(){
-    const signature=JSON.stringify([state.phase,state.health,state.maxHealth,state.mana,state.maxMana,state.objective,state.progress,state.abilities,Math.round(state.alert),state.score,Math.ceil(state.remaining)]);
+    const signature=JSON.stringify([state.ready,state.phase,state.health,state.maxHealth,state.mana,state.maxMana,state.objective,state.progress,state.abilities,Math.round(state.alert),state.score,Math.ceil(state.remaining),state.codeSnapshot?.remaining!==undefined,state.codeSnapshot?.maxMana]);
     if(signature!==last){ui.render();$('#status').textContent=`${state.phase.toUpperCase()} · ${state.progress} · ${state.failureReason||state.objective}${lifecycle.timer?' · '+Math.ceil(state.remaining)+'s remaining':''}`;last=signature;}
     const game=$('#game');game.dataset.phase=state.phase;game.dataset.playerX=String(Math.round(state.x));game.dataset.playerY=String(Math.round(state.y));game.dataset.enemyStates=JSON.stringify(state.enemyStates||[]);
   }
