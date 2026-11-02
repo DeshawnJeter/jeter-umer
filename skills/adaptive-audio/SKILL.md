@@ -1,0 +1,2 @@
+# Structured game audio
+Compose bounded musical data using the existing Tone.js score contract. Preserve music enablement, selected style and concrete instrument. Reuse working scores for unrelated revisions. Start audio only after a player gesture, stop on pause or terminal state, respect independent master/music/SFX controls. Instrument presets are synthesized; do not promise acoustic recordings or claim listening from static inspection.
