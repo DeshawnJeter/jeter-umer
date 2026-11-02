@@ -2,7 +2,7 @@ import {createHash} from 'node:crypto';
 import {EXTENSION_SPECS,extensionDefaults,extensionErrors} from '../../../../shared/specialists.js';
 import {genreOf} from '../../../../shared/game-types.js';
 import {advancedProfile} from '../../../../shared/advanced-games.js';
-import {runProjectRules,stealthBehaviorEvidence} from './rules-tests.js';
+import {runProjectRules,stealthBehaviorEvidence,enemyFairnessEvidence} from './rules-tests.js';
 const hash=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 export const contributions=context=>Object.fromEntries((context.memory?.dependencies||[]).map(record=>[record.role,record.artifact]));
 export const manifestFor=context=>hash((context.memory?.dependencies||[]).map(record=>[record.role,record.hash]));
@@ -28,6 +28,7 @@ export async function check(role,request){
   const {artifact,context={}}=request,findings=extensionErrors(role,artifact);
   if(!findings.length){
     if(role==='enemies'&&artifact.chaseSpeed<artifact.patrolSpeed)findings.push('Chase speed must not be slower than patrol speed');
+    if(role==='enemies'&&!Object.values(enemyFairnessEvidence(artifact)).every(Boolean))findings.push('Enemy warning, cooldown, occlusion or stuck-recovery probes failed');
     if(role==='enemies'&&request.brief.genre==='stealth'&&!Object.values(stealthBehaviorEvidence(artifact)).every(Boolean))findings.push('Stealth behavior must investigate, pursue through lost sight, search, recover and respect walls');
     if(role==='progression'&&artifact.levelTwoAt>artifact.xpPerEncounter*3)findings.push('Level two must be reachable within three encounters');
     if(role==='implementation'){const expected=referenceFor(role,request);if(artifact.runtime!==expected.runtime||artifact.version!==1||JSON.stringify(artifact.modules)!==JSON.stringify(expected.modules))findings.push('Implementation must use the exact trusted runtime and capability modules');}

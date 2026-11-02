@@ -39,11 +39,12 @@ export function createMode(scene,ctx){
       if(attack.mode==='attack')guard.sprite.setVelocity(0);
       if(guard.type==='sentry'&&result.mode==='patrol'){guard.sprite.setVelocity(0);guard.facing+=dt;}
       guard.displayMode=attack.mode==='attack'?'attack':guard.type==='sentry'&&result.mode==='patrol'?'idle':result.mode;
+      const current={x:guard.sprite.x,y:guard.sprite.y},attempting=Math.hypot(guard.sprite.body.velocity.x,guard.sprite.body.velocity.y)>1;guard.stalled=attempting&&guard.previous&&Math.hypot(current.x-guard.previous.x,current.y-guard.previous.y)<0.3?(guard.stalled||0)+dt:0;guard.previous=current;if(guard.stalled>1.5){guard.goal='';guard.path=[];guard.repath=0;guard.stalled=0;guard.recoveries=(guard.recoveries||0)+1;}
       guard.label.setPosition(guard.sprite.x-32,guard.sprite.y-36).setText(guard.type.toUpperCase()+' '+(guard.displayMode==='attack'?'WINDUP':guard.displayMode.toUpperCase()));guard.sprite.setTint(result.mode==='chase'?0xff546d:result.mode==='investigate'?0xffcb66:0xffffff);
       const range=config.enemies?.visionRange??210;cones.fillStyle(result.mode==='chase'?0xff4966:0xffcc66,0.13);cones.beginPath();cones.moveTo(guard.sprite.x,guard.sprite.y);for(let a=-Math.PI/5;a<=Math.PI/5+0.01;a+=Math.PI/25)cones.lineTo(guard.sprite.x+Math.cos(guard.facing+a)*range,guard.sprite.y+Math.sin(guard.facing+a)*range);cones.closePath();cones.fillPath();
     }
     state.alert=Math.max(0,...guards.map(guard=>guard.brain.alert));
-    state.enemyStates=guards.map(guard=>({mode:guard.displayMode,type:guard.type,x:Math.round(guard.sprite.x),y:Math.round(guard.sprite.y)}));
+    state.enemyStates=guards.map(guard=>({mode:guard.displayMode,type:guard.type,recoveries:guard.recoveries||0,x:Math.round(guard.sprite.x),y:Math.round(guard.sprite.y)}));
     const text='Guards: '+guards.map(guard=>guard.displayMode).join(' / ');if(text!==previousReport){report.textContent=text;previousReport=text;}
     state.objective='Intel '+intel+'/'+state.required+' · alarms '+alarms+(hidden?' · hidden':'');
   }};
