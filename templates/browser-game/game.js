@@ -13,6 +13,9 @@ title.textContent = config.ui.title; document.title = config.ui.title; message.t
 document.querySelector('#instructions').textContent = rules.controls;
 document.querySelector('#genre').textContent = rules.name;
 document.querySelector('#volume').value = config.audio.volume;
+const musicInfo = document.createElement('p'); musicInfo.id = 'music-info'; musicInfo.textContent = config.audio.music ? 'Music starts with your game' : 'Music off'; status.after(musicInfo);
+document.querySelector('#mute').textContent = audio.muted ? 'Unmute' : 'Mute';
+document.querySelector('#mute').setAttribute('aria-pressed', String(audio.muted));
 const state = { ready: false, genre, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, health: 3, x: 0, y: 0 };
 let scene, player, stars, enemies, portal, cursors, wasd, space, elapsed = 0, lastHud = '', lastDamage = -2;
 const held = new Set(); let touchJump = false;
@@ -110,7 +113,7 @@ new Phaser.Game({ type: Phaser.AUTO, width: 720, height: 480, parent: 'game', ba
 document.querySelector('#start').onclick = async () => {
   if (!state.ready || state.phase !== 'ready') return;
   state.phase = 'playing';
-  try { await audio.start(); audio.setPlaying?.(true); } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
+  try { await audio.start(); audio.setPlaying?.(state.phase === 'playing'); document.querySelector('#music-info').textContent = config.audio.music ? `${audio.score.style} score · ${audio.score.tempo} BPM` : 'Music off · event sounds enabled'; } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
 };
 document.querySelector('#restart').onclick = () => { if (scene) scene.scene.restart(); };
 document.querySelector('#mute').onclick = event => { audio.muted = !audio.muted; audio.update(); event.currentTarget.textContent = audio.muted ? 'Unmute' : 'Mute'; event.currentTarget.setAttribute('aria-pressed', String(audio.muted)); };
@@ -118,9 +121,11 @@ document.querySelector('#volume').oninput = event => { audio.volume = Number(eve
 document.querySelector('#volume').addEventListener('keydown', event => event.stopPropagation());
 for (const button of document.querySelectorAll('[data-control]')) {
   const control = button.dataset.control;
+  button.hidden = control === 'jump' ? genre !== 'platformer' : genre === 'platformer' && ['up','down'].includes(control);
   button.onpointerdown = event => { event.preventDefault(); button.setPointerCapture(event.pointerId); held.add(control); if (control === 'jump') touchJump = true; };
   button.onpointerup = button.onpointercancel = button.onlostpointercapture = () => held.delete(control);
 }
 window.addEventListener('blur', () => held.clear());
+document.addEventListener('visibilitychange', () => audio.setPlaying(!document.hidden && state.phase === 'playing'));
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
-window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume });
+window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });

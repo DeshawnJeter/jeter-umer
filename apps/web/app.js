@@ -5,14 +5,14 @@ async function api(path, data) { const res = await fetch(path, data === undefine
 function element(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
 async function perform(fn) { if (busy) return; busy = true; $('#error').textContent = ''; try { await fn(); await refresh(); } catch (error) { $('#error').textContent = error.message; } finally { busy = false; } }
 async function action(name, data = {}) { await api(`/api/runs/${selected}/${name}`, data); }
-$('#brief').onsubmit = event => { event.preventDefault(); perform(async () => { const run = await api('/api/runs', { title: $('#title').value, prompt: $('#prompt').value, genre: $('#genre').value, theme: $('#theme').value, difficulty: $('#difficulty').value, music: $('#music').checked, askStory: $('#ask-story').checked }); selected = run.id; }); };
+$('#brief').onsubmit = event => { event.preventDefault(); perform(async () => { const run = await api('/api/runs', { title: $('#title').value, prompt: $('#prompt').value, genre: $('#genre').value, theme: $('#theme').value, musicStyle: $('#music-style').value, difficulty: $('#difficulty').value, music: $('#music').checked, askStory: $('#ask-story').checked }); selected = run.id; }); };
 function renderPlan(run) {
   $('#plan').hidden = run.status !== 'awaiting_plan';
   const signature = `${run.id}:${run.status}:${run.planHash}`;
   if (signature === planSignature) return; planSignature = signature; $('#plan').replaceChildren();
   if (run.status !== 'awaiting_plan') return;
   const plan = run.results.planner.artifact;
-  $('#plan').append(element('h3', 'Review the checked plan'), element('p', `${plan.title}: ${plan.objective}`), element('p', `Game type: ${run.brief.genre || 'collector'}. Difficulty: ${plan.difficulty}. Music: ${run.brief.music ? 'enabled' : 'disabled'}.`), element('p', 'The planner checker passed. Specialists will start after you approve this plan.'));
+  $('#plan').append(element('h3', 'Review the checked plan'), element('p', `${plan.title}: ${plan.objective}`), element('p', `Game type: ${run.brief.genre || 'collector'}. Art: ${run.brief.theme || 'space'}. Difficulty: ${plan.difficulty}. Music: ${run.brief.music ? run.brief.musicStyle || 'adventure' : 'disabled'}.`), element('p', 'The planner checker passed. Specialists will start after you approve this plan.'));
   const approve = element('button', 'Approve plan and start specialists'); const id = run.id, planHash = run.planHash;
   approve.onclick = () => perform(() => api(`/api/runs/${id}/approve_plan`, { planHash })); $('#plan').append(approve);
   const form = document.createElement('form');
@@ -65,7 +65,7 @@ function render(run) {
     if (previewUrl !== nextUrl) {
       previewUrl = nextUrl; $('#preview').src = nextUrl; $('#checklist').replaceChildren();
       for (const [key, label] of Object.entries(checkLabels)) { const row = element('label', undefined, 'inline'); const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.dataset.check = key; row.append(checkbox, document.createTextNode(label)); $('#checklist').append(row); }
-      $('#revision-difficulty').value = run.brief.difficulty; $('#revision-music').checked = run.brief.music; $('#revision-genre').value = run.brief.genre || 'collector'; $('#revision-theme').value = run.brief.theme || 'space';
+      $('#revision-difficulty').value = run.brief.difficulty; $('#revision-music').checked = run.brief.music; $('#revision-genre').value = run.brief.genre || 'collector'; $('#revision-theme').value = run.brief.theme || 'space'; $('#revision-music-style').value = run.brief.musicStyle || 'adventure';
     }
     $('#open-game').href = nextUrl; $('#download').href = `/api/runs/${run.id}/download`;
     $('#approve').disabled = run.status !== 'awaiting_review'; $('#revise').disabled = run.status !== 'awaiting_review';
@@ -73,7 +73,7 @@ function render(run) {
   $('#events').replaceChildren(...run.events.slice(-50).map(event => element('li', `${new Date(event.at).toLocaleTimeString()} ${event.message}`)));
 }
 $('#approve').onclick = () => perform(() => action('approve', { sha256: current.build.sha256, checks: Object.fromEntries([...document.querySelectorAll('[data-check]')].map(el => [el.dataset.check, el.checked])) }));
-$('#revise').onclick = () => perform(() => action('revise', { genre: $('#revision-genre').value, theme: $('#revision-theme').value, difficulty: $('#revision-difficulty').value, music: $('#revision-music').checked }));
+$('#revise').onclick = () => perform(() => action('revise', { genre: $('#revision-genre').value, theme: $('#revision-theme').value, musicStyle: $('#revision-music-style').value, difficulty: $('#revision-difficulty').value, music: $('#revision-music').checked }));
 let refreshing = false;
 async function refresh() {
   if (refreshing) return; refreshing = true;

@@ -1,22 +1,76 @@
+import { composeScore, validateScore } from './score.js';
+const safeVolume = value => Number.isFinite(value) ? Math.max(0, Math.min(0.3, value)) : 0;
 export class GameAudio {
-  constructor(config) { this.config = config; this.volume = config.volume; this.muted = !config.enabled; this.started = false; }
+  constructor(config, { Tone = globalThis.Tone, AudioContextCtor = globalThis.AudioContext || globalThis.webkitAudioContext } = {}) {
+    this.config = config; this.Tone = Tone; this.AudioContextCtor = AudioContextCtor;
+    this.score = config.score || composeScore();
+    const errors = validateScore(this.score); if (errors.length) throw new Error(errors.join('; '));
+    this.volume = safeVolume(config.volume); this.muted = !config.enabled; this.started = false; this.playing = false; this.disposed = false; this.nodes = []; this.sequences = []; this.scheduledNotes = 0;
+  }
   async start() {
+    if (this.disposed) throw new Error('Audio session disposed');
     if (this.started) { await this.context?.resume(); return; }
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (AudioContext) { this.context = new AudioContext(); this.gain = this.context.createGain(); this.gain.connect(this.context.destination); await this.context.resume(); }
-    if (this.config.music && window.Tone) {
-      await Tone.start(); this.musicGain = new Tone.Gain(0).toDestination();
-      this.synth = new Tone.Synth().connect(this.musicGain); let index = 0;
-      this.timer = setInterval(() => { this.synth.triggerAttackRelease(['C4', 'E4', 'G4', 'E4'][index++ % 4], '8n'); }, 450);
+    if (this.starting) return this.starting;
+    this.starting = this.initialize().catch(error => { this.clearMusic(); throw error; }).finally(() => { this.starting = null; });
+    return this.starting;
+  }
+  async initialize() {
+    if (!this.context && this.AudioContextCtor) {
+      this.context = new this.AudioContextCtor(); this.gain = this.context.createGain(); this.gain.connect(this.context.destination);
+    }
+    await this.context?.resume();
+    if (this.disposed) throw new Error('Audio session disposed');
+    if (this.config.music && this.Tone) {
+      const T = this.Tone; await T.start();
+      if (this.disposed) throw new Error('Audio session disposed');
+      const own = node => { this.nodes.push(node); return node; };
+      this.limiter = own(new T.Limiter(-12)).toDestination();
+      this.musicGain = own(new T.Gain(0)).connect(this.limiter);
+      this.lead = own(new T.Synth({ volume: -15, oscillator: { type: this.score.waveform }, envelope: { attack: 0.015, decay: 0.18, sustain: 0.1, release: 0.3 } })).connect(this.musicGain);
+      this.bass = own(new T.Synth({ volume: -19, oscillator: { type: 'sine' }, envelope: { attack: 0.02, decay: 0.25, sustain: 0.15, release: 0.4 } })).connect(this.musicGain);
+      this.transport = T.getTransport(); this.transport.bpm.value = this.score.tempo;
+      const sequence = (voice, notes, interval, duration) => {
+        const seq = new T.Sequence((time, note) => {
+          if (note !== 'R' && this.playing && !this.disposed) { voice.triggerAttackRelease(note, duration, time); this.scheduledNotes++; }
+        }, notes, interval).start(0);
+        this.sequences.push(seq);
+      };
+      sequence(this.lead, this.score.melody, '8n', '16n'); sequence(this.bass, this.score.bass, '2n', '4n');
+      if (this.score.drums) {
+        this.drum = own(new T.MembraneSynth({ volume: -25, pitchDecay: 0.025, octaves: 3 })).connect(this.musicGain);
+        sequence(this.drum, ['C2','R','C2','R'], '4n', '16n');
+      }
     }
     this.started = true; this.update();
   }
-  update() { if (this.gain) this.gain.gain.value = this.muted ? 0 : this.volume; if (this.musicGain) this.musicGain.gain.value = this.muted ? 0 : this.volume * 0.3; }
-  tone(frequency) {
-    if (!this.context || this.muted) return;
-    const oscillator = this.context.createOscillator(); const envelope = this.context.createGain();
-    oscillator.frequency.value = frequency; envelope.gain.setValueAtTime(0.35, this.context.currentTime); envelope.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.16);
-    oscillator.connect(envelope); envelope.connect(this.gain); oscillator.start(); oscillator.stop(this.context.currentTime + 0.18);
+  setPlaying(playing) {
+    if (this.disposed || !this.started) return;
+    this.playing = !!playing;
+    if (!this.transport) return;
+    if (this.playing && this.transport.state !== 'started') this.transport.start();
+    if (!this.playing && this.transport.state !== 'stopped') this.transport.stop();
   }
-  dispose() { clearInterval(this.timer); this.synth?.dispose(); this.musicGain?.dispose(); this.context?.close(); }
+  update() {
+    this.volume = safeVolume(this.volume);
+    if (this.gain) this.gain.gain.value = this.muted ? 0 : this.volume;
+    if (this.musicGain) this.musicGain.gain.rampTo(this.muted ? 0 : this.volume * 0.55, 0.05);
+  }
+  tone(frequency) {
+    if (!this.context || this.muted || this.disposed || !Number.isFinite(frequency) || frequency < 100 || frequency > 2000) return;
+    const oscillator = this.context.createOscillator(), envelope = this.context.createGain();
+    oscillator.frequency.value = frequency; envelope.gain.setValueAtTime(0.35, this.context.currentTime);
+    envelope.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.16);
+    oscillator.connect(envelope); envelope.connect(this.gain); oscillator.start(); oscillator.stop(this.context.currentTime + 0.18);
+    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+  }
+  clearMusic() {
+    this.playing = false; this.transport?.stop();
+    for (const sequence of this.sequences) sequence.dispose(); this.sequences = [];
+    for (const node of this.nodes.reverse()) node.dispose(); this.nodes = []; this.musicGain = null; this.transport = null;
+  }
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true; this.clearMusic(); this.context?.close()?.catch(() => {}); this.started = false;
+  }
+  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes }; }
 }

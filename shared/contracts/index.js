@@ -1,5 +1,6 @@
 import { genreOf } from '../game-types.js';
 import { themeOf } from '../art-catalog.js';
+import { musicStyleOf, composeScore, validateScore } from '../music.js';
 export const ROLES = ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio'];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
@@ -8,7 +9,7 @@ export const defaults = {
   levels: { spawn: { x: 1, y: 1 }, exit: { x: 13, y: 8 }, stars: [{ x: 3, y: 2 }, { x: 8, y: 3 }, { x: 11, y: 6 }], walls: [{ x: 5, y: 4 }, { x: 6, y: 4 }, { x: 7, y: 4 }] },
   ui: { title: 'Star Collector', playerColor: '#66e3bd', backgroundColor: '#111d30', theme: 'space' },
   story: { intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
-  audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880 }
+  audio: { enabled: true, volume: 0.18, music: false, pickupFrequency: 660, winFrequency: 880, score: composeScore() }
 };
 export const clone = value => structuredClone(value);
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -37,6 +38,7 @@ export function validateArtifact(role, value) {
     check(typeof value.enabled === 'boolean' && typeof value.music === 'boolean', 'Audio switches must be booleans');
     check(number(value.volume, 0, 0.5), 'Volume must be 0–0.5');
     check(number(value.pickupFrequency, 100, 2000) && number(value.winFrequency, 100, 2000), 'Tone frequencies must be 100–2000 Hz');
+    if (value.score !== undefined) errors.push(...validateScore(value.score));
   }
   return errors;
 }
@@ -44,5 +46,5 @@ export function validateBrief(brief) {
   if (!object(brief) || !string(brief.prompt, 2000)) throw new Error('Describe the game in 1–2000 characters');
   if (!['', 'beginner', 'experienced'].includes(brief.difficulty ?? '')) throw new Error('Invalid difficulty');
   if (brief.title !== undefined && !string(brief.title, 60)) throw new Error('Title must be 1–60 characters');
-  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
+  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), musicStyle: musicStyleOf(brief.musicStyle), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
 }
