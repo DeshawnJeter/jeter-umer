@@ -9,8 +9,10 @@ export function battleAction(battle,action,target=battle.target){
   if(battle.phase!=='player')return false;
   const c=battle.campaign,actor=c.party[battle.actor];
   if(!actor||actor.hp<=0)return false;
-  const enemy=battle.enemies[target];let guarded=false;
+  let enemy,guarded=false;
   if(action==='attack'||action==='spell'){
+    if(!Number.isInteger(target)||target<0||target>=battle.enemies.length)return false;
+    enemy=battle.enemies[target];
     if(!enemy||enemy.hp<=0)return false;
     if(action==='spell'){if(actor.mp<2){battle.message='This character needs 2 MP. Guard to pass to the next party member.';return false;}actor.mp-=2;}
     enemy.hp=Math.max(0,enemy.hp-(action==='spell'?6+c.level:3+c.level));battle.message=`${actor.name} ${action==='spell'?'casts a spell':'attacks'} ${enemy.name}.`;
