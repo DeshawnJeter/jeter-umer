@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
 import { ROLES } from '../../../../shared/contracts/index.js';
 import { policy } from '../../../../shared/policies/index.js';
+import {EXTENSION_SPECS} from '../../../../shared/specialists.js';
 import { loadSkills } from './skills.js';
 export const fingerprint = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 export async function loadMasterInstructions() {
@@ -45,5 +46,6 @@ export async function loadSystemManifest() {
   }
   const briefResolver=await readFile(resolve('prompts/brief-resolver.md'),'utf8');
   if(!briefResolver.trim()||briefResolver.length>policy.maxContextChars)throw new Error('Invalid prompt resolver instructions');
-  return { master, agents, briefResolver:fingerprint(briefResolver), hash: fingerprint({ master: master.hash, agents, briefResolver:fingerprint(briefResolver) }) };
+  const contracts=fingerprint(EXTENSION_SPECS);
+  return { master, agents, contracts,briefResolver:fingerprint(briefResolver), hash: fingerprint({ master: master.hash, agents,contracts, briefResolver:fingerprint(briefResolver) }) };
 }
