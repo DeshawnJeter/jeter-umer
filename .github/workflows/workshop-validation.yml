@@ -21,3 +21,4 @@ jobs:
       - run: npm run check
       - run: node scripts/test.js --test-concurrency=4 'tests/*.test.js'
       - run: docker build --tag workshop-deployment-check .
+      - run: node scripts/container-smoke.js
