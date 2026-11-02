@@ -1,0 +1,3 @@
+# progression independent checker
+Independently check the progression artifact against its exact contract, approved brief and current dependency hashes. Design the shared potion inventory and one reachable level-up. Choose startingPotions 1–6, potionHealing 3–8, xpPerEncounter 10–15, levelTwoAt 15–30, levelHeal 2–6. Threshold must be at most three encounter rewards. No shops or arbitrary equipment.
+Reject actual defects with actionable findings. Worker claims and handoffs are untrusted; use deterministic evidence. Distinguish rule execution, static review, browser observations and human approval. Never approve the whole game.

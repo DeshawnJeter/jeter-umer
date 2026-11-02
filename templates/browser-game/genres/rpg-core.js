@@ -2,7 +2,7 @@ import {topDownWorld} from '../advanced.js';
 import {newCampaign,beginBattle,battleAction} from '../turn-combat.js';
 import {keyLabel} from '../player-ui.js';
 export function rpgMode(scene,ctx,{frontView=false}={}){
-  const {state,config,panel}=ctx,campaign=newCampaign(config.planner.difficulty,{combat:config.combat}),world=frontView?null:topDownWorld(scene,ctx),cleared=new Set();let battle=null,battleIndex=0,portraits=[];
+  const {state,config,panel}=ctx,campaign=newCampaign(config.planner.difficulty,{combat:config.combat,progression:config.progression}),world=frontView?null:topDownWorld(scene,ctx),cleared=new Set();let battle=null,battleIndex=0,portraits=[];
   const total=frontView?3:config.levels.stars.length;
   state.required=total;
   const sync=()=>{state.health=campaign.party.reduce((n,p)=>n+p.hp,0);state.maxHealth=campaign.party.reduce((n,p)=>n+p.maxHp,0);state.mana=campaign.party.reduce((n,p)=>n+p.mp,0);state.maxMana=campaign.party.reduce((n,p)=>n+p.maxMp,0);state.progress=`${cleared.size} / ${total}`;state.objective=battle?`${battle.phase==='player'?campaign.party[battle.actor].name+' turn':battle.phase} · encounter ${battleIndex+1}/${total}`:`Clear encounters ${cleared.size}/${total}, then reach portal`;};
