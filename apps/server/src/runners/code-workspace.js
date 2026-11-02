@@ -16,6 +16,8 @@ export function checkCode(artifact,{sourceOnly=false}={}){
       const target=node.type==='AssignmentExpression'?node.left:node.type==='UpdateExpression'||node.type==='UnaryExpression'&&node.operator==='delete'?node.argument:null;
       if(target?.type==='MemberExpression'&&target.object.type==='Identifier'&&target.object.name==='input')throw Error('Input is read-only and replaced every worker step. Store button latches in persistent game state, never on input.');
       if(node.type==='Identifier'&&['eval','Function','fetch','XMLHttpRequest','WebSocket','Worker','SharedWorker','importScripts','globalThis','self','postMessage','close','navigator','location','indexedDB','caches'].includes(node.name))throw Error('Host capabilities are unavailable in game rules');
+      if(node.type==='MemberExpression') {const key=node.computed?(node.property.type==='Literal'?node.property.value:undefined):node.property.name;if(['constructor','prototype','__proto__'].includes(key))throw Error('Prototype and constructor access is unavailable in game rules');}
+      if(node.type==='Property'&&['constructor','prototype','__proto__'].includes(node.key?.name??node.key?.value))throw Error('Prototype and constructor properties are unavailable in game rules');
       for(const value of Object.values(node))if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')walk(value);
     };walk(tree);if(!exported)throw Error('Export function createGame(api)');if(!sourceOnly)codeScenarios(artifact.scenarios);
   }catch(error){findings.push(error.message.slice(0,300));}

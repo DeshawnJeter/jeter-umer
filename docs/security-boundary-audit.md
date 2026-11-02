@@ -1,5 +1,7 @@
 # Security boundary audit — October 30, 2026
 
+Historical localhost-mode audit. Production authentication, durable shared allowances, hosted preview isolation and recovery controls are added separately in [deployment.md](deployment.md), with dedicated deployment HTTP/browser tests. Local unauthenticated development mode remains explicit; this original probe report is not a production deployment attestation.
+
 This audit used disposable loopback demo servers, synthetic credentials and harmless browser probes. It made no paid model calls, loaded no real environment file, changed no user project and installed or updated no dependency. Production security behavior is unchanged by this branch.
 
 ## Confirmed gaps

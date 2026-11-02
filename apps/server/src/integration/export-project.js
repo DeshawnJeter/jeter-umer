@@ -1,11 +1,12 @@
 import {DEFAULT_SOURCE} from '../../../../shared/code-game.js';
-import {readFile,readdir} from 'node:fs/promises';
+import {readFile,readdir,stat} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {zipSync,strToU8} from 'fflate';
 import {hashBuild} from './build.js';
-export async function exportProject(versions,projectId,versionId){
+export async function exportProject(versions,projectId,versionId,{maxBytes=32000000}={}){
+ if(!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>64000000)throw Error('Invalid export byte allowance');let bytes=0;
  const snapshot=await versions.get(projectId,versionId),root=resolve(versions.folder(projectId,versionId),'build'),files={};
- async function walk(prefix=''){for(const entry of await readdir(resolve(root,prefix),{withFileTypes:true})){const path=prefix+entry.name;if(entry.isDirectory())await walk(path+'/');else if(entry.isFile())files['game/'+path]=new Uint8Array(await readFile(resolve(root,path)));else throw Error('Exports require regular files');}}await walk();
+ async function walk(prefix=''){for(const entry of await readdir(resolve(root,prefix),{withFileTypes:true})){const path=prefix+entry.name;if(entry.isDirectory())await walk(path+'/');else if(entry.isFile()){bytes+=(await stat(resolve(root,path))).size;if(bytes>maxBytes)throw Object.assign(Error('Export exceeds the download allowance'),{status:413});files['game/'+path]=new Uint8Array(await readFile(resolve(root,path)));}else throw Error('Exports require regular files');}}await walk();
  if(await hashBuild(root)!==snapshot.buildHash)throw Error('Version changed during export');
  files['package.json']=strToU8(JSON.stringify({name:'exported-game',private:true,type:'module',scripts:{dev:'vite --host 127.0.0.1',build:'node scripts/build.mjs',preview:'vite preview --host 127.0.0.1'},devDependencies:{vite:'8.3.5'}},null,2));
  files['vite.config.js']=strToU8("export default {root:'game',base:'./',build:{outDir:'../dist',emptyOutDir:true}};\n");

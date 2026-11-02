@@ -146,7 +146,7 @@ function usageOf(value) {
   if (!value || !['input_tokens', 'output_tokens', 'total_tokens'].every(key => Number.isSafeInteger(value[key]) && value[key] >= 0) || value.total_tokens !== value.input_tokens + value.output_tokens) return null;
   return { inputTokens: value.input_tokens, outputTokens: value.output_tokens, totalTokens: value.total_tokens };
 }
-export function createModelClient(apiKey, config, { fetchImpl = globalThis.fetch,countInputTokens=fetchImpl===globalThis.fetch,protocol } = {}) {
+export function createModelClient(apiKey, config, { fetchImpl = globalThis.fetch,countInputTokens=fetchImpl===globalThis.fetch,protocol,sharedBudget } = {}) {
   if(!protocol)throw Error('An explicit model protocol is required');
   const label=protocol.label,endpoint=protocol.endpoint,countEndpoint=protocol.countEndpoint;
   const headers=()=>protocol.headers(apiKey);
@@ -182,7 +182,8 @@ export function createModelClient(apiKey, config, { fetchImpl = globalThis.fetch
         prepared.reservation=bytes+prepared.body.max_output_tokens+512;
       }
       const reservation=await reservationFor(prepared,signal);prepared.reservation=reservation.tokens;
-      await reserve(prepared.reservation);
+      const sharedReservation=sharedBudget?await sharedBudget.reserve(prepared.reservation):null;
+      try{await reserve(prepared.reservation);}catch(error){if(sharedReservation)await sharedBudget.settle(sharedReservation,null,{cancel:true});throw error;}
       let usage = null, output, failure,continuation,toolUse;
       const timeout = AbortSignal.timeout(config.timeoutMs);
       const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -221,7 +222,7 @@ export function createModelClient(apiKey, config, { fetchImpl = globalThis.fetch
         }
       } catch (error) {
         failure = signal?.aborted ? cancelled() : timeout.aborted ? providerError('Model provider request timed out. No automatic retry was made.') : protocol && !(error instanceof ModelOutputError) ? providerError(error.message) : error;
-      } finally { await finish(usage, prepared.reservation); }
+      } finally { try{if(sharedReservation)await sharedBudget.settle(sharedReservation,usage);}finally{await finish(usage, prepared.reservation);} }
       if (signal?.aborted) failure = cancelled();
       await onAttempt({ role, stage, model:prepared.body.model,effort:prepared.body.effort||null, ...(request.operation ? {operation:request.operation} : {}), attempt, taskAttempt:request.attempt ?? 1, requestHash:createHash('sha256').update(prepared.serialized).digest('hex'), outcome: !failure ? continuation?'tool_call':'accepted' : failure instanceof ModelOutputError ? 'invalid_output' : 'terminal_error', ...(failure instanceof ModelOutputError ? { code:failure.code } : {}),...(toolUse?{toolUse}:{}), reservationMethod:reservation.method,reservationTokens:reservation.tokens,usage });
       if (!failure) { if (signal?.aborted) throw cancelled();return continuation?generate(role,stage,continuation,{signal,reserve,finish,onAttempt}):output; }
