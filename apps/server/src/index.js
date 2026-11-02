@@ -1,3 +1,4 @@
+import {restoreVersion,compareVersions} from './orchestrator/project-actions.js';
 import {addFeedback,updateFeedback} from './memory/feedback.js';
 import { createServer } from 'node:http';
 import { readFile, stat, readdir } from 'node:fs/promises';
@@ -40,6 +41,8 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='restore')return json(res,201,await restoreVersion(manager,parts[2],(await body(req)).versionId));
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='milestone'){const data=await body(req);if(typeof data.label!=='string'||!data.label.trim()||data.label.length>60)throw Error('Milestone requires a short name');return json(res,200,await manager.projects.update(parts[2],project=>{const v=project.versions.find(v=>v.id===data.versionId);if(!v)throw Error('Version not found');v.label=data.label.trim();}));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts[3]==='feedback'){const data=await body(req);if(parts.length===4)return json(res,201,await addFeedback(manager.projects,parts[2],data));if(parts.length===5)return json(res,200,await updateFeedback(manager.projects,parts[2],parts[4],data));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===2)return json(res,201,await manager.projects.create((await body(req)).title));
       if (parts[0] !== 'api' || parts[1] !== 'runs') return json(res, 404, { error: 'Not found' });
@@ -48,10 +51,12 @@ const server = createServer(async (req, res) => {
         if ([...manager.runs.values()].filter(run => !terminalStates.has(run.status)).length >= 5) throw new Error('Finish or cancel an existing run before creating another');
         return json(res, 201, await manager.create(data));
       }
+      if(parts.length===4&&parts[3]==='save_version'){const run=manager.get(parts[2]);if(!['awaiting_review','complete','failed'].includes(run.status)||!run.build)throw Error('Wait for a delivered build');await manager.versions.capture(run,resolve(manager.store.folder(run.id),'builds',String(run.build.generation)));return json(res,200,await manager.projects.get(run.projectId));}
       if (parts.length === 4) return json(res, 200, await manager.act(parts[2], parts[3], data));
       return json(res, 404, { error: 'Not found' });
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+    if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='compare')return json(res,200,await compareVersions(manager,parts[2],url.searchParams.get('left'),url.searchParams.get('right')));
     if(url.pathname==='/api/projects')return json(res,200,await manager.projects.list());
     if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===3)return json(res,200,await manager.projects.get(parts[2]));
     if(url.pathname==='/api/game-catalog'&&req.method==='GET')return json(res,200,Object.entries(GAME_TYPES).map(([value,game])=>({value,label:game.name})));

@@ -245,6 +245,7 @@ export class Manager {
       if(run.briefResolution?.proposal.unsupportedRequests.length&&data.acceptUnsupported!==true)throw new Error('Acknowledge the unsupported requests before approving the supported plan, or edit the prompt/settings.');
       run.planApproval = { hash: run.planHash, at: new Date().toISOString(), source: 'human', ...(run.briefResolution?.proposal.unsupportedRequests.length?{unsupportedAcknowledged:true}:{}) };
       approveSpecification(run);
+      if(run.restoredFrom&&run.build){run.status='awaiting_review';await this.event(run,'Human approved restored plan; playtest this exact restored build');return run;}
       this.transition(run, 'running'); await this.event(run, 'Human approved the checked plan'); this.launch(run); return run;
     }
     if (action === 'answer') {
