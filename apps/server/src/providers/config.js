@@ -23,6 +23,7 @@ export function providerConfig(env = process.env) {
     maxCalls: integer(env, 'OPENAI_MAX_CALLS', 24, 1, 40),
     maxTotalTokens: integer(env, 'OPENAI_MAX_TOTAL_TOKENS', 64000, 2000, 256000),
     maxOutputTokens: integer(env, 'OPENAI_MAX_OUTPUT_TOKENS', 2048, 256, 8192),
+    maxResponseRepairs: integer(env, 'OPENAI_MAX_RESPONSE_REPAIRS', 2, 0, 2),
     timeoutMs: integer(env, 'OPENAI_TIMEOUT_MS', 30000, 1000, 60000),
     maxRequestBytes: 40000, maxResponseBytes: 131072
   } };

@@ -60,6 +60,8 @@ Pause/settings (or Escape) freezes the Phaser scene, including physics, enemies,
 
 The HUD/pause-menu branch is stacked on music styles/instruments (#19), also targeting development. Existing saved build bytes and approvals are not rewritten: create a new game or revision to receive these features. Automated checks and model reviews are separate from the human playtest approval.
 
+Real-model generation now places summary/report bounds and consistent checker verdict shapes in the strict output schema. Completed malformed responses receive up to two format-repair requests against the unchanged task/artifact. Each request counts against the existing call/token budgets and gets a safe audit/activity entry. Invalid output is never silently accepted or echoed into repair instructions. Refusals, API errors, incomplete responses and exhausted budgets still stop visibly. See [OpenAI provider](docs/openai-provider.md) for `OPENAI_MAX_RESPONSE_REPAIRS` (0–2, default 2), audit details and limitations. This branch is stacked on HUD/pause-menu PR #20 and targets development; new runs use the updated provider policy after restarting the app.
+
 The feature pull requests are stacked for review, all targeting development: merge the existing OpenAI provider (#13), validation fixes (#14), game types (#15), artwork (#16), Windows state recovery (#17), then composed music. Each new branch contains its feature commit on the preceding tested prerequisite. Development remains unchanged until those requests are reviewed and merged.
 
 Use merge commits to preserve this stack’s ancestry. If you squash a prerequisite instead, rebase the remaining branches onto the updated development branch before merging them; this avoids duplicate prerequisite diffs and add/add conflicts.
