@@ -41,6 +41,6 @@ test('checkpoint codes reject path/code payloads, invalid rooms and impossible a
   for(const text of ['execute()',JSON.stringify({version:1,room:2,doubleJump:true,dash:false}),'x'.repeat(201)])assert.throws(()=>decodeCheckpoint(text));
 });
 test('old saved controls migrate without losing existing remaps or introducing duplicate bindings',()=>{
-  const legacy=defaultSettings();legacy.version=1;for(const action of ['attack','ability','interact'])delete legacy.bindings[action];legacy.bindings.left=['KeyJ'];legacy.bindings.right=['KeyK'];
-  assert.equal(validSettings(legacy),true);const next=upgradeSettings(legacy);assert.equal(next.version,2);assert.deepEqual(next.bindings.left,['KeyJ']);assert.deepEqual(next.bindings.right,['KeyK']);assert.equal(validSettings(next),true);assert.equal(legacy.version,1);
+  const legacy=defaultSettings();legacy.version=1;delete legacy.reducedEffects;for(const action of ['attack','ability','interact'])delete legacy.bindings[action];legacy.bindings.left=['KeyJ'];legacy.bindings.right=['KeyK'];
+  assert.equal(validSettings(legacy),true);const next=upgradeSettings(legacy);assert.equal(next.version,3);assert.deepEqual(next.bindings.left,['KeyJ']);assert.deepEqual(next.bindings.right,['KeyK']);assert.equal(validSettings(next),true);assert.equal(legacy.version,1);
 });

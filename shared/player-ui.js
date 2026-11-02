@@ -13,10 +13,11 @@ export const ACTIONS = Object.freeze(['left', 'right', 'up', 'down', 'jump','att
 export const KEY_CODES = Object.freeze(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space', ...Array.from({length:26}, (_, i) => `Key${String.fromCharCode(65+i)}`), ...Array.from({length:10}, (_, i) => `Digit${i}`)]);
 export const SETTINGS_KEY = 'game-workshop.player-settings.v1';
 export function defaultSettings(volume = 0.18, muted = false) {
-  return { version: 2, volume, muted, musicVolume: 1, sfxVolume: 1, musicMuted: false, sfxMuted: false, bindings: { left: ['ArrowLeft','KeyA'], right: ['ArrowRight','KeyD'], up: ['ArrowUp','KeyW'], down: ['ArrowDown','KeyS'], jump: ['Space'],attack:['KeyJ'],ability:['KeyK'],interact:['KeyE'] } };
+  return { version: 3, reducedEffects:false, volume, muted, musicVolume: 1, sfxVolume: 1, musicMuted: false, sfxMuted: false, bindings: { left: ['ArrowLeft','KeyA'], right: ['ArrowRight','KeyD'], up: ['ArrowUp','KeyW'], down: ['ArrowDown','KeyS'], jump: ['Space'],attack:['KeyJ'],ability:['KeyK'],interact:['KeyE'] } };
 }
 export function validSettings(value) {
-  if (!value || typeof value !== 'object' || Object.keys(value).sort().join() !== Object.keys(defaultSettings()).sort().join() || ![1,2].includes(value.version)) return false;
+  if (!value || typeof value !== 'object' || Object.keys(value).sort().join() !== Object.keys(defaultSettings()).filter(key=>value.version===3||key!=='reducedEffects').sort().join() || ![1,2,3].includes(value.version)) return false;
+  if(value.version===3&&typeof value.reducedEffects!=='boolean')return false;
   if (!['muted','musicMuted','sfxMuted'].every(key => typeof value[key] === 'boolean')) return false;
   if (!['volume','musicVolume','sfxVolume'].every(key => Number.isFinite(value[key]) && value[key] >= 0 && value[key] <= (key === 'volume' ? 0.3 : 1))) return false;
   const bindings = value.bindings;
@@ -29,12 +30,13 @@ export function validSettings(value) {
   }
   return new Set(all).size === all.length;
 }
-export function upgradeSettings(value){
+export function upgradeSettings(value,reducedDefault=false){
   if(!validSettings(value))throw Error('Invalid settings');const next=structuredClone(value);
-  if(next.version===2)return next;
+  if(next.version===3)return next;
+  if(next.version===2){next.version=3;next.reducedEffects=!!reducedDefault;return next;}
   const used=new Set(Object.values(next.bindings).flat());
   for(const action of ACTIONS.slice(5)){const preferred=defaultSettings().bindings[action][0],key=!used.has(preferred)?preferred:KEY_CODES.find(code=>!used.has(code));next.bindings[action]=[key];used.add(key);}
-  next.version=2;return next;
+  next.version=3;next.reducedEffects=!!reducedDefault;return next;
 }
 export const keyLabel = code => code.startsWith('Key') ? code.slice(3) : code.startsWith('Digit') ? code.slice(5) : code.replace('Arrow', '') === code ? code : `${code.slice(5)} arrow`;
 export function remap(settings, action, code) {

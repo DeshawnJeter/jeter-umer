@@ -12,7 +12,8 @@ export class GameVfx{
     }
     if(event.type==='damage_taken'&&this.config.shake>0&&this.time-this.lastShake>=0.5){this.lastShake=this.time;this.scene.cameras.main.shake(Math.min(120,this.config.flashMs+30),this.config.shake);}
   }
-  update(dt){if(this.disposed)return;this.time+=dt;this.tokens=Math.min(24,this.tokens+24*dt);const allowed=vfxAllowed(this.config,this.getSettings());for(let i=this.active.length-1;i>=0;i--){const p=this.active[i];p.age+=dt;if(!allowed||p.age>=p.life){p.node.setVisible(false);this.free.push(p.node);this.active.splice(i,1);}else{p.x+=p.vx*dt;p.y+=p.vy*dt;p.node.setPosition(p.x,p.y).setAlpha(0.8*(1-p.age/p.life));}}}
+  refreshSettings(){if(!vfxAllowed(this.config,this.getSettings())){for(const p of this.active){p.node.setVisible(false);this.free.push(p.node);}this.active.length=0;this.scene.cameras.main.shakeEffect?.reset?.();}}
+  update(dt){this.refreshSettings();if(this.disposed)return;this.time+=dt;this.tokens=Math.min(24,this.tokens+24*dt);const allowed=vfxAllowed(this.config,this.getSettings());for(let i=this.active.length-1;i>=0;i--){const p=this.active[i];p.age+=dt;if(!allowed||p.age>=p.life){p.node.setVisible(false);this.free.push(p.node);this.active.splice(i,1);}else{p.x+=p.vx*dt;p.y+=p.vy*dt;p.node.setPosition(p.x,p.y).setAlpha(0.8*(1-p.age/p.life));}}}
   inspect(){return {active:this.active.length,allocated:this.all.size,limit:this.config.maxParticles,dropped:this.dropped,reduced:!!this.getSettings().reducedEffects};}
   dispose(){if(this.disposed)return;this.disposed=true;this.unsubscribe();for(const node of this.all)node.destroy();this.all.clear();this.active.length=0;this.free.length=0;}
 }

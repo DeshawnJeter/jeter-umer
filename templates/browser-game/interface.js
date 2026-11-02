@@ -5,8 +5,9 @@ const $ = selector => document.querySelector(selector);
 export class PlayerInterface {
   constructor(options) { Object.assign(this, options); this.keys = new Set(); this.previousPhase = null; this.capture = null; }
   async initialize() {
-    const loaded = await loadPreferences(defaultSettings(this.audio.volume, this.audio.muted));
-    this.settings = upgradeSettings(loaded.settings); this.storage = loaded.storage;this.profile=advancedProfile(this.genre);
+    const fallback=defaultSettings(this.audio.volume,this.audio.muted);fallback.reducedEffects=!!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const loaded = await loadPreferences(fallback);
+    this.settings = upgradeSettings(loaded.settings,fallback.reducedEffects); this.storage = loaded.storage;this.profile=advancedProfile(this.genre);
     this.hud = validateHud(this.config.ui.hud, this.genre).length ? hudFor(this.genre) : this.config.ui.hud;
     $('#hud').dataset.layout = this.hud.layout;
     for (const stat of this.hud.stats) {
@@ -23,6 +24,7 @@ export class PlayerInterface {
       $(`#${key}`).oninput = event => { this.settings[key] = Number(event.target.value); this.apply(true); };
     }
     for (const key of ['muted','musicMuted','sfxMuted']) $(`#${key}`).onchange = event => { this.settings[key] = event.target.checked; this.apply(true); };
+    $('#reducedEffects').onchange=event=>{this.settings.reducedEffects=event.target.checked;this.apply(true);};
     $('#mute').onclick = () => this.toggleMute();
     $('#reset-controls').onclick = () => { this.settings.bindings = defaultSettings().bindings; this.capture = null; $('#binding-error').textContent = ''; this.apply(true); this.controls(); };
     $('#pause-menu').addEventListener('close', () => { if (this.previousPhase !== null) this.resume(); });
@@ -37,6 +39,7 @@ export class PlayerInterface {
     for (const key of ['volume','musicVolume','sfxVolume']) { $(`#${key}`).value = this.settings[key]; $(`#${key}-value`).textContent = `${Math.round(this.settings[key] / (key === 'volume' ? 0.3 : 1) * 100)}%`; }
     for (const key of ['muted','musicMuted','sfxMuted']) $(`#${key}`).checked = this.settings[key];
     $('#mute').textContent = muted ? 'Unmute all' : 'Mute all'; $('#mute').setAttribute('aria-pressed', String(muted));
+    $('#reducedEffects').checked=this.settings.reducedEffects;this.onEffectsChanged?.();
     const saved = save ? savePreferences(this.settings, this.storage) : this.storage !== 'session';
     $('#settings-status').textContent = saved ? 'Preferences saved on this device.' : 'Preferences apply to this session; device storage is unavailable.';
   }
