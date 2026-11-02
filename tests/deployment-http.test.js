@@ -6,7 +6,23 @@ import {deploymentConfig} from '../apps/server/src/deployment/config.js';
 import {Control,passwordHash} from '../apps/server/src/deployment/control.js';
 import {buildGame} from '../apps/server/src/integration/build.js';import {defaults,clone} from '../shared/contracts/index.js';
 import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../shared/code-game.js';
+import {previewRelay} from '../apps/preview/server.js';
 const password='HTTP fixture password 4242';
+test('separate preview relay serves signed builds and denies workshop routes and traversal',async()=>{
+ const s=await workshop({hosted:true});
+ const relay=previewRelay({upstream:s.base,previewOrigin:s.playOrigin});
+ relay.listen(0,'127.0.0.1');await once(relay,'listening');
+ const fetchRelay=(path,headers={},method='GET')=>new Promise((yes,no)=>{
+  const req=httpRequest({host:'127.0.0.1',port:relay.address().port,path,method,headers:{Host:new URL(s.playOrigin).host,...headers}},res=>{const chunks=[];res.on('data',d=>chunks.push(d));res.on('end',()=>yes({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});req.on('error',no);req.end();
+ });
+ try {
+  const headers=await login(s),runs=await(await s.request('/api/runs',{headers})).json(),path=new URL(runs[0].build.url).pathname;
+  const html=await fetchRelay(path,{Cookie:'must-not-forward=1',Authorization:'Bearer must-not-forward'});assert.equal(html.status,200);assert.match(html.headers['content-security-policy'],/frame-ancestors https:\/\/workshop.example/);assert.equal(html.headers['set-cookie'],undefined);
+  const worker=await fetchRelay(path.replace('index.html','code-worker.js'),{'sec-fetch-dest':'worker'});assert.equal(worker.status,200);assert.match(worker.headers['content-security-policy'],/connect-src 'none'/);
+  for(const bad of ['/api/runs','/signin','/auth/session','//evil.example/',path.replace('index.html','../config.json'),path.replace('index.html','%2e%2e/config.json'),path.replace('/play/','/play/invalid')])assert.equal((await fetchRelay(bad)).status,404);
+  assert.equal((await fetchRelay(path,{},'POST')).status,404);assert.equal((await fetchRelay(path,{Host:'evil.example'})).status,403);
+ } finally {await new Promise(yes=>relay.close(yes));await s.close();}
+});
 async function port(){const s=createServer();s.listen(0,'127.0.0.1');await once(s,'listening');const p=s.address().port;await new Promise(yes=>s.close(yes));return p;}
 async function workshop({hosted=false,fixture=true,genre='custom'}={}){
  const root=await mkdtemp(join(tmpdir(),'hosted-http-')),p=await port(),preview=await port(),id=randomUUID();
