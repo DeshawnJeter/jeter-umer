@@ -39,6 +39,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===2)return json(res,201,await manager.projects.create((await body(req)).title));
       if (parts[0] !== 'api' || parts[1] !== 'runs') return json(res, 404, { error: 'Not found' });
       const data = await body(req);
       if (parts.length === 2) {
@@ -49,6 +50,8 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: 'Not found' });
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+    if(url.pathname==='/api/projects')return json(res,200,await manager.projects.list());
+    if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===3)return json(res,200,await manager.projects.get(parts[2]));
     if(url.pathname==='/api/game-catalog'&&req.method==='GET')return json(res,200,Object.entries(GAME_TYPES).map(([value,game])=>({value,label:game.name})));
     if(url.pathname==='/api/agent-catalog')return json(res,200,{roles:['planner','gameplay','levels','ui','story','audio',...Object.keys(EXTENSION_SPECS)],jobs:EXTENSION_SPECS});
     if(parts[0]==='api'&&parts[1]==='runs'&&parts.length===4&&parts[3]==='memory')return json(res,200,manager.get(parts[2]).memory||null);

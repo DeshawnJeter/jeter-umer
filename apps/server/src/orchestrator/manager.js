@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
+import {Projects} from '../storage/projects.js';
 import { Store } from '../storage/store.js';
 import { runPair } from '../runners/harness.js';
 import { fingerprint, loadSystemManifest } from '../runners/instructions.js';
@@ -23,12 +24,13 @@ import {frameworkConfig} from '../integration/framework.js';
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
     if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
-    this.store = store; this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
+    this.store = store; this.projects=new Projects(store.root); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
       run.decisions ??= {}; run.tasks ??= {}; run.planApproval ??= null; run.planHash ??= null;
       run.browserQaMode??=this.browserMode;
+      if(!run.projectId){try{await this.projects.get(run.id);}catch(error){if(error.code!=='ENOENT')throw error;await this.projects.create(run.brief.title,run.id);}run.projectId=run.id;}
       ensureMemory(run);
       for(const role of ROLES)if(run.results?.[role]&&!run.memory.artifacts[role])acceptMemory(run,role,run.results[role],role==='planner'?[]:['planner']);
       if (run.providerUsage) recoverUsage(run.providerUsage);
@@ -44,7 +46,7 @@ export class Manager {
   }
   save(run) {
     const snapshot = clone(run); const prior = this.writes.get(run.id) || Promise.resolve();
-    const next = prior.catch(() => {}).then(() => this.store.save(snapshot)); this.writes.set(run.id, next); return next;
+    const next = prior.catch(() => {}).then(async () => {await this.store.save(snapshot);if(snapshot.projectId)await this.projects.record(snapshot);}); this.writes.set(run.id, next); return next;
   }
   async event(run, message) { run.events.push({ at: new Date().toISOString(), message }); await this.save(run); }
   transition(run, next) { assertTransition(run.status, next); run.status = next; }
@@ -75,7 +77,9 @@ export class Manager {
     return new Promise(resolve=>{let waiters=this.usageWaiters.get(run.id);if(!waiters){waiters=new Set();this.usageWaiters.set(run.id,waiters);}const wake=()=>{waiters.delete(wake);if(!waiters.size)this.usageWaiters.delete(run.id);signal?.removeEventListener('abort',wake);resolve();};waiters.add(wake);signal?.addEventListener('abort',wake,{once:true});});
   }
   async create(brief) {
-    const run = { version: 2, id: randomUUID(), createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
+    const project=brief.projectId?await this.projects.get(brief.projectId):await this.projects.create(validateBrief(brief).title);
+    const projectHistory=this.projects.context(project);
+    const run = { version: 2, id: randomUUID(), projectId:project.id, projectHistory, createdAt: new Date().toISOString(), mode: this.runtime.mode, providerConfig: clone(this.runtime.publicConfig), providerUsage: this.runtime.mode === 'openai' ? emptyUsage() : null, brief: validateBrief(brief), instructions: await this.manifest(), status: 'queued', steps: 0, generation: 0, agents: {}, tasks: {}, results: {}, questions: [], answers: [], decisions: {}, events: [], planHash: null, planApproval: null, build: null, validation: null };
     run.maxSteps=policy.maxSteps;run.browserQaMode=this.browserMode;ensureMemory(run);this.runs.set(run.id, run); await this.save(run); this.transition(run, 'running'); await this.save(run); this.launch(run); return run;
   }
   launch(run) {
@@ -134,7 +138,7 @@ export class Manager {
     const execution = { provider: this.runtime.mode, ...(this.runtime.mode === 'openai' ? { models: clone(this.runtime.publicConfig.models[role]) } : {}) };
     const memoryDependencies=dependenciesFor(role,run.brief.genre);
     const dependencyHashes=Object.fromEntries(memoryDependencies.map(parent=>[parent,run.memory.artifacts[parent].hash]));
-    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
+    const result = await runPair({ role, task, execution, brief: run.brief, context: { ...(run.projectHistory?{projectHistory:clone(run.projectHistory)}:{}),...(run.lastBrowserFailure?{browserFeedback:clone(run.lastBrowserFailure)}:{}),memory:readMemory(run,role,memoryDependencies),...(role === 'planner' ? {} : { plan: run.results.planner.artifact }), decisions: clone(run.decisions), ...(run.briefResolution?{promptResolution:{assumptions:run.briefResolution.proposal.assumptions,unsupportedRequests:run.briefResolution.proposal.unsupportedRequests}}:{}) }, ...handlers,
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), ...(role==='coding'?{verifyProposal:async artifact=>{const report=await runCodeChecks(artifact,this.controllers.get(run.id)?.signal,{lossDeadlineSeconds:lossDeadlineForBrief(run.brief)});recordTests(run,'code-worker',report);return report;}}:{}), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
