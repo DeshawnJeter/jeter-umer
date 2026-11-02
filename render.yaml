@@ -4,6 +4,7 @@ services:
     runtime: docker
     repo: https://github.com/DeshawnJeter/jeter-umer
     branch: development
+    region: virginia
     plan: 0.5c-512mb
     numInstances: 1
     autoDeployTrigger: off
@@ -45,3 +46,23 @@ services:
         value: "100"
       - key: WORKSHOP_MAX_PROJECTS
         value: "100"
+  - type: web
+    name: team-game-previews
+    runtime: docker
+    repo: https://github.com/DeshawnJeter/jeter-umer
+    branch: development
+    region: virginia
+    dockerfilePath: ./Dockerfile.preview
+    plan: free
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: WORKSHOP_PREVIEW_ORIGIN
+        sync: false
+      - key: WORKSHOP_UPSTREAM
+        fromService:
+          name: team-game-workshop
+          type: web
+          property: hostport
