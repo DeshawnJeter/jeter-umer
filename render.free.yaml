@@ -1,0 +1,56 @@
+# Temporary private test deployment: no card, paid resources or persistent disk.
+services:
+  - type: web
+    name: jeter-workshop-free
+    runtime: docker
+    repo: https://github.com/DeshawnJeter/jeter-umer
+    branch: codex/render-free-workshop
+    region: virginia
+    plan: free
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: WORKSHOP_EPHEMERAL
+        value: "on"
+      - key: WORKSHOP_DATA_DIR
+        value: /var/data/workshop
+      - key: GAME_BUILDER_PROVIDER
+        value: demo
+      - key: GAME_BUILDER_BROWSER_QA
+        value: "on"
+      - key: WORKSHOP_PUBLIC_ORIGIN
+        sync: false
+      - key: WORKSHOP_PREVIEW_ORIGIN
+        sync: false
+      - key: WORKSHOP_PASSWORD_HASH
+        sync: false
+      - key: WORKSHOP_SESSION_SECRET
+        generateValue: true
+      - key: WORKSHOP_BACKUP_KEY
+        sync: false
+      - key: WORKSHOP_PREVIEW_RELAY_SECRET
+        generateValue: true
+  - type: web
+    name: jeter-previews-free
+    runtime: docker
+    repo: https://github.com/DeshawnJeter/jeter-umer
+    branch: codex/render-free-workshop
+    region: virginia
+    dockerfilePath: ./Dockerfile.preview
+    plan: free
+    autoDeployTrigger: off
+    healthCheckPath: /healthz
+    envVars:
+      - key: WORKSHOP_UPSTREAM
+        sync: false
+      - key: WORKSHOP_PREVIEW_ORIGIN
+        sync: false
+      - key: WORKSHOP_PREVIEW_RELAY_SECRET
+        fromService:
+          name: jeter-workshop-free
+          type: web
+          envVarKey: WORKSHOP_PREVIEW_RELAY_SECRET

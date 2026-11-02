@@ -2,6 +2,7 @@ import {isAbsolute,resolve} from 'node:path';
 export function integer(env,key,fallback,min=1,max=1000000000){const n=Number(env[key]??fallback);if(!Number.isSafeInteger(n)||n<min||n>max)throw Error(`Invalid ${key}`);return n;}
 export function deploymentConfig(env=process.env){
  const hosted=env.NODE_ENV==='production',enabled=hosted||env.WORKSHOP_AUTH==='on';
+ if(env.WORKSHOP_EPHEMERAL==='on'&&env.GAME_BUILDER_PROVIDER!=='demo')throw Error('Temporary free workshops require the demo provider');
  const port=integer(env,'PORT',3000,1024,65535),previewPort=integer(env,'GAME_BUILDER_CODE_PREVIEW_PORT',port>65400?port-100:port+100,1024,65535);
  function origin(key,fallback){const value=env[key]||fallback,url=new URL(value);if(url.origin!==value||url.username||url.password||hosted&&url.protocol!=='https:')throw Error(`Invalid ${key}: use an exact HTTPS origin without a trailing slash`);return value;}
  const appOrigin=origin('WORKSHOP_PUBLIC_ORIGIN',`http://127.0.0.1:${port}`),previewOrigin=origin('WORKSHOP_PREVIEW_ORIGIN',`http://127.0.0.1:${previewPort}`);

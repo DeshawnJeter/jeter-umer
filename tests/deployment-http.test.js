@@ -10,13 +10,15 @@ import {previewRelay} from '../apps/preview/server.js';
 const password='HTTP fixture password 4242';
 test('separate preview relay serves signed builds and denies workshop routes and traversal',async()=>{
  const s=await workshop({hosted:true});
- const relay=previewRelay({upstream:s.base,previewOrigin:s.playOrigin});
+ const relay=previewRelay({upstream:s.base,previewOrigin:s.playOrigin,secret:'c'.repeat(64)});
  relay.listen(0,'127.0.0.1');await once(relay,'listening');
  const fetchRelay=(path,headers={},method='GET')=>new Promise((yes,no)=>{
   const req=httpRequest({host:'127.0.0.1',port:relay.address().port,path,method,headers:{Host:new URL(s.playOrigin).host,...headers}},res=>{const chunks=[];res.on('data',d=>chunks.push(d));res.on('end',()=>yes({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});req.on('error',no);req.end();
  });
  try {
   const headers=await login(s),runs=await(await s.request('/api/runs',{headers})).json(),path=new URL(runs[0].build.url).pathname;
+  assert.equal((await s.request(path,{headers:{'x-workshop-preview-relay':'wrong'}})).status,401);
+  assert.equal((await s.request('/api/runs',{headers:{'x-workshop-preview-relay':'c'.repeat(64)}})).status,401);
   const html=await fetchRelay(path,{Cookie:'must-not-forward=1',Authorization:'Bearer must-not-forward'});assert.equal(html.status,200);assert.match(html.headers['content-security-policy'],/frame-ancestors https:\/\/workshop.example/);assert.equal(html.headers['set-cookie'],undefined);
   const worker=await fetchRelay(path.replace('index.html','code-worker.js'),{'sec-fetch-dest':'worker'});assert.equal(worker.status,200);assert.match(worker.headers['content-security-policy'],/connect-src 'none'/);
   for(const bad of ['/api/runs','/signin','/auth/session','//evil.example/',path.replace('index.html','../config.json'),path.replace('index.html','%2e%2e/config.json'),path.replace('/play/','/play/invalid')])assert.equal((await fetchRelay(bad)).status,404);
@@ -28,7 +30,7 @@ async function workshop({hosted=false,fixture=true,genre='custom'}={}){
  const root=await mkdtemp(join(tmpdir(),'hosted-http-')),p=await port(),preview=await port(),id=randomUUID();
 
  const origin=hosted?'https://workshop.example':`http://127.0.0.1:${p}`,playOrigin=hosted?'https://games.example.net':`http://127.0.0.1:${preview}`;
- const env={...process.env,NODE_ENV:hosted?'production':'test',WORKSHOP_AUTH:'on',WORKSHOP_PUBLIC_ORIGIN:origin,WORKSHOP_PREVIEW_ORIGIN:playOrigin,WORKSHOP_DATA_DIR:root,WORKSHOP_PASSWORD_HASH:await passwordHash(password),WORKSHOP_SESSION_SECRET:'a'.repeat(64),WORKSHOP_BACKUP_KEY:'b'.repeat(64),PORT:String(p),GAME_BUILDER_CODE_PREVIEW_PORT:String(preview),GAME_BUILDER_PROVIDER:'demo',GAME_BUILDER_BROWSER_QA:hosted?'on':'off',WORKSHOP_MAX_RUNS:'1'};delete env.OPENAI_API_KEY;delete env.ANTHROPIC_API_KEY;
+ const env={...process.env,NODE_ENV:hosted?'production':'test',WORKSHOP_AUTH:'on',WORKSHOP_PUBLIC_ORIGIN:origin,WORKSHOP_PREVIEW_ORIGIN:playOrigin,WORKSHOP_DATA_DIR:root,WORKSHOP_PASSWORD_HASH:await passwordHash(password),WORKSHOP_SESSION_SECRET:'a'.repeat(64),WORKSHOP_BACKUP_KEY:'b'.repeat(64),PORT:String(p),GAME_BUILDER_CODE_PREVIEW_PORT:String(preview),GAME_BUILDER_PROVIDER:'demo',GAME_BUILDER_BROWSER_QA:hosted?'on':'off',WORKSHOP_MAX_RUNS:'1',WORKSHOP_PREVIEW_RELAY_SECRET:'c'.repeat(64)};delete env.OPENAI_API_KEY;delete env.ANTHROPIC_API_KEY;
  await new Control(deploymentConfig(env)).initialize();
  if(fixture){const folder=join(root,'runs',id),config={...clone(defaults),genre,...(genre==='custom'?{coding:{source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS}}:{})};config.audio.music=true;await buildGame(join(folder,'builds','0'),config);await writeFile(join(folder,'state.json'),JSON.stringify({id,version:2,mode:'scripted-demo',providerConfig:{mode:'scripted-demo'},createdAt:new Date().toISOString(),brief:{title:'Hosted fixture',genre},status:'awaiting_review',generation:0,steps:0,agents:{},questions:[],validation:{scope:'Synthetic fixture build',passed:true},results:{},answers:[],events:[],build:{generation:0,sha256:'fixture',url:'historical'}}));}
  const child=spawn(process.execPath,['apps/server/src/index.js'],{env,stdio:['ignore','pipe','pipe'],windowsHide:true});let output='';child.stderr.on('data',d=>output+=d);const base=`http://127.0.0.1:${p}`;
