@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {Store} from '../apps/server/src/storage/store.js';import {Manager} from '../apps/server/src/orchestrator/manager.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';import {restoreVersion,compareVersions} from '../apps/server/src/orchestrator/project-actions.js';
+import {Store} from '../apps/server/src/storage/store.js';import {Manager} from '../apps/server/src/orchestrator/manager.js';import {createRuntime} from './fixtures/legacy-provider.js';import {restoreVersion,compareVersions} from '../apps/server/src/orchestrator/project-actions.js';
 test('restore creates a new run with exact bytes, open feedback and fresh approvals; project survives restart',async()=>{
  const root=await mkdtemp(join(tmpdir(),'game-restore-'));try{
  const options={runtime:createRuntime({env:{}}),browserMode:'off'},manager=new Manager(new Store(root),options);await manager.initialize();const original=await manager.create({title:'Restore test',prompt:'Collect stars',difficulty:'beginner'});await manager.jobs.get(original.id);assert.equal(original.status,'awaiting_plan',original.error);

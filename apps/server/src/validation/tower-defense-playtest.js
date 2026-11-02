@@ -1,3 +1,4 @@
+import {browserEnvironment} from './browser-environment.js';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 
@@ -7,7 +8,7 @@ export async function runTowerDefensePlaytest({url,reportFolder}){
   if(new URL(url).hostname!=='127.0.0.1')throw Error('Use a local playtest preview');
   const report={scope:'tower-defense-player-playtest',passed:false,listeningTested:false,tests:[]};
   const {chromium}=await import('playwright');
-  const browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio'],env:Object.fromEntries(Object.entries(process.env).filter(([key,value])=>typeof value==='string'&&!/^(OPENAI_|AWS_|GH_|GITHUB_|CODEX_)/.test(key)))});
+  const browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio'],env:browserEnvironment()});
   let page;const errors=[],securityErrors=[];
   const assert=(condition,message)=>{if(!condition)throw Error(message);};
   try{

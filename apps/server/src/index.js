@@ -1,3 +1,4 @@
+import {isModelProvider,providerLabel} from '../../../shared/providers.js';
 import {validateBindings} from './integration/asset-bindings.js';
 import {estimateBuild} from './providers/build-budget.js';
 import {validateBrief} from '../../../shared/contracts/index.js';
@@ -91,13 +92,14 @@ const server = createServer(async (req, res) => {
       return await serve(res, resolve(manager.store.folder(run.id), 'builds', parts[2]), parts.slice(3).join('/'), true);
     }
     if (url.pathname === '/') return await serve(res, 'apps/web', 'index.html');
+    if (url.pathname === '/providers.js') return await serve(res, 'shared', 'providers.js');
     if (url.pathname === '/player-ui.js') return await serve(res, 'shared', 'player-ui.js');
     if (url.pathname === '/advanced-games.js') return await serve(res, 'shared', 'advanced-games.js');
     if (url.pathname === '/project-workspace.js' || url.pathname === '/app.js' || url.pathname === '/preferences.js' || url.pathname === '/style.css') return await serve(res, 'apps/web', parts[0]);
     json(res, 404, { error: 'Not found' });
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }
 });
-server.listen(port, '127.0.0.1', () => console.log(`Game builder: ${origin} (${manager.runtime.mode === 'openai' ? 'OpenAI mode; API usage is billed' : 'scripted demo; no API calls'})`));
+server.listen(port, '127.0.0.1', () => console.log(`Game builder: ${origin} (${isModelProvider(manager.runtime.mode) ? `${providerLabel(manager.runtime.mode)} mode; API usage is billed` : 'scripted demo; no API calls'})`));
 
 const codeServer=createServer(async(req,res)=>{try{
   if(req.method!=='GET'||req.headers.host!==new URL(codeOrigin).host)return json(res,403,{error:'Read-only game origin'});

@@ -1,3 +1,5 @@
+> Historical validation record: model names and measurements below describe earlier OpenAI runs. Current live generation uses the [Claude role policy](role-model-policy.md); OpenAI commands are retired.
+
 # Planner human-question validation
 
 The reported Moonbrook Lanterns run failed after repeated invalid planner questions. Its brief was in manual mode with collector/space/adventure settings, although the description requested custom lantern rules, forest art and calm bells. Manual settings take precedence; that conflict legitimately needs resolution. The original rejected question bodies were not retained, so their exact invalid fields cannot be reconstructed from the audit.

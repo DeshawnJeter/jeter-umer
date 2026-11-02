@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { questionSchema, decodeProviderOutput } from '../apps/server/src/providers/schemas.js';
 import { normalizeQuestion, validateAnswer } from '../shared/contracts/questions.js';
 import { repairInstruction } from '../apps/server/src/providers/output-errors.js';
-import { createOpenAIClient, buildRequest } from '../apps/server/src/providers/openai.js';
-import { providerConfig } from '../apps/server/src/providers/config.js';
+import { createOpenAIClient, buildRequest } from './fixtures/legacy-provider.js';
+import { providerConfig } from './fixtures/legacy-provider.js';
 
 const question = {key:'planner.settings',text:'Which settings should apply?',reason:'The selected collector settings conflict with the requested lantern rules.',options:['Use form settings','Use prompt settings'],recommended:'Use prompt settings',blocking:true,affectedRoles:['planner'],maxLength:500};
 const worker = q => ({kind:'question',artifact:null,question:q,summary:'Resolve conflicting settings before planning.'});

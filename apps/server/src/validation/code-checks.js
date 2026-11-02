@@ -1,3 +1,4 @@
+import {browserEnvironment} from './browser-environment.js';
 import {validateAcceptanceCases} from '../../../../shared/acceptance-cases.js';
 import {createServer} from 'node:http';
 import {mkdtemp,mkdir,writeFile,cp,readFile,rm} from 'node:fs/promises';
@@ -26,7 +27,7 @@ async function execute(artifact,signal,{lossDeadlineSeconds=null,acceptanceCases
       res.writeHead(200,{'Content-Type':extname(path)==='.js'?'text/javascript':'text/html','Content-Security-Policy':`default-src 'none'; script-src ${origin}; worker-src ${relative==='code-worker.js'?"'none'":origin}; connect-src 'none'`});res.end(relative==='index.html'?'<!doctype html><title>Isolated rules check</title>':await readFile(path));
     }catch{res.writeHead(404);res.end();}});
     await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});const origin=`http://127.0.0.1:${server.address().port}`;
-    const {chromium}=await import('playwright');browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--disable-background-networking'],env:Object.fromEntries(Object.entries(process.env).filter(([key,value])=>typeof value==='string'&&!/^(OPENAI_|AWS_|GH_|GITHUB_|CODEX_)/.test(key)))});
+    const {chromium}=await import('playwright');browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--disable-background-networking'],env:browserEnvironment()});
     const context=await browser.newContext({serviceWorkers:'block'});await context.route('**/*',route=>new URL(route.request().url()).origin===origin?route.continue():route.abort());
     const page=await context.newPage();page.setDefaultTimeout(5000);await page.goto(origin+'/index.html');report.browserTested=true;
     const executed=await page.evaluate(async ({cases,lossDeadlineSeconds,acceptanceCases})=>{

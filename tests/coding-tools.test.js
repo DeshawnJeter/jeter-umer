@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp,readFile} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {createRuntime} from './fixtures/legacy-provider.js';
 import {runPair} from '../apps/server/src/runners/harness.js';
 import {DEFAULT_SOURCE,DEFAULT_SCENARIOS} from '../shared/code-game.js';
 import {activeRoles} from '../shared/specialists.js';

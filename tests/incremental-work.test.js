@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {mkdtemp} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
-import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from './fixtures/legacy-provider.js';
 test('audio-only revision preserves checked gameplay and renews human approval before affected work',async()=>{
   const manager=new Manager(new Store(await mkdtemp(join(tmpdir(),'incremental-'))),{runtime:createRuntime({env:{}}),browserMode:'off'});
   const run=await manager.create({title:'Incremental',prompt:'Collect stars',difficulty:'beginner'});await manager.jobs.get(run.id);await manager.act(run.id,'approve_plan',{planHash:run.planHash});await manager.jobs.get(run.id);

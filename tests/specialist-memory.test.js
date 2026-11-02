@@ -7,7 +7,7 @@ import {activeRoles,dependenciesFor,EXTENSION_SPECS,extensionDefaults} from '../
 import {validateArtifact,defaults,clone} from '../shared/contracts/index.js';
 import {Manager} from '../apps/server/src/orchestrator/manager.js';
 import {Store} from '../apps/server/src/storage/store.js';
-import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {createRuntime} from './fixtures/legacy-provider.js';
 import {compileAssembly} from '../apps/server/src/integration/assembly.js';
 import {runProjectRules} from '../apps/server/src/specialists/rules-tests.js';
 import {newCampaign,beginBattle,battleAction} from '../shared/turn-combat.js';

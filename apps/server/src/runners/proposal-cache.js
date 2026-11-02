@@ -1,3 +1,4 @@
+import {isModelProvider} from '../../../../shared/providers.js';
 import {readFile,access} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {fingerprint} from './instructions.js';
@@ -7,7 +8,7 @@ function semanticRequest(request){
   return copy;
 }
 export async function pendingProposal(folder,attempt,request){
-  if(request.execution?.provider!=='openai')return null;
+  if(!isModelProvider(request.execution?.provider))return null;
   try{
     // Reviewed failures need repair, not replay of the same proposal. Accepted
     // work normally lives in project memory and is skipped by the manager.
@@ -21,7 +22,7 @@ export async function pendingProposal(folder,attempt,request){
 
 function repairIdentity(request){const copy=semanticRequest(request);delete copy.attempt;delete copy.findings;delete copy.replayRepair;if(copy.context){delete copy.context.previousSource;delete copy.context.sourceReference;}return fingerprint(copy);}
 export async function reviewedRepair(folder,request,maxAttempts){
- if(request.execution?.provider!=='openai')return null;
+ if(!isModelProvider(request.execution?.provider))return null;
  let found=null;
  for(let attempt=1;attempt<=maxAttempts;attempt++){
   try{

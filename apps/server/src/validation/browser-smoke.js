@@ -1,3 +1,4 @@
+import {browserEnvironment} from './browser-environment.js';
 import {createServer} from 'node:http';
 import {readFile,mkdir,access} from 'node:fs/promises';
 import {resolve,sep,extname} from 'node:path';
@@ -19,7 +20,7 @@ async function execute({folder,config,buildHash,reportFolder,signal}){
     await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});
     const origin=`http://127.0.0.1:${server.address().port}`;
     const {chromium}=await import('playwright');
-    browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio','--disable-background-networking'],env:Object.fromEntries(Object.entries(process.env).filter(([key,value])=>typeof value==='string'&&!/^(OPENAI_|AWS_|GH_|GITHUB_|CODEX_)/.test(key)))});
+    browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio','--disable-background-networking'],env:browserEnvironment()});
     const context=await browser.newContext({viewport:{width:1000,height:900},reducedMotion:'no-preference',serviceWorkers:'block'});
     await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin?route.continue():route.abort();});
     page=await context.newPage();report.browserTested=true;page.setDefaultTimeout(8000);page.on('pageerror',error=>errors.push(error.message.slice(0,300)));

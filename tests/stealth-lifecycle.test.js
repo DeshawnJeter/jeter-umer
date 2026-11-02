@@ -10,7 +10,7 @@ import {patrolPlans,gridPath,newGuardBrain,stepGuard} from '../shared/stealth-ru
 import {stealthBehaviorEvidence} from '../apps/server/src/specialists/rules-tests.js';
 import {Manager} from '../apps/server/src/orchestrator/manager.js';
 import {Store} from '../apps/server/src/storage/store.js';
-import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {createRuntime} from './fixtures/legacy-provider.js';
 import {buildGame} from '../apps/server/src/integration/build.js';
 import {defaults,clone} from '../shared/contracts/index.js';
 

@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {mkdtemp,mkdir,writeFile,rm,rename} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
 import {Projects} from '../apps/server/src/storage/projects.js';import {Versions} from '../apps/server/src/storage/versions.js';import {hashBuild} from '../apps/server/src/integration/build.js';
-import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from '../apps/server/src/providers/runtime.js';
+import {Manager} from '../apps/server/src/orchestrator/manager.js';import {Store} from '../apps/server/src/storage/store.js';import {createRuntime} from './fixtures/legacy-provider.js';
 test('temporary Windows version-directory locks retry without recopying or duplicating a version',async()=>{
  const root=await mkdtemp(join(tmpdir(),'version-lock-'));try{
  const projects=new Projects(root),project=await projects.create('Locks'),build=join(root,'build');await mkdir(build);await writeFile(join(build,'index.html'),'game');let attempts=0;

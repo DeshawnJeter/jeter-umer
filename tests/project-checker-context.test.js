@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {providerConfig} from '../apps/server/src/providers/config.js';import {buildRequest} from '../apps/server/src/providers/openai.js';import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {providerConfig} from './fixtures/legacy-provider.js';import {buildRequest} from './fixtures/legacy-provider.js';import {loadProfile,instructionBundle} from '../apps/server/src/runners/instructions.js';
 test('project checkers keep requirements and canonical answers without repeating template examples or historical answers',async()=>{
  const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'synthetic'}).publicConfig;
  for(const role of ['planner','story']){
