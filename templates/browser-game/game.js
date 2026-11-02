@@ -41,6 +41,10 @@ const size = 48, center = n => n * size + size / 2;
 function end(phase) {
   if (state.phase !== 'playing') return;
   state.phase = phase;events?.emit(phase==='won'?'victory':'defeat',{x:state.x,y:state.y}); player.body.setVelocity(0); enemies?.setVelocity(0, 0);
+  // Overlap callbacks can run before Arcade's final sprite synchronization.
+  // Reset pending body deltas so a terminal frame cannot move the player later.
+  player.body.reset(player.x,player.y);for(const enemy of enemies?.getChildren()||[])enemy.body.reset(enemy.x,enemy.y);
+  state.x=player.x;state.y=player.y;state.enemyStates=enemies?.getChildren().map(enemy=>({x:enemy.x,y:enemy.y,mode:'chase'}))||[];
   state.failureReason=phase==='lost'?failureReason(genre,state):null;
   message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat']+(state.failureReason?' '+state.failureReason+'. Choose Restart to try again.':'');
   scene.physics.pause();

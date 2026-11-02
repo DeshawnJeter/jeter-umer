@@ -16,5 +16,5 @@ export const GAME_LIFECYCLES=Object.freeze({
 });
 export function lifecycleFor(genre='collector'){if(!Object.hasOwn(GAME_LIFECYCLES,genre))throw Error('Unknown game lifecycle');return GAME_LIFECYCLES[genre];}
 export function failureReason(genre,state){const rules=lifecycleFor(genre);if(rules.health&&state.health<=0)return ['rpg','front_battle','campaign','roguelike'].includes(genre)?'Party defeated':'Health depleted';if(rules.timer&&!rules.surviveTimer&&state.remaining<=0)return 'Time expired';return null;}
-export const BASE_HUMAN_CHECKS=['movement','collectAndWin','timeoutAndRestart','audioControls','presentation'];
+export const BASE_HUMAN_CHECKS=['movement','collectAndWin','timeoutAndRestart','pauseSettings','audioControls','presentation'];
 export function humanChecksFor(genre){lifecycleFor(genre);return [...BASE_HUMAN_CHECKS,...(genre==='stealth'?['enemyReactions']:[])];}
