@@ -4,3 +4,8 @@ test('independent expectations reject a self-passing game whose required score b
  const report=await runCodeChecks({source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},undefined,{acceptanceCases:cases});assert.equal(report.passed,false);assert.ok(report.tests.some(t=>t.name.startsWith('Independent:')&&!t.passed));assert.ok(report.tests.some(t=>t.phase==='won'&&t.passed));
  assert.throws(()=>validateAcceptanceCases([{...cases[0],steps:[{dt:0.1,actions:['fetch'],repeat:1}]}]),/input/);
 });
+test('visible-label checks observe actual render nodes rather than source text or agent claims',async()=>{
+ const cases=[{name:'existing player label',steps:[{dt:0,actions:[],repeat:1}],assertions:[{field:'label',op:'eq',value:'Player'}]},{name:'missing label',steps:[{dt:0,actions:[],repeat:1}],assertions:[{field:'label',op:'eq',value:'Not visible'}]}];
+ const report=await runCodeChecks({source:DEFAULT_SOURCE,scenarios:DEFAULT_SCENARIOS},undefined,{acceptanceCases:cases});assert.equal(report.passed,false);assert.equal(report.tests.find(t=>t.name==='Independent: existing player label').passed,true);assert.equal(report.tests.find(t=>t.name==='Independent: missing label').passed,false);
+ assert.throws(()=>validateAcceptanceCases([{...cases[0],assertions:[{field:'label',op:'gte',value:'Player'}]}]),/assertion/);
+});

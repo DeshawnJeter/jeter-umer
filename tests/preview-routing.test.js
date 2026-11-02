@@ -1,0 +1,9 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';import {randomUUID} from 'node:crypto';
+test('saved previews use the active server ports without rewriting historical build metadata',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'portable-preview-')),id=randomUUID(),port=38000+Math.floor(Math.random()*500),codePort=port+1000;await mkdir(join(root,id));
+ const oldUrl=`http://127.0.0.1:3100/preview/${id}/0/index.html`,run={id,version:2,mode:'scripted-demo',providerConfig:{mode:'scripted-demo'},createdAt:new Date().toISOString(),brief:{title:'Portable',genre:'custom'},status:'awaiting_review',generation:0,results:{},answers:[],events:[],build:{generation:0,sha256:'historical-hash',url:oldUrl}};await writeFile(join(root,id,'state.json'),JSON.stringify(run));
+ const env={...process.env,PORT:String(port),GAME_BUILDER_CODE_PREVIEW_PORT:String(codePort),GAME_BUILDER_PROVIDER:'demo',GAME_BUILDER_BROWSER_QA:'off',GAME_BUILDER_RUNS_DIR:root};delete env.OPENAI_API_KEY;const server=spawn(process.execPath,['apps/server/src/index.js'],{env,stdio:'pipe',windowsHide:true});
+ try{let values;for(let i=0;;i++){try{const response=await fetch(`http://127.0.0.1:${port}/api/runs`);values=await response.json();break;}catch(error){if(i>100)throw error;await new Promise(yes=>setTimeout(yes,100));}}
+ assert.equal(values[0].build.url,`http://127.0.0.1:${codePort}/preview/${id}/0/index.html`);const persisted=JSON.parse(await readFile(join(root,id,'state.json'),'utf8'));assert.equal(persisted.build.url,oldUrl);assert.equal(persisted.build.sha256,'historical-hash');
+ }finally{server.kill();await new Promise(yes=>server.exitCode!==null?yes():server.once('exit',yes));await rm(root,{recursive:true,force:true});}
+});

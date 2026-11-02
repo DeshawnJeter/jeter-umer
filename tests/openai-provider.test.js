@@ -71,7 +71,7 @@ test('request preserves instructions/data separation and disables storage/trunca
   assert.equal(prepared.body.store, false); assert.equal(prepared.body.truncation, 'disabled'); assert.equal(prepared.body.text.format.strict, true);
   assert.ok(!prepared.body.instructions.includes(req.brief.prompt)); assert.ok(prepared.body.input[0].content[0].text.includes(req.brief.prompt));
   assert.equal(prepared.body.tools, undefined); assert.equal(prepared.body.previous_response_id, undefined); assert.ok(!prepared.serialized.includes(token));
-  req.limits = { maxContextChars: prepared.serialized.length - 1 };
+  req.limits = { maxContextChars: prepared.contextChars - 1 };
   assert.throws(() => buildRequest(providerConfig(env).publicConfig, 'gameplay', 'worker', req), /context limit/);
 });
 test('all active worker/checker pairs use separate model requests with auditable usage', async () => {
@@ -222,7 +222,7 @@ test('format repair exhaustion is finite and configurable down to zero', async (
 
 test('repair request cannot exceed the complete context bound or silently truncate it', async () => {
   const config=providerConfig(env).publicConfig,req=await request();
-  req.limits={maxContextChars:buildRequest(config,'gameplay','worker',req).serialized.length+20};
+  req.limits={maxContextChars:buildRequest(config,'gameplay','worker',req).contextChars+20};
   let calls=0,finishes=0;const client=createOpenAIClient(token,config,{fetchImpl:async()=>{calls++;return response({kind:'artifact',artifact:defaults.gameplay,question:null,summary:''});}});
   await assert.rejects(client.generate('gameplay','worker',req,{finish:()=>finishes++}),/context limit/);assert.equal(calls,1);assert.equal(finishes,1);
 });

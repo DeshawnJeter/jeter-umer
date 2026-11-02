@@ -7,6 +7,15 @@ import {activeRoles} from '../shared/specialists.js';
 const env={GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_CODING_TOOL_TEST'};
 const response=output=>{for(const item of output)for(const part of item.content||[])if(part.type==='output_text'){const value=JSON.parse(part.text);if(typeof value.artifact?.scenarios==='string'){value.artifact.scenarios=JSON.parse(value.artifact.scenarios).map(c=>({name:c.name,expect:c.expect,steps:c.steps.map(step=>({dt:step.dt,actions:Object.entries(step.input).filter(([,value])=>value).map(([key])=>key),repeat:step.repeat??1}))}));part.text=JSON.stringify(value);}}return new Response(JSON.stringify({status:'completed',output,usage:{input_tokens:100,output_tokens:50,total_tokens:150}}));};
 const call=(name,args,id='call_1')=>({type:'function_call',name,arguments:JSON.stringify(args),call_id:id});
+test('completed tool calls reach the next model request as actual Responses tool messages',async()=>{
+ let workers=0;const directory=await mkdtemp(join(tmpdir(),'tool-handoff-'));
+ const runtime=createRuntime({env,fetchImpl:async(_,options)=>{const body=JSON.parse(options.body);if(body.text.format.name==='coding_worker'){
+  if(workers++===0)return response([call('read_source',{path:'generated/rules.js',startLine:1,maxLines:30},'read-complete')]);
+  const pair=body.input.slice(-2);assert.equal(pair[0].type,'function_call');assert.equal(pair[0].call_id,'read-complete');assert.equal(pair[1].type,'function_call_output');assert.equal(pair[1].call_id,'read-complete');assert.match(JSON.parse(pair[1].output).source,/export function createGame/);assert.equal(JSON.parse(body.input[0].content[0].text).context.lastToolResult,undefined);
+  return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:'',scenarios:DEFAULT_SCENARIOS},question:null,summary:'Preserved checked source after reading the real tool result'})}]}]);
+ }return response([{type:'message',content:[{type:'output_text',text:JSON.stringify({review:{verdict:'pass',findings:[],evidence:['Synthetic independent review'],question:null}})}]}]);}});
+ const result=await runPair({role:'coding',brief:{title:'Tool handoff',genre:'custom',prompt:'Preserve working rules',difficulty:'beginner'},context:{previousSource:DEFAULT_SOURCE,seedOwnedSource:true},directory,...await runtime.route('coding',{})});assert.equal(workers,2);assert.equal(result.status,'accepted');assert.equal(result.artifact.source,DEFAULT_SOURCE);
+});
 test('model coding tools inspect and patch owned source, then submit without repeating its source text',async()=>{
   let workers=0,usage=0;const bodies=[],directory=await mkdtemp(join(tmpdir(),'coding-tools-'));
   const runtime=createRuntime({env,fetchImpl:async(_,options)=>{

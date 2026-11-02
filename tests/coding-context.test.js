@@ -35,7 +35,7 @@ test('large repairs omit optional tool schemas rather than cutting source or ins
  const config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_REPAIR_CONTEXT'}).publicConfig;
  const request={brief:{genre:'custom',prompt:'Preserve all requirements'},instructions:'Complete instructions',context:{previousSource:'x'.repeat(6000)},tools:{inspect_components(){},read_source(){},search_source(){},apply_source_patch(){},run_rule_checks(){}},findings:['Repair the start contract']};
  const first=buildRequest(config,'coding','worker',request);assert.ok(first.body.tools);
- const focused=buildRequest(config,'coding','worker',{...request,limits:{maxContextChars:first.serialized.length-100}});
+ const focused=buildRequest(config,'coding','worker',{...request,limits:{maxContextChars:first.contextChars-100}});
  assert.equal(focused.body.tools,undefined);assert.equal(JSON.parse(focused.body.input[0].content[0].text).context.previousSource,request.context.previousSource);assert.ok(focused.body.instructions.includes(request.instructions));
 });
 
@@ -56,9 +56,14 @@ test('scenarios-only requests lock source and use structured replays without edi
  const request={...bundle,brief:{genre:'custom',prompt:'Full approved requirements'},context:{sourceReference:{hash:'locked'}},replayRepair:{scope:'scenarios-only',sourceHash:'locked'},tools:{apply_source_patch(){}}};
  const body=buildRequest(config,'coding','worker',request).body;assert.equal(body.tools,undefined);assert.equal(body.max_output_tokens,2048);assert.deepEqual(body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(body.instructions.includes('scenarios-only repair'));
 });
+test('tool budget completion requests a bounded final artifact instead of offering a fifth tool call',async()=>{
+ const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_TOOL_FINAL'}).publicConfig;
+ const prepared=buildRequest(config,'coding','worker',{...bundle,brief:{genre:'custom',prompt:'Preserve the current game'},context:{previousSource:DEFAULT_SOURCE},toolTurns:4,tools:{read_source(){},apply_source_patch(){}}});
+ assert.equal(prepared.body.tools,undefined);assert.equal(prepared.body.tool_choice,undefined);assert.deepEqual(prepared.body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.equal(prepared.body.max_output_tokens,config.maxOutputTokens);assert.match(prepared.body.instructions,/Submit the structured artifact now/);
+});
 
 test('oversized full-source repairs use bounded source windows and focused patches',async()=>{
  const profile=await loadProfile('coding'),bundle=await instructionBundle('coding','worker',profile,{genre:'custom'}),config=providerConfig({GAME_BUILDER_PROVIDER:'openai',OPENAI_API_KEY:'SYNTHETIC_FOCUSED_SOURCE'}).publicConfig;
- const source=DEFAULT_SOURCE+'/*'+'x'.repeat(5000)+'*/',request={...bundle,brief:{genre:'custom',prompt:'Required game mechanics. '.repeat(65)},context:{previousSource:source},findings:['Initialize arrays before inspect.'],tools:{read_source(){},search_source(){},apply_source_patch(){},inspect_components(){},run_rule_checks(){}}};
- const prepared=buildRequest(config,'coding','worker',request),data=JSON.parse(prepared.body.input[0].content[0].text);assert.ok(prepared.serialized.length<=16000);assert.ok(data.context.sourceReference);assert.equal(data.context.previousSource,undefined);assert.ok(prepared.body.tools.some(tool=>tool.name==='read_source'));assert.equal(prepared.body.max_output_tokens,2048);assert.deepEqual(prepared.body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(prepared.body.instructions.includes(bundle.focusedCode.roleInstructions));
+ const source=DEFAULT_SOURCE+'/*'+'x'.repeat(5000)+'*/',request={...bundle,brief:{genre:'custom',prompt:'Required game mechanics. '.repeat(65)},context:{previousSource:source},limits:{maxContextChars:12000},findings:['Initialize arrays before inspect.'],tools:{read_source(){},search_source(){},apply_source_patch(){},inspect_components(){},run_rule_checks(){}}};
+ const prepared=buildRequest(config,'coding','worker',request),data=JSON.parse(prepared.body.input[0].content[0].text);assert.ok(prepared.contextChars<=12000);assert.ok(Buffer.byteLength(prepared.serialized)<=config.maxRequestBytes);assert.ok(data.context.sourceReference);assert.equal(data.context.previousSource,undefined);assert.ok(prepared.body.tools.some(tool=>tool.name==='read_source'));assert.equal(prepared.body.max_output_tokens,2048);assert.deepEqual(prepared.body.text.format.schema.properties.artifact.anyOf[0].properties.source.enum,['']);assert.ok(prepared.body.instructions.includes(bundle.focusedCode.roleInstructions));
 });
