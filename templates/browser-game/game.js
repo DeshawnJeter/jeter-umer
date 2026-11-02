@@ -1,56 +1,129 @@
 import { GameAudio } from './audio.js';
+import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
-const response = await fetch('config.json'); if (!response.ok) throw new Error('Game configuration unavailable');
-const config = await response.json();
+const response = await fetch('config.json');
+if (!response.ok) throw new Error('Game configuration unavailable');
+const config = await response.json(), genre = genreOf(config.genre), rules = GAME_TYPES[genre];
 const audio = new GameAudio(config.audio);
 const title = document.querySelector('#title'), message = document.querySelector('#message'), status = document.querySelector('#status');
 title.textContent = config.ui.title; document.title = config.ui.title; message.textContent = config.story.intro;
+document.querySelector('#instructions').textContent = rules.controls;
+document.querySelector('#genre').textContent = rules.name;
 document.querySelector('#volume').value = config.audio.volume;
-const state = { ready: false, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, x: 0, y: 0 };
-let scene, player, stars, portal, cursors, wasd, time = 0, lastCell = '';
+const state = { ready: false, genre, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, health: 3, x: 0, y: 0 };
+let scene, player, stars, enemies, portal, cursors, wasd, space, elapsed = 0, lastHud = '', lastDamage = -2;
+const held = new Set(); let touchJump = false;
 const size = 48, center = n => n * size + size / 2;
-function end(phase) { state.phase = phase; player.body.setVelocity(0); message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat']; audio.tone(phase === 'won' ? config.audio.winFrequency : 140); }
-function reset() { if (scene) scene.scene.restart(); }
-function texture(s, name, color, radius) { const g = s.make.graphics({ x: 0, y: 0 }); g.fillStyle(color); g.fillCircle(16, 16, radius); g.generateTexture(name, 32, 32); g.destroy(); }
-class Collector extends Phaser.Scene {
+function end(phase) {
+  if (state.phase !== 'playing') return;
+  state.phase = phase; player.body.setVelocity(0); enemies?.setVelocity(0, 0);
+  message.textContent = config.story[phase === 'won' ? 'victory' : 'defeat'];
+  audio.tone(phase === 'won' ? config.audio.winFrequency : 140); audio.setPlaying?.(false);
+}
+function texture(s, name, color, radius) {
+  const g = s.make.graphics({ x: 0, y: 0 }); g.fillStyle(color); g.fillCircle(16, 16, radius); g.generateTexture(name, 32, 32); g.destroy();
+}
+function drawBackdrop(s) {
+  const g = s.add.graphics(); g.lineStyle(1, 0x293950);
+  for (let x = 0; x <= 15; x++) g.lineBetween(x * size, 0, x * size, 480);
+  for (let y = 0; y <= 10; y++) g.lineBetween(0, y * size, 720, y * size);
+}
+class WorkshopGame extends Phaser.Scene {
   create() {
-    scene = this; time = 0; lastCell = ''; Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit }); message.textContent = config.story.intro;
-    if (!this.textures.exists('player')) { texture(this, 'player', Phaser.Display.Color.HexStringToColor(config.ui.playerColor).color, 13); texture(this, 'star', 0xffd275, 9); }
-    const graphics = this.add.graphics(); graphics.lineStyle(1, 0x293950);
-    for (let x = 0; x <= 15; x++) graphics.lineBetween(x * size, 0, x * size, 480);
-    for (let y = 0; y <= 10; y++) graphics.lineBetween(0, y * size, 720, y * size);
+    scene = this; elapsed = 0; lastHud = ''; lastDamage = -2; held.clear(); touchJump = false;
+    Object.assign(state, { ready: true, phase: 'ready', score: 0, remaining: config.gameplay.timeLimit, health: 3 });
+    message.textContent = config.story.intro;
+    drawBackdrop(this);
+    if (!this.textures.exists('player')) {
+      texture(this, 'player', Phaser.Display.Color.HexStringToColor(config.ui.playerColor).color, 13);
+      texture(this, 'star', 0xffd275, 9); texture(this, 'enemy', 0xff657c, 12);
+    }
     const walls = this.physics.add.staticGroup();
-    for (const wall of config.levels.walls) { const box = this.add.rectangle(center(wall.x), center(wall.y), size, size, 0x486078); this.physics.add.existing(box, true); walls.add(box); }
-    portal = this.add.rectangle(center(config.levels.exit.x), center(config.levels.exit.y), 36, 36, 0xae82ff); this.physics.add.existing(portal, true);
-    player = this.physics.add.sprite(center(config.levels.spawn.x), center(config.levels.spawn.y), 'player'); player.setCollideWorldBounds(true); player.body.setCircle(12, 4, 4); this.physics.add.collider(player, walls);
-    stars = this.physics.add.staticGroup(); for (const star of config.levels.stars) stars.create(center(star.x), center(star.y), 'star');
-    this.physics.add.overlap(player, stars, (_, star) => { if (state.phase !== 'playing') return; star.destroy(); state.score++; audio.tone(config.audio.pickupFrequency); });
-    this.physics.add.overlap(player, portal, () => { if (state.phase === 'playing' && state.score === state.required) end('won'); });
+    for (const wall of config.levels.walls) {
+      const box = this.add.rectangle(center(wall.x), center(wall.y), size, size, 0x486078);
+      this.physics.add.existing(box, true); walls.add(box);
+    }
+    if (genre !== 'survival') {
+      portal = this.add.rectangle(center(config.levels.exit.x), center(config.levels.exit.y), 36, 36, 0xae82ff);
+      this.physics.add.existing(portal, true);
+    } else portal = null;
+    player = this.physics.add.sprite(center(config.levels.spawn.x), center(config.levels.spawn.y), 'player');
+    player.setCollideWorldBounds(true); player.body.setSize(24, 28).setOffset(4, 2);
+    player.body.setGravityY(genre === 'platformer' ? 1000 : 0);
+    this.physics.add.collider(player, walls);
+    stars = this.physics.add.staticGroup();
+    for (const star of config.levels.stars) stars.create(center(star.x), center(star.y), 'star');
+    this.physics.add.overlap(player, stars, (_, star) => {
+      if (state.phase !== 'playing') return;
+      star.destroy(); state.score++; if (genre === 'survival') state.health = Math.min(3, state.health + 1);
+      audio.tone(config.audio.pickupFrequency);
+    });
+    if (portal) this.physics.add.overlap(player, portal, () => {
+      if (state.phase !== 'playing') return;
+      const outcome = roundOutcome({ ...state, atExit: true }); if (outcome !== 'playing') end(outcome);
+    });
+    enemies = this.physics.add.group();
+    if (genre === 'survival') {
+      const blocked = new Set(config.levels.walls.map(p => `${p.x},${p.y}`));
+      const candidates = [];
+      for (let y = 0; y < 10; y++) for (let x = 0; x < 15; x++) if (!blocked.has(`${x},${y}`)) candidates.push({ x, y, distance: Math.hypot(x - config.levels.spawn.x, y - config.levels.spawn.y) });
+      const spawns = [];
+      for (const point of candidates.sort((a, b) => b.distance - a.distance)) if (point.distance >= 5 && spawns.every(p => Math.hypot(point.x - p.x, point.y - p.y) >= 3)) {
+        spawns.push(point); if (spawns.length === (config.planner.difficulty === 'beginner' ? 2 : 3)) break;
+      }
+      for (const point of spawns) enemies.create(center(point.x), center(point.y), 'enemy').setCollideWorldBounds(true).setBounce(1);
+      this.physics.add.collider(enemies, walls); this.physics.add.collider(enemies, enemies);
+      this.physics.add.overlap(player, enemies, () => {
+        if (state.phase !== 'playing' || elapsed - lastDamage < 1.2) return;
+        state.health--; lastDamage = elapsed; audio.tone(120); this.cameras.main.shake(120, 0.006);
+        if (state.health <= 0) end('lost');
+      });
+    }
     cursors = this.input.keyboard.createCursorKeys(); wasd = this.input.keyboard.addKeys('W,A,S,D');
+    space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false); });
   }
   update(_, delta) {
     if (!player) return;
     if (state.phase === 'playing') {
-      time += delta / 1000; state.remaining = Math.max(0, config.gameplay.timeLimit - time);
-      const x = Number(cursors.right.isDown || wasd.D.isDown) - Number(cursors.left.isDown || wasd.A.isDown);
-      const y = Number(cursors.down.isDown || wasd.S.isDown) - Number(cursors.up.isDown || wasd.W.isDown);
-      player.body.setVelocity(x, y); if (x || y) player.body.velocity.normalize().scale(config.gameplay.speed);
-      if (state.remaining <= 0) end('lost');
-    } else player.body.setVelocity(0);
+      elapsed += delta / 1000; state.remaining = Math.max(0, config.gameplay.timeLimit - elapsed);
+      const x = Number(cursors.right.isDown || wasd.D.isDown || held.has('right')) - Number(cursors.left.isDown || wasd.A.isDown || held.has('left'));
+      const y = Number(cursors.down.isDown || wasd.S.isDown || held.has('down')) - Number(cursors.up.isDown || wasd.W.isDown || held.has('up'));
+      if (genre === 'platformer') {
+        player.body.setVelocityX(x * config.gameplay.speed);
+        const jump = Phaser.Input.Keyboard.JustDown(space) || Phaser.Input.Keyboard.JustDown(cursors.up) || Phaser.Input.Keyboard.JustDown(wasd.W) || touchJump;
+        if (jump && player.body.blocked.down) player.body.setVelocityY(-480);
+      } else { player.body.setVelocity(x, y); if (x || y) player.body.velocity.normalize().scale(config.gameplay.speed); }
+      touchJump = false;
+      if (genre === 'survival') for (const enemy of enemies.getChildren()) {
+        const speed = config.gameplay.speed * (config.planner.difficulty === 'beginner' ? 0.42 : 0.57);
+        this.physics.moveToObject(enemy, player, speed);
+      }
+      player.setAlpha(genre === 'survival' && elapsed - lastDamage < 1.2 ? 0.5 : 1);
+      const outcome = roundOutcome(state); if (outcome !== 'playing') end(outcome);
+    } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
     state.x = player.x; state.y = player.y;
-    const cell = `${state.phase}/${state.score}/${Math.ceil(state.remaining)}`;
-    if (cell !== lastCell) { status.textContent = `${state.phase.toUpperCase()}   Stars ${state.score}/${state.required}   Time ${Math.ceil(state.remaining)}s`; lastCell = cell; }
+    const text = `${state.phase.toUpperCase()} · Stars ${state.score}/${state.required} · ${Math.ceil(state.remaining)}s${genre === 'survival' ? ` · Shields ${state.health}/3` : ''}`;
+    if (text !== lastHud) { status.textContent = text; lastHud = text; }
   }
 }
-new Phaser.Game({ type: Phaser.AUTO, width: 720, height: 480, parent: 'game', backgroundColor: config.ui.backgroundColor, physics: { default: 'arcade', arcade: { gravity: { y: 0 } } }, scene: Collector, audio: { noAudio: true } });
-document.querySelector('#start').onclick = async () => { try { await audio.start(); } catch { message.textContent = 'Audio unavailable. The game can still run.'; } if (state.phase === 'ready') state.phase = 'playing'; };
-document.querySelector('#restart').onclick = reset;
+new Phaser.Game({ type: Phaser.AUTO, width: 720, height: 480, parent: 'game', backgroundColor: config.ui.backgroundColor, physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 } } }, scene: WorkshopGame, audio: { noAudio: true } });
+document.querySelector('#start').onclick = async () => {
+  if (!state.ready || state.phase !== 'ready') return;
+  state.phase = 'playing';
+  try { await audio.start(); audio.setPlaying?.(true); } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
+};
+document.querySelector('#restart').onclick = () => { if (scene) scene.scene.restart(); };
 document.querySelector('#mute').onclick = event => { audio.muted = !audio.muted; audio.update(); event.currentTarget.textContent = audio.muted ? 'Unmute' : 'Mute'; event.currentTarget.setAttribute('aria-pressed', String(audio.muted)); };
 document.querySelector('#volume').oninput = event => { audio.volume = Number(event.target.value); audio.update(); };
-// Phaser captures arrow keys globally; let the focused slider use its native keys.
 document.querySelector('#volume').addEventListener('keydown', event => event.stopPropagation());
+for (const button of document.querySelectorAll('[data-control]')) {
+  const control = button.dataset.control;
+  button.onpointerdown = event => { event.preventDefault(); button.setPointerCapture(event.pointerId); held.add(control); if (control === 'jump') touchJump = true; };
+  button.onpointerup = button.onpointercancel = button.onlostpointercapture = () => held.delete(control);
+}
+window.addEventListener('blur', () => held.clear());
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
-// Read-only observability for browser checks. No hidden success or teleport controls.
 window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume });

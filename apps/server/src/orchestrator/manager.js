@@ -131,7 +131,7 @@ export class Manager {
         this.transition(run, 'awaiting_human'); await this.event(run, 'Independent ready tasks finished. Waiting for context needed by blocked roles.'); return;
       }
       await this.checkpoint(run);
-      const config = Object.fromEntries(Object.entries(run.results).map(([role, result]) => [role, result.artifact]));
+      const config = { ...Object.fromEntries(Object.entries(run.results).map(([role, result]) => [role, result.artifact])), genre: run.brief.genre ?? 'collector' };
       run.validation = validateGame(config);
       if (!run.validation.passed) throw new Error(`Integration failed: ${run.validation.findings.join('; ')}`);
       await this.event(run, 'Static integration checks passed. Building playable preview.');
