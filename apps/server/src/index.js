@@ -1,3 +1,4 @@
+import {requestChange} from './orchestrator/change-request.js';
 import {restoreVersion,compareVersions} from './orchestrator/project-actions.js';
 import {addFeedback,updateFeedback} from './memory/feedback.js';
 import { createServer } from 'node:http';
@@ -41,6 +42,7 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, origin); const parts = decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if (req.method === 'POST') {
       if (req.headers.origin && ![origin, `http://localhost:${port}`].includes(req.headers.origin)) return json(res, 403, { error: 'Origin rejected' });
+      if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='change')return json(res,201,await requestChange(manager,parts[2],await body(req)));
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='restore')return json(res,201,await restoreVersion(manager,parts[2],(await body(req)).versionId));
       if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='milestone'){const data=await body(req);if(typeof data.label!=='string'||!data.label.trim()||data.label.length>60)throw Error('Milestone requires a short name');return json(res,200,await manager.projects.update(parts[2],project=>{const v=project.versions.find(v=>v.id===data.versionId);if(!v)throw Error('Version not found');v.label=data.label.trim();}));}
       if(parts[0]==='api'&&parts[1]==='projects'&&parts[3]==='feedback'){const data=await body(req);if(parts.length===4)return json(res,201,await addFeedback(manager.projects,parts[2],data));if(parts.length===5)return json(res,200,await updateFeedback(manager.projects,parts[2],parts[4],data));}
