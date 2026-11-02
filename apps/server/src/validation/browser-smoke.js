@@ -24,14 +24,17 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     await new Promise((yes,no)=>{server.once('error',no);server.listen(0,'127.0.0.1',yes);});
     const origin=`http://127.0.0.1:${server.address().port}`;
     const {chromium}=await import('playwright');
-    browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio','--disable-background-networking'],env:browserEnvironment()});
+    // Headless cloud hosts have no GPU. Exercise Phaser.AUTO's supported Canvas
+    // fallback instead of software WebGL's expensive per-frame GPU emulation.
+    browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true,args:['--mute-audio','--disable-background-networking',...(process.platform==='win32'?[]:['--disable-webgl'])],env:browserEnvironment()});
     const context=await browser.newContext({viewport:{width:1000,height:900},reducedMotion:'no-preference',serviceWorkers:'block'});
     await context.route('**/*',route=>{const url=new URL(route.request().url());return url.origin===origin?route.continue():route.abort();});
     page=await context.newPage();report.browserTested=true;page.setDefaultTimeout(8000);page.on('pageerror',error=>errors.push(error.message.slice(0,300)));
     await page.clock.install({time:new Date('2026-01-01T00:00:00Z')});await page.goto(origin,{waitUntil:'load'});await page.waitForFunction(()=>window.gameState?.().ready,undefined,{timeout:12000});
     await page.clock.pauseAt(await page.evaluate(()=>Date.now())+1000);
-    const state=()=>page.evaluate(()=>window.gameState());
-    const advance=async milliseconds=>{if(signal?.aborted||timedOut)throw Error('Browser checks interrupted');await page.clock.runFor(milliseconds);};
+    report.renderer=await page.evaluate(()=>globalThis.Phaser?.GAMES?.[0]?.renderer?.type===globalThis.Phaser?.CANVAS?'canvas':'webgl');
+    const state=async()=>{const value=await page.evaluate(()=>window.gameState());report.lastObservation={phase:value.phase,score:value.score,health:value.health,remaining:value.remaining,x:value.x,y:value.y};return value;};
+    const advance=async milliseconds=>{if(signal?.aborted||timedOut)throw Error('Browser checks interrupted');report.lastAdvanceMs=milliseconds;await page.clock.runFor(milliseconds);};
     const click=async name=>{const button=page.getByRole('button',{name,exact:true});if(!await button.isVisible()||!await button.isEnabled())throw Error('Control unavailable: '+name);await button.click({force:true});await advance(40);};
     const assert=(condition,message)=>{if(!condition)throw Error(message);};
     const observedModes=new Set();
@@ -53,7 +56,7 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     report.tests.push({name:'build boot',passed:!!await page.locator('canvas').count()});
     await click('Start game');assert((await state()).phase==='playing','Start did not enter gameplay');
     report.tests.push({name:'Start enters gameplay',passed:true});
-    await checkBrowserControls({page,state,advance,click,assert,config,report,requireInGameHud});
+    report.stage='controls';await checkBrowserControls({page,state,advance,click,assert,config,report,requireInGameHud});report.stage='gameplay';
     if(config.genre==='custom'){
       assert(await page.locator('#stat-progress .stat-label').textContent()==='Score'&&await page.locator('#value-progress').innerText()===String((await state()).score),'Custom HUD must show score rather than a stage counter');
       report.tests.push({name:'custom HUD uses actual game score',passed:true});
@@ -73,6 +76,7 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     const rules=lifecycleFor(config.genre),initial=await state();
     const victory=async()=>{const won=await state();assert(won.phase==='won','Input replay did not demonstrate victory');await checkHud(page,won,assert);report.tests.push({name:'reachable victory state',passed:true});const snapshot=gameplaySnapshot(won);await page.keyboard.down('ArrowRight');await page.keyboard.press('KeyJ');await advance(1000);await page.keyboard.up('ArrowRight');const after=gameplaySnapshot(await state());assert((await state()).phase==='won'&&JSON.stringify(after)===JSON.stringify(snapshot),'Victory did not freeze gameplay: '+Object.keys(snapshot).filter(k=>JSON.stringify(snapshot[k])!==JSON.stringify(after[k])).map(k=>`${k} ${JSON.stringify(snapshot[k])} -> ${JSON.stringify(after[k])}`).join('; '));report.tests.push({name:'victory freezes gameplay',passed:true});await click('Restart');await click('Start game');};
     if(['collector','maze'].includes(config.genre)){
+      report.stage='collector/maze victory';
       if(config.genre==='collector')for(const point of config.levels.stars){const score=(await state()).score;await drive(s=>s.score>score?null:{x:point.x*48+24,y:point.y*48+24},100);}
       const exit=config.levels.exit;await drive(()=>({x:exit.x*48+24,y:exit.y*48+24}),180);await victory();
     }
@@ -130,7 +134,7 @@ async function execute({folder,config,buildHash,reportFolder,signal,acceptanceCa
     }else if(rules.health){
       await advance(500);await drive(s=>(s.enemyStates||[])[0],100);await advance(14000);
     }else await advance(config.gameplay.timeLimit*1000+500);
-    let lost=await state();
+    report.stage='failure replay';let lost=await state();
     if(lost.phase==='playing'&&rules.timer&&!rules.surviveTimer){await advance((lost.remaining+1)*1000);lost=await state();}
     assert(lost.phase==='lost','Input replay did not demonstrate the required failure state');report.tests.push({name:'reachable failure state',passed:true,reason:lost.failureReason||'Health/time loss'});
     assert(lost.vfx&&lost.vfx.active<=lost.vfx.limit&&lost.vfx.allocated<=lost.vfx.limit,'VFX exceeded its resource limit');report.tests.push({name:'bounded VFX resources',passed:true});

@@ -17,6 +17,7 @@ The deployment code is separate from the existing localhost demo. `NODE_ENV=prod
 - One process owns the persistent data directory. The file lock rejects concurrent writers; a dead process's lock is recovered. This JSON-backed deployment is single-instance. Do not scale replicas or run overlapping deploys against the same disk. Hosted runs share one build slot; independent roles within that run can still work in parallel. Waiting runs do not spend model tokens. SIGTERM stops new paid work, pauses active runs, drains requests and waits for saved work, with a bounded shutdown deadline.
 - In-memory ZIP downloads are limited to 32 MB of source files to bound export memory. Larger projects need an administrator-managed export rather than silently consuming all server memory.
 - Native browser QA has a recorded wall-clock allowance based on game duration: at least 60 seconds and at most three minutes. Custom-code QA retains its one-minute wall cap and separate bounded rule checks. Linux CI uses two test processes to reduce competing software-rendered browsers; checks are not skipped. This does not increase model-call or token allowances.
+- On Linux headless hosts, browser QA exercises Phaser's supported Canvas fallback to avoid software WebGL emulation. Windows Edge QA retains its normal renderer. Player previews still use the delivered Phaser.AUTO configuration. Reports record the renderer, current stage and last observed gameplay values. Human visual review remains necessary for the player's actual browser/GPU.
 
 ## Required hosting configuration
 

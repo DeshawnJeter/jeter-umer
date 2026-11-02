@@ -11,7 +11,7 @@ async function fixture(change=async()=>{},options={}){
  try{await buildGame(folder,config);await change(folder);return await runBrowserSmoke({folder,config,buildHash:await hashBuild(folder),...options});}finally{await rm(folder,{recursive:true,force:true});}
 }
 test('delivered collector completes win/loss, music settings and restart while retaining human approval',async()=>{
- const report=await fixture();assert.equal(report.passed,true,report.error);assert.equal(report.fullPlaythrough,true);assert.equal(report.humanApproved,false);assert.equal(report.listeningTested,false);assert.ok(report.acceptance.manualChecks.length);
+ const report=await fixture();assert.equal(report.passed,true,JSON.stringify(report));assert.equal(report.fullPlaythrough,true);assert.equal(report.humanApproved,false);assert.equal(report.listeningTested,false);assert.ok(report.acceptance.manualChecks.length);
 });
 test('a delivered HUD with valid code but false collection values fails whole-game acceptance',async()=>{
  const report=await fixture(async folder=>{const file=join(folder,'interface.js'),source=await readFile(file,'utf8');const mutant=source.replace('`${this.state.score} / ${this.state.required}`',"'999 / 999'");assert.notEqual(mutant,source);await writeFile(file,mutant);});assert.equal(report.passed,false);assert.match(report.error,/HUD collection count/);
