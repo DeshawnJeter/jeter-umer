@@ -2,7 +2,7 @@ import {topDownWorld} from '../advanced.js';
 import {newCampaign,beginBattle,battleAction} from '../turn-combat.js';
 import {keyLabel} from '../player-ui.js';
 export function rpgMode(scene,ctx,{frontView=false}={}){
-  const {state,config,panel}=ctx,campaign=newCampaign(config.planner.difficulty),world=frontView?null:topDownWorld(scene,ctx),cleared=new Set();let battle=null,battleIndex=0,portraits=[];
+  const {state,config,panel}=ctx,campaign=newCampaign(config.planner.difficulty,{combat:config.combat}),world=frontView?null:topDownWorld(scene,ctx),cleared=new Set();let battle=null,battleIndex=0,portraits=[];
   const total=frontView?3:config.levels.stars.length;
   state.required=total;
   const sync=()=>{state.health=campaign.party.reduce((n,p)=>n+p.hp,0);state.maxHealth=campaign.party.reduce((n,p)=>n+p.maxHp,0);state.mana=campaign.party.reduce((n,p)=>n+p.mp,0);state.maxMana=campaign.party.reduce((n,p)=>n+p.maxMp,0);state.progress=`${cleared.size} / ${total}`;state.objective=battle?`${battle.phase==='player'?campaign.party[battle.actor].name+' turn':battle.phase} · encounter ${battleIndex+1}/${total}`:`Clear encounters ${cleared.size}/${total}, then reach portal`;};
@@ -19,7 +19,7 @@ export function rpgMode(scene,ctx,{frontView=false}={}){
       const button=ctx.button(`${i===battle.target?'Target: ':''}${enemy.name} HP ${enemy.hp}/${enemy.maxHp}`,()=>{battle.target=i;paint();});button.disabled=enemy.hp<=0||battle.phase!=='player';
     });
     if(battle.phase==='player'){
-      for(const [label,action]of [[`Attack (${shortcut('attack')})`,'attack'],[`Spell · 2 MP (${shortcut('ability')})`,'spell'],[`Potion (${shortcut('interact')})`,'potion'],['Guard / next party member','guard']]){const button=ctx.button(label,()=>act(action));const actor=campaign.party[battle.actor];button.disabled=action==='spell'&&actor.mp<2||action==='potion'&&(campaign.potions===0||actor.hp===actor.maxHp);}
+      for(const [label,action]of [[`Attack (${shortcut('attack')})`,'attack'],[`Spell · ${campaign.rules.spellCost} MP (${shortcut('ability')})`,'spell'],[`Potion (${shortcut('interact')})`,'potion'],['Guard / next party member','guard']]){const button=ctx.button(label,()=>act(action));const actor=campaign.party[battle.actor];button.disabled=action==='spell'&&actor.mp<campaign.rules.spellCost||action==='potion'&&(campaign.potions===0||actor.hp===actor.maxHp);}
     }else if(battle.phase==='won')ctx.button(frontView?(cleared.size===total?'Finish expedition':'Next encounter'):'Return to exploration',()=>{
       battle=null;portraits.forEach(p=>p.destroy());portraits=[];
       if(frontView){if(cleared.size===total)ctx.end('won');else engage(cleared.size);}else paint();

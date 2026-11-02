@@ -25,3 +25,5 @@ export function extensionErrors(role,value){
   }
   return errors;
 }
+
+EXTENSION_SPECS.combat={"genres":["rpg","front_battle"],"job":"Design bounded party combat. Choose attackPower 2–5, spellPower 4–8, spellCost 1–3 and enemyDamage 1–3. Preserve the party template and avoid unsupported mechanics.","fields":{"attackPower":{"type":"integer","default":3,"min":2,"max":5},"spellPower":{"type":"integer","default":6,"min":4,"max":8},"spellCost":{"type":"integer","default":2,"min":1,"max":3},"enemyDamage":{"type":"integer","default":2,"min":1,"max":3}}};
