@@ -21,5 +21,5 @@ export function validateCheckpoint(value){
   if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).sort().join()!=='dash,doubleJump,room,version')return false;
   return value.version===1&&Number.isInteger(value.room)&&value.room>=0&&value.room<=2&&typeof value.doubleJump==='boolean'&&typeof value.dash==='boolean'&&(!value.dash||value.doubleJump)&&(value.room<1||value.doubleJump)&&(value.room<2||value.dash);
 }
-export function encodeCheckpoint(value){if(!validateCheckpoint(value))throw Error('Invalid checkpoint');return JSON.stringify(value);}
-export function decodeCheckpoint(text){if(typeof text!=='string'||text.length>200)throw Error('Invalid save code');const value=JSON.parse(text);if(!validateCheckpoint(value))throw Error('Invalid checkpoint');return value;}
+export function encodeCheckpoint(value){if(!validateCheckpoint(value))throw Error('Invalid checkpoint');return 'GW1:'+btoa(JSON.stringify(value));}
+export function decodeCheckpoint(text){if(typeof text!=='string'||text.length>200||!text.startsWith('GW1:'))throw Error('Invalid save code');const value=JSON.parse(atob(text.slice(4)));if(!validateCheckpoint(value))throw Error('Invalid checkpoint');return value;}
