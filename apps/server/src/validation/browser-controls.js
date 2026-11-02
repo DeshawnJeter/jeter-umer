@@ -1,4 +1,10 @@
 import {gameplaySnapshot} from './whole-game-acceptance.js';
+export async function waitForAudio(state,predicate,{attempts=50,pause=ms=>new Promise(yes=>setTimeout(yes,ms)),message='Audio playback did not settle'}={}){
+ if(!Number.isInteger(attempts)||attempts<1||attempts>50)throw Error('Invalid audio observation allowance');
+ // The Web Audio clock is native: advancing Playwright's JS clock does not
+ // finish a scheduled gain ramp. Observe the real playback value, not labels.
+ for(let i=0;i<attempts;i++){const audio=(await state()).audio;if(predicate(audio))return audio;await pause(20);}throw Error(message);
+}
 export async function checkHud(page,state,assert,requireInGameHud=true){
  const overlay=page.locator('#in-game-hud'),present=await overlay.count()>0;
  if(requireInGameHud)assert(present&&await overlay.isVisible(),'In-game HUD is missing');
@@ -34,11 +40,11 @@ export async function checkBrowserControls({page,state,advance,click,assert,conf
  assert(await page.locator('#binding-error').innerText()==='Control updated.','Control remapping failed');
  assert((await page.getByRole('button',{name:'Change '+action+' control',exact:true}).innerText())==='L','Remapped control label is stale');
  await click('Reset controls');await click('Resume game');await advance(100);
- let audio=(await state()).audio;assert(audio.volume===0.12&&audio.sfxVolume===0.4&&audio.sfxGain===0,'SFX mute or master volume did not reach playback');
+ let audio=await waitForAudio(state,a=>a.volume===0.12&&a.sfxVolume===0.4&&a.sfxGain===0&&(!config.audio.music||a.musicVolume===0.5&&a.musicGain>0),{message:'SFX mute or master volume did not reach playback'});assert(audio.volume===0.12&&audio.sfxVolume===0.4&&audio.sfxGain===0,'SFX mute or master volume did not reach playback');
  if(config.audio.music)assert(audio.musicVolume===0.5&&audio.musicGain>0,'SFX mute incorrectly silenced music');
  await click('Pause / settings');await toggle('sfxMuted',false);if(config.audio.music)await toggle('musicMuted',true);await click('Resume game');await advance(100);
- audio=(await state()).audio;assert(Math.abs(audio.sfxGain-0.048)<0.0001,'SFX volume did not reach its playback gain');
- if(config.audio.music)assert(audio.musicGain===0,'Music mute did not silence its playback gain');
+ audio=await waitForAudio(state,a=>Math.abs(a.sfxGain-0.048)<0.0001&&(!config.audio.music||Math.abs(a.musicGain)<0.000001),{message:'Music mute or SFX volume did not reach its playback gain'});assert(Math.abs(audio.sfxGain-0.048)<0.0001,'SFX volume did not reach its playback gain');
+ if(config.audio.music)assert(Math.abs(audio.musicGain)<0.000001,'Music mute did not silence its playback gain');
  await click('Pause / settings');const beforeRestore=gameplaySnapshot(await state());
  for(const key of ['volume','sfxVolume',...(config.audio.music?['musicVolume']:[])])await slider(key,original[key]);
  for(const key of ['muted','sfxMuted',...(config.audio.music?['musicMuted']:[])])await toggle(key,original[key]);

@@ -18,6 +18,7 @@ The deployment code is separate from the existing localhost demo. `NODE_ENV=prod
 - In-memory ZIP downloads are limited to 32 MB of source files to bound export memory. Larger projects need an administrator-managed export rather than silently consuming all server memory.
 - Native browser QA has a recorded wall-clock allowance based on game duration: at least 60 seconds and at most three minutes. Custom-code QA retains its one-minute wall cap and separate bounded rule checks. Linux CI uses two test processes to reduce competing software-rendered browsers; checks are not skipped. This does not increase model-call or token allowances.
 - On Linux headless hosts, browser QA exercises Phaser's supported Canvas fallback to avoid software WebGL emulation. Windows Edge QA retains its normal renderer. Player previews still use the delivered Phaser.AUTO configuration. Reports record the renderer, current stage and last observed gameplay values. Human visual review remains necessary for the player's actual browser/GPU.
+- Audio QA observes native gain values with a bounded settling window: the browser's actual audio clock is independent of accelerated JavaScript time. A label saying muted cannot satisfy the check while playback gain stays positive.
 
 ## Required hosting configuration
 
