@@ -1,3 +1,4 @@
+import {Versions} from '../storage/versions.js';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import {Projects} from '../storage/projects.js';
@@ -24,7 +25,7 @@ import {frameworkConfig} from '../integration/framework.js';
 export class Manager {
   constructor(store = new Store(), { router, runtime = createRuntime(),browserRunner=runBrowserSmoke,browserMode=process.env.GAME_BUILDER_BROWSER_QA||'on' } = {}) {
     if(!['on','off'].includes(browserMode))throw Error('Invalid browser QA mode');this.browserRunner=browserRunner;this.browserMode=browserMode;
-    this.store = store; this.projects=new Projects(store.root); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
+    this.store = store; this.projects=new Projects(store.root); this.versions=new Versions(store.root,this.projects); this.router = router; this.runtime = runtime; this.controllers = new Map(); this.runs = new Map(); this.jobs = new Map(); this.writes = new Map(); this.actions = new Map();this.usageWaiters=new Map();
   }
   async initialize() {
     for (const run of await this.store.list()) {
@@ -213,6 +214,7 @@ export class Manager {
         run.browserChecks=report;recordTests(run,'browser-smoke',report);await this.save(run);
         if(!report.passed||report.buildHash!==sha256||await hashBuild(folder)!==sha256)throw Error('Browser QA failed: '+(report.error||'The delivered game did not pass current-build smoke checks'));
       }else{run.browserChecks={scope:'browser-smoke',buildHash:sha256,browserTested:false,passed:null,reason:'Browser QA explicitly disabled; manual playtesting is required'};await this.save(run);}
+      await this.versions.capture(run,folder);
       this.transition(run, 'awaiting_review'); await this.event(run, 'Ready for human playtest. Static checks do not prove browser behavior.');
     } catch (error) { if (!error.suspended) throw error; }
   }
@@ -277,6 +279,7 @@ export class Manager {
       if ((await this.manifest()).hash !== run.instructions.hash) throw new Error('Instructions changed. Revise the plan before approving.');
       if (await hashBuild(resolve(this.store.folder(id), 'builds', String(run.build.generation))) !== run.build.sha256) throw new Error('Build changed since validation. Rebuild before approval.');
       run.approval = { sha256: run.build.sha256, checks: clone(data.checks), at: new Date().toISOString(), source: 'human-attestation' };
+      await this.versions.capture(run,resolve(this.store.folder(run.id),'builds',String(run.build.generation)));await this.versions.approve(run);
       this.transition(run, 'complete'); await this.event(run, 'Human approved this exact build after playtesting'); return run;
     }
     throw new Error('Unknown action');
