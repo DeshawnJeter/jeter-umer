@@ -1,0 +1,15 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {spawn} from 'node:child_process';import {mkdtemp,rm} from 'node:fs/promises';import {tmpdir} from 'node:os';import {join} from 'node:path';
+test('developer can create, report feedback, restore and continue the same project in the browser',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'workspace-ui-')),port=34000+Math.floor(Math.random()*1000),origin=`http://127.0.0.1:${port}`;
+ const env={...process.env,PORT:String(port),GAME_BUILDER_CODE_PREVIEW_PORT:String(port+1000),GAME_BUILDER_PROVIDER:'demo',GAME_BUILDER_BROWSER_QA:'off',GAME_BUILDER_RUNS_DIR:root};delete env.OPENAI_API_KEY;
+ const server=spawn(process.execPath,['apps/server/src/index.js'],{env,stdio:'pipe',windowsHide:true});let browser;
+ const api=async(path,data)=>{const response=await fetch(origin+path,data?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}:{});const result=await response.json();if(!response.ok)throw Error(result.error);return result;};
+ try{
+ for(let i=0;;i++){try{await api('/api/config');break;}catch(error){if(i>100)throw error;await new Promise(yes=>setTimeout(yes,100));}}
+ const {chromium}=await import('playwright');browser=await chromium.launch({channel:process.platform==='win32'?'msedge':undefined,headless:true});const page=await browser.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));await page.goto(origin);
+ await page.locator('#difficulty').selectOption('beginner');await page.getByRole('button',{name:'Build a game',exact:true}).click();await page.getByRole('button',{name:'Approve plan and start specialists'}).click({timeout:20000});await page.locator('#review').waitFor({state:'visible',timeout:25000});
+ await page.getByText('Playtest feedback',{exact:true}).click();await page.locator('#feedback-title').fill('Test unresolved issue');await page.locator('#feedback-expected').fill('Expected guard reaction');await page.locator('#feedback-submit').click();await page.getByText('OPEN: Test unresolved issue',{exact:true}).waitFor();
+ await page.getByText('Versions and milestones',{exact:true}).click();await page.getByRole('button',{name:'Restore as a new run'}).first().click();await page.getByRole('button',{name:'Approve plan and start specialists'}).click({timeout:20000});await page.locator('#review').waitFor({state:'visible'});
+ const runs=await api('/api/runs');assert.equal(runs.length,2);assert.equal(runs[0].projectId,runs[1].projectId);const project=await api('/api/projects/'+runs[0].projectId);assert.equal(project.versions.length,2);assert.equal(project.feedback[0].status,'open');assert.ok(project.versions.every(v=>!v.approval));assert.equal(errors.length,0,errors.join('; '));
+ }finally{await browser?.close();server.kill();await new Promise(yes=>server.exitCode!==null?yes():server.once('exit',yes));await rm(root,{recursive:true,force:true});}
+});
