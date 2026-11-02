@@ -1,3 +1,4 @@
+import './preferences.js';
 const $ = selector => document.querySelector(selector);
 let selected = null, current = null, previewUrl = '', questionSignature = '', planSignature = '', busy = false;
 const checkLabels = { movement: 'Movement, collisions and any jumping work', collectAndWin: 'The selected game objective and win condition work', timeoutAndRestart: 'The timer, loss condition and restart work', audioControls: 'Sound starts after a gesture; mute and volume work', presentation: 'Title, instructions, HUD, and story are readable' };

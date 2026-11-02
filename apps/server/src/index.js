@@ -58,7 +58,8 @@ const server = createServer(async (req, res) => {
       return await serve(res, resolve(manager.store.folder(run.id), 'builds', parts[2]), parts.slice(3).join('/'), true);
     }
     if (url.pathname === '/') return await serve(res, 'apps/web', 'index.html');
-    if (url.pathname === '/app.js' || url.pathname === '/style.css') return await serve(res, 'apps/web', parts[0]);
+    if (url.pathname === '/player-ui.js') return await serve(res, 'shared', 'player-ui.js');
+    if (url.pathname === '/app.js' || url.pathname === '/preferences.js' || url.pathname === '/style.css') return await serve(res, 'apps/web', parts[0]);
     json(res, 404, { error: 'Not found' });
   } catch (error) { json(res, error.code === 'ENOENT' ? 404 : 400, { error: error.code === 'ENOENT' ? 'Not found' : error.message }); }
 });

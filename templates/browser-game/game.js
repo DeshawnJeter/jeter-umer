@@ -1,3 +1,4 @@
+import { PlayerInterface } from './interface.js';
 import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
 import { createArt, drawBackdrop } from './art.js';
@@ -18,8 +19,14 @@ const musicInfo = document.createElement('p'); musicInfo.id = 'music-info'; musi
 document.querySelector('#mute').textContent = audio.muted ? 'Unmute' : 'Mute';
 document.querySelector('#mute').setAttribute('aria-pressed', String(audio.muted));
 const state = { ready: false, genre, phase: 'ready', score: 0, required: config.levels.stars.length, remaining: config.gameplay.timeLimit, health: 3, x: 0, y: 0 };
-let scene, player, stars, enemies, portal, cursors, wasd, space, elapsed = 0, lastHud = '', lastDamage = -2;
+let scene, player, stars, enemies, portal, elapsed = 0, lastHud = '', lastDamage = -2;
 const held = new Set(); let touchJump = false;
+const ui = new PlayerInterface({ config, genre, state, audio, held, onJump: () => { touchJump = true; },
+  onPause: () => { held.clear(); touchJump = false; scene?.scene.pause(); },
+  onResume: () => { scene?.scene.resume(); },
+  onRestart: () => { if (scene) scene.scene.restart(); }
+});
+await ui.initialize();
 const size = 48, center = n => n * size + size / 2;
 function end(phase) {
   if (state.phase !== 'playing') return;
@@ -79,19 +86,18 @@ class WorkshopGame extends Phaser.Scene {
         if (state.health <= 0) end('lost');
       });
     }
-    cursors = this.input.keyboard.createCursorKeys(); wasd = this.input.keyboard.addKeys('W,A,S,D');
-    space = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    ui.render();
     this.events.once('shutdown', () => { held.clear(); audio.setPlaying?.(false); });
   }
   update(_, delta) {
     if (!player) return;
     if (state.phase === 'playing') {
       elapsed += delta / 1000; state.remaining = Math.max(0, config.gameplay.timeLimit - elapsed);
-      const x = Number(cursors.right.isDown || wasd.D.isDown || held.has('right')) - Number(cursors.left.isDown || wasd.A.isDown || held.has('left'));
-      const y = Number(cursors.down.isDown || wasd.S.isDown || held.has('down')) - Number(cursors.up.isDown || wasd.W.isDown || held.has('up'));
+      const x = Number(ui.isDown('right')) - Number(ui.isDown('left'));
+      const y = Number(ui.isDown('down')) - Number(ui.isDown('up'));
       if (genre === 'platformer') {
         player.body.setVelocityX(x * config.gameplay.speed);
-        const jump = Phaser.Input.Keyboard.JustDown(space) || Phaser.Input.Keyboard.JustDown(cursors.up) || Phaser.Input.Keyboard.JustDown(wasd.W) || touchJump;
+        const jump = touchJump;
         if (jump && player.body.blocked.down) player.body.setVelocityY(-480);
       } else { player.body.setVelocity(x, y); if (x || y) player.body.velocity.normalize().scale(config.gameplay.speed); }
       touchJump = false;
@@ -107,26 +113,23 @@ class WorkshopGame extends Phaser.Scene {
     } else { player.body.setVelocity(0); enemies?.setVelocity(0, 0); }
     state.x = player.x; state.y = player.y;
     const text = `${state.phase.toUpperCase()} · Stars ${state.score}/${state.required} · ${Math.ceil(state.remaining)}s${genre === 'survival' ? ` · Shields ${state.health}/3` : ''}`;
-    if (text !== lastHud) { status.textContent = text; lastHud = text; }
+    if (text !== lastHud) { status.textContent = text; ui.render(); lastHud = text; }
   }
 }
 new Phaser.Game({ type: Phaser.AUTO, width: 720, height: 480, parent: 'game', backgroundColor: config.ui.backgroundColor, physics: { default: 'arcade', arcade: { gravity: { x: 0, y: 0 } } }, scene: WorkshopGame, audio: { noAudio: true } });
 document.querySelector('#start').onclick = async () => {
   if (!state.ready || state.phase !== 'ready') return;
-  state.phase = 'playing';
+  state.phase = 'playing'; document.querySelector('#game').focus();
   try { await audio.start(); audio.setPlaying?.(state.phase === 'playing'); document.querySelector('#music-info').textContent = config.audio.music ? `${MUSIC_STYLES[audio.score.style].name} · ${MUSIC_INSTRUMENTS[audio.instrument].name} · ${audio.score.tempo} BPM` : 'Music off · event sounds enabled'; } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
 };
-document.querySelector('#restart').onclick = () => { if (scene) scene.scene.restart(); };
-document.querySelector('#mute').onclick = event => { audio.muted = !audio.muted; audio.update(); event.currentTarget.textContent = audio.muted ? 'Unmute' : 'Mute'; event.currentTarget.setAttribute('aria-pressed', String(audio.muted)); };
-document.querySelector('#volume').oninput = event => { audio.volume = Number(event.target.value); audio.update(); };
-document.querySelector('#volume').addEventListener('keydown', event => event.stopPropagation());
+document.querySelector('#restart').onclick = () => ui.restart();
 for (const button of document.querySelectorAll('[data-control]')) {
   const control = button.dataset.control;
   button.hidden = control === 'jump' ? genre !== 'platformer' : genre === 'platformer' && ['up','down'].includes(control);
-  button.onpointerdown = event => { event.preventDefault(); button.setPointerCapture(event.pointerId); held.add(control); if (control === 'jump') touchJump = true; };
+  button.onpointerdown = event => { event.preventDefault(); if (state.phase !== 'playing') return; button.setPointerCapture(event.pointerId); held.add(control); if (control === 'jump') touchJump = true; };
   button.onpointerup = button.onpointercancel = button.onlostpointercapture = () => held.delete(control);
 }
-window.addEventListener('blur', () => held.clear());
-document.addEventListener('visibilitychange', () => audio.setPlaying(!document.hidden && state.phase === 'playing'));
+window.addEventListener('blur', () => { held.clear(); ui.clearInput(); if (state.phase === 'playing') ui.pause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && state.phase === 'playing') ui.pause(); });
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
 window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume, audio: audio.inspect() });
