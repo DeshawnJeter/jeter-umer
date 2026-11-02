@@ -35,7 +35,7 @@ export function invalidateMemory(run,roles,reason='Requirements or dependency ch
   const m=ensureMemory(run),affected=new Set(roles);let changed=true;
   while(changed){changed=false;for(const [role,entry]of Object.entries(m.artifacts))if(!affected.has(role)&&Object.keys(entry.dependencies).some(parent=>affected.has(parent))){affected.add(role);changed=true;}}
   for(const role of affected){if(m.artifacts[role])m.artifacts[role].stale=true;if(m.workspaces[role])m.workspaces[role].stage='stale';}
-  for(const record of m.tests)record.stale=true;
+  for(const record of m.tests)if((record.affectedRoles||Object.keys(record.artifactHashes||{})).some(role=>affected.has(role)))record.stale=true;
   m.invalidations.push({revision:++m.revision,generation:run.generation,roles:[...affected],reason});
   if(affected.has('planner'))m.specification=null;
   return [...affected];
@@ -47,4 +47,4 @@ export function readMemory(run,role,dependencies=[]){
   if(JSON.stringify(result).length>7000)throw Error('Focused memory exceeds context budget; split the task instead of truncating requirements');
   return result;
 }
-export function recordTests(run,kind,evidence){const m=ensureMemory(run);m.tests.push({kind,generation:run.generation,revision:m.revision,artifactHashes:Object.fromEntries(Object.entries(m.artifacts).filter(([,v])=>!v.stale).map(([role,v])=>[role,v.hash])),evidence:clone(evidence),stale:false});}
+export function recordTests(run,kind,evidence){const m=ensureMemory(run),affectedRoles=kind==='code-worker'?['coding','planner','ui']:Object.keys(m.artifacts);m.tests.push({kind,generation:run.generation,revision:m.revision,affectedRoles,artifactHashes:Object.fromEntries(Object.entries(m.artifacts).filter(([role,v])=>!v.stale&&affectedRoles.includes(role)).map(([role,v])=>[role,v.hash])),evidence:clone(evidence),stale:false});}
