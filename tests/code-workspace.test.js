@@ -12,3 +12,22 @@ test('syntax and capability checks reject code before server execution and requi
   assert.equal(checkCode({source:DEFAULT_SOURCE,scenarios:'[]'}).verdict,'fail');
   assert.throws(()=>inspectSnapshot({phase:'won',health:Infinity}));
 });
+
+test('drafts survive syntax rejection and patch mismatches return recoverable feedback without mutation',async()=>{
+ const w=codeWorkspace(await mkdtemp(join(tmpdir(),'draft-repair-'))),broken='export function createGame(api){';
+ await w.stage(broken);assert.equal(await w.read(),broken);
+ const mismatch=await w.patch({path:'generated/rules.js',find:'not present',replacement:'x'});
+ assert.equal(mismatch.verdict,'fail');assert.equal(await w.read(),broken);assert.match(mismatch.findings[0],/read_source/);
+ const partial=await w.patch({path:'generated/rules.js',find:broken,replacement:'export function createGame(api){\n'});
+ assert.equal(partial.verdict,'fail');assert.equal(await w.read(),'export function createGame(api){\n');
+ const repaired=await w.patch({path:'generated/rules.js',find:await w.read(),replacement:DEFAULT_SOURCE});
+ assert.equal(repaired.verdict,'pass');assert.equal(await w.read(),DEFAULT_SOURCE);
+ await assert.rejects(w.stage('x'.repeat(6001)));await assert.rejects(w.patch({path:'../../.env',find:'',replacement:'x'}));assert.equal(await w.read(),DEFAULT_SOURCE);
+});
+
+test('repair diagnostics name replay limits, action mappings and unavailable API methods',()=>{
+ const cases=JSON.parse(DEFAULT_SCENARIOS);cases[1].steps=[{dt:0.1,input:{},repeat:300},{dt:0.1,input:{}}];
+ assert.match(checkCode({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)}).findings[0],/301 steps.*300 total/);
+ cases[1].steps=[{dt:0.1,input:{j:true}}];assert.match(checkCode({source:DEFAULT_SOURCE,scenarios:JSON.stringify(cases)}).findings[0],/J maps to attack/);
+ const source=DEFAULT_SOURCE.replace('time+=dt;','time+=dt;api.musicStart();');assert.match(checkCode({source,scenarios:DEFAULT_SCENARIOS}).findings[0],/Unavailable api method: musicStart/);
+});

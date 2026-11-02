@@ -18,3 +18,14 @@ test('unavailable input counts retain conservative reservations and do not leak 
   await client.generate('gameplay','worker',request,{reserve:async value=>{reservation=value;},onAttempt:async value=>audits.push(value)});
   assert.equal(reservation,buildRequest(config,'gameplay','worker',request).reservation);assert.equal(audits[0].reservationMethod,'byte-upper-bound');assert.ok(!JSON.stringify(audits).includes('PRIVATE_ERROR_CANARY'));
 });
+
+test('counted coding reservations include coding headroom on fresh and cached requests',async()=>{
+ let count=0;const reserved=[];
+ const client=createOpenAIClient('SYNTHETIC_COUNT_KEY',config,{countInputTokens:true,fetchImpl:async(url,options)=>{
+  if(url===TOKEN_COUNT_ENDPOINT){count++;return new Response(JSON.stringify({input_tokens:200}));}
+  assert.equal(JSON.parse(options.body).max_output_tokens,6144);
+  return new Response(JSON.stringify({status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({kind:'artifact',artifact:{source:'fixture',scenarios:'[]'},question:null,summary:'count fixture'})}]}],usage:{input_tokens:200,output_tokens:30,total_tokens:230}}));
+ }});
+ for(let n=0;n<2;n++)await client.generate('coding','worker',{instructions:'fixture',brief:{genre:'custom'},context:{}},{reserve:async value=>reserved.push(value)});
+ assert.equal(count,1);assert.deepEqual(reserved,[200+6144+512,200+6144+512]);
+});

@@ -29,7 +29,7 @@ async function execute(artifact,signal){
       const {CodeClient}=await import('./code-client.js');const tests=[];
       for(const c of cases){const client=new CodeClient();try{
         const initial=await client.request('inspect');if(initial.phase!=='ready')throw Error('New game must be ready');
-        let state=await client.request('start');if(state.phase!=='playing')throw Error('Start must enter gameplay');
+        let state=await client.request('start');if(state.phase!=='playing')throw Error('game.start() is called without keyboard input before any update. It must immediately set phase to playing; observed '+state.phase+'. Do not bind start to a reset that leaves phase ready.');
         for(const step of c.steps)for(let n=0;n<(step.repeat??1);n++)state=await client.request('step',{dt:step.dt,input:step.input});
         if(state.phase!==c.expect)throw Error('Expected '+c.expect+', observed '+state.phase);
         const frozen=await client.request('step',{dt:0.1,input:{right:true,attack:true}});if(JSON.stringify(frozen)!==JSON.stringify(state))throw Error('Terminal rules continue changing');
