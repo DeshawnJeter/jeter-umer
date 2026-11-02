@@ -1,6 +1,7 @@
 // Delivered with the game as rules.js. Keep this module browser-compatible.
 import {EXTRA_GAME_TYPES} from './extra-game-types.js';
 import {advancedProfile} from './advanced-games.js';
+import {failureReason} from './lifecycle.js';
 export const GAME_TYPES = Object.freeze({
   collector: { name: 'Star collector', objective: 'Collect every star and reach the exit.', controls: 'Arrow keys or WASD to move. Collect every star, then enter the portal.', intro: 'Recover the scattered stars, then find the portal.', victory: 'All stars recovered. Mission complete!', defeat: 'Time ran out. Try again!' },
   maze: { name: 'Maze escape', objective: 'Find a route through the maze and reach the exit before time runs out.', controls: 'Arrow keys or WASD to move. Find the portal before time runs out. Stars are optional bonuses.', intro: 'Find your way through the maze to the exit. Stars are optional bonuses.', victory: 'You escaped the maze!', defeat: 'The maze timer ran out. Try another route!' },
@@ -26,7 +27,7 @@ export function referenceLevel(genre = 'collector') {
 }
 export function roundOutcome({ genre = 'collector', remaining, score, required, atExit = false, health = 3 }) {
   genreOf(genre);
-  if (genre === 'survival') return health <= 0 ? 'lost' : remaining <= 0 ? 'won' : 'playing';
-  if (remaining <= 0) return 'lost';
+  if(failureReason(genre,{remaining,health}))return 'lost';
+  if (genre === 'survival') return remaining <= 0 ? 'won' : 'playing';
   return atExit && (genre === 'maze' || score >= required) ? 'won' : 'playing';
 }

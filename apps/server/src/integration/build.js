@@ -4,15 +4,17 @@ import { createHash } from 'node:crypto';
 import { ART_MANIFEST } from '../../../../shared/art-catalog.js';
 import { composeScore } from '../../../../shared/music.js';
 import {compileAssembly} from './assembly.js';
+import {lifecycleFor,humanChecksFor} from '../../../../shared/lifecycle.js';
 export async function buildGame(folder, config) {
   await mkdir(folder, { recursive: true });
   await cp(resolve('templates/browser-game'), folder, { recursive: true });
   await writeFile(resolve(folder,'assembly.js'),compileAssembly(config));
+  await writeFile(resolve(folder,'lifecycle.json'),JSON.stringify({...lifecycleFor(config.genre),requiredHumanChecks:humanChecksFor(config.genre)},null,2));
   await cp(resolve('shared/game-types.js'), resolve(folder, 'rules.js'));
   await cp(resolve('shared/art-catalog.js'), resolve(folder, 'art-catalog.js'));
   await cp(resolve('shared/music.js'), resolve(folder, 'score.js'));
   await cp(resolve('shared/player-ui.js'), resolve(folder, 'player-ui.js'));
-  for(const file of ['advanced-games.js','extra-game-types.js','turn-combat.js'])await cp(resolve('shared',file),resolve(folder,file));
+  for(const file of ['advanced-games.js','extra-game-types.js','turn-combat.js','stealth-rules.js','lifecycle.js'])await cp(resolve('shared',file),resolve(folder,file));
   await writeFile(resolve(folder, 'music-score.json'), JSON.stringify(config.audio.score || composeScore(), null, 2));
   await writeFile(resolve(folder, 'assets-manifest.json'), JSON.stringify({ ...ART_MANIFEST, theme: config.ui.theme || 'space' }, null, 2));
   await mkdir(resolve(folder, 'vendor'), { recursive: true });
