@@ -26,7 +26,7 @@ The default Blueprint now creates a second, diskless `team-game-previews` web se
 
 Use the checked-in `Dockerfile` and `render.yaml`. The image includes Node 24 and the pinned Playwright Chromium browser with system dependencies. Application source stays root-owned and read-only to the application user; `/app/.local` is a writable ephemeral cache. The container prepares only a whitelisted data directory under `/var/data` as root, holds a kernel `flock` for the disk, then runs the application as the unprivileged `node` user. The kernel releases this lock even after a crash or PID-namespace restart. No API key is supplied during the image build.
 
-The Blueprint selects a single paid web service, a five-GB persistent disk, manual deploys, browser QA, and **demo mode initially**. No billable Render resources are created just by committing it. The smallest paid compute plan is a starting configuration; verify memory with your actual concurrent builds and increase it if needed. The local machine's Docker daemon was unavailable during implementation; the new Linux CI job builds the image rather than claiming a local image build passed.
+The Blueprint selects a paid workshop service, a free preview relay, a five-GB persistent disk, manual deploys, browser QA, and **demo mode initially**. No billable Render resources are created just by committing it. The smallest paid compute plan is a starting configuration; verify memory with your actual concurrent builds and increase it if needed. The local machine's Docker daemon was unavailable during implementation; the new Linux CI job builds the image rather than claiming a local image build passed.
 
 Configure these values privately in the hosting environment:
 
