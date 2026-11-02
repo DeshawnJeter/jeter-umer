@@ -1,3 +1,4 @@
+import {exportProject} from './integration/export-project.js';
 import {repairFeedback} from './orchestrator/feedback-repair.js';
 import {validateAcceptanceCases} from '../../../shared/acceptance-cases.js';
 import {requestChange} from './orchestrator/change-request.js';
@@ -62,6 +63,7 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: 'Not found' });
     }
     if (req.method !== 'GET') return json(res, 405, { error: 'Method not allowed' });
+    if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===5&&parts[3]==='export'){const bytes=await exportProject(manager.versions,parts[2],parts[4]);res.writeHead(200,{'Content-Type':'application/zip','Content-Disposition':'attachment; filename=editable-game-project.zip'});return res.end(bytes);}
     if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===4&&parts[3]==='compare')return json(res,200,await compareVersions(manager,parts[2],url.searchParams.get('left'),url.searchParams.get('right')));
     if(url.pathname==='/api/projects')return json(res,200,await manager.projects.list());
     if(parts[0]==='api'&&parts[1]==='projects'&&parts.length===3)return json(res,200,await manager.projects.get(parts[2]));
