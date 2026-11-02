@@ -11,7 +11,7 @@ import { buildGame, hashBuild } from '../integration/build.js';
 import { validateGame, HUMAN_CHECKS } from '../validation/index.js';
 import { createRuntime } from '../providers/runtime.js';
 import { emptyUsage, reserveUsage, finishUsage, recoverUsage } from '../providers/usage.js';
-import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests} from '../memory/project.js';
+import {ensureMemory,approveSpecification,recordDecision,checkpointMemory,acceptMemory,invalidateMemory,readMemory,recordTests,assertCurrentMemory} from '../memory/project.js';
 import {activeRoles,dependenciesFor} from '../../../../shared/specialists.js';
 import {runProjectRules} from '../specialists/rules-tests.js';
 import {humanChecksFor} from '../../../../shared/lifecycle.js';
@@ -121,7 +121,11 @@ export class Manager {
       directory: resolve(this.store.folder(run.id), 'workspaces', `generation-${run.generation}`), beforeStep: () => this.checkpoint(run),
       onEvent: async event => { checkpointMemory(run,role,event);run.agents[role] = event; await this.event(run, `${role}: ${event.stage} (attempt ${event.attempt})`); } });
     if (run.status !== 'running') return;
-    if(task.generation!==run.generation||memoryDependencies.some(parent=>run.memory.artifacts[parent]?.stale||run.memory.artifacts[parent]?.hash!==dependencyHashes[parent])){checkpointMemory(run,role,{stage:'stale',attempt:run.agents[role]?.attempt||1});await this.event(run,`${role}: stale in-flight contribution discarded; dependency changed`);return;}
+    // Revalidate the complete handoff chain after asynchronous worker/checker
+    // execution, including changes to result payloads or checker acceptance.
+    let dependenciesCurrent=true;
+    try{for(const parent of memoryDependencies)assertCurrentMemory(run,parent);}catch{dependenciesCurrent=false;}
+    if(!dependenciesCurrent||task.generation!==run.generation||memoryDependencies.some(parent=>run.memory.artifacts[parent]?.hash!==dependencyHashes[parent])){checkpointMemory(run,role,{stage:'stale',attempt:run.agents[role]?.attempt||1});await this.event(run,`${role}: stale in-flight contribution discarded; dependency changed`);return;}
     if (result.status === 'needs_human') {
       await this.addQuestion(run, result.question); run.agents[role].stage = 'awaiting_human'; run.tasks[role].status = 'blocked'; await this.save(run); return;
     }
@@ -140,6 +144,9 @@ export class Manager {
         await this.event(run, 'Instructions or profiles changed. Prior results and approvals require fresh checks.');
       }
       run.instructions = instructions;
+      // Resumed runs can reuse checked work only while both stored copies and
+      // the independent acceptance of every ancestor still agree.
+      for(const role of Object.keys(run.results))assertCurrentMemory(run,role);
       if(run.brief.inputMode==='prompt'&&!run.briefResolution){
         const resolution=await this.runtime.resolveBrief({brief:clone(run.brief),decisions:clone(run.decisions),hooks:this.providerHooks(run,'planner'),directory:resolve(this.store.folder(run.id),'workspaces',`generation-${run.generation}`),beforeStep:()=>this.checkpoint(run),onEvent:async event=>{run.agents.planner={role:'planner',...event};await this.event(run,`Planner: ${event.stage.replaceAll('_',' ')} (attempt ${event.attempt})`);}});
         if(run.status!=='running')return;
