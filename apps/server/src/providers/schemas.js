@@ -1,6 +1,6 @@
 import { ROLES } from '../../../../shared/contracts/index.js';
 import { normalizeQuestion } from '../../../../shared/contracts/questions.js';
-import { MELODY_NOTES, BASS_NOTES } from '../../../../shared/music.js';
+import { MELODY_NOTES, BASS_NOTES, MUSIC_STYLES, MUSIC_INSTRUMENTS } from '../../../../shared/music.js';
 const string = { type: 'string' }, number = { type: 'number' }, boolean = { type: 'boolean' };
 const object = properties => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const array = items => ({ type: 'array', items });
@@ -12,7 +12,7 @@ const artifacts = {
   levels: object({ spawn: point, exit: point, stars: array(point), walls: array(point) }),
   ui: object({ title: string, playerColor: string, backgroundColor: string, theme: { type: 'string', enum: ['space', 'forest', 'neon'] } }),
   story: object({ intro: string, victory: string, defeat: string }),
-  audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: ['calm','adventure','arcade'] }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
+  audio: object({ enabled: boolean, volume: number, music: boolean, pickupFrequency: number, winFrequency: number, score: object({ style: { type: 'string', enum: Object.keys(MUSIC_STYLES) }, instrument: { type:'string', enum:Object.keys(MUSIC_INSTRUMENTS) }, tempo: { type: 'integer' }, waveform: { type: 'string', enum: ['sine','triangle','square'] }, melody: array({ type: 'string', enum: MELODY_NOTES }), bass: array({ type: 'string', enum: BASS_NOTES }), drums: boolean }) })
 };
 export const questionSchema = object({ key: string, text: string, reason: string, options: array(string), recommended: string, blocking: boolean, affectedRoles: array({ type: 'string', enum: ROLES }), maxLength: { type: 'integer' } });
 export function responseSchema(role, stage) {

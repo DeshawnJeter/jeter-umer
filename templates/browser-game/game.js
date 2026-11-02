@@ -1,6 +1,7 @@
 import { GameAudio } from './audio.js';
 import { GAME_TYPES, genreOf, roundOutcome } from './rules.js';
 import { createArt, drawBackdrop } from './art.js';
+import { MUSIC_STYLES, MUSIC_INSTRUMENTS } from './score.js';
 const errors = [];
 window.addEventListener('error', event => errors.push(String(event.message)));
 window.addEventListener('unhandledrejection', event => errors.push(String(event.reason)));
@@ -113,7 +114,7 @@ new Phaser.Game({ type: Phaser.AUTO, width: 720, height: 480, parent: 'game', ba
 document.querySelector('#start').onclick = async () => {
   if (!state.ready || state.phase !== 'ready') return;
   state.phase = 'playing';
-  try { await audio.start(); audio.setPlaying?.(state.phase === 'playing'); document.querySelector('#music-info').textContent = config.audio.music ? `${audio.score.style} score · ${audio.score.tempo} BPM` : 'Music off · event sounds enabled'; } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
+  try { await audio.start(); audio.setPlaying?.(state.phase === 'playing'); document.querySelector('#music-info').textContent = config.audio.music ? `${MUSIC_STYLES[audio.score.style].name} · ${MUSIC_INSTRUMENTS[audio.instrument].name} · ${audio.score.tempo} BPM` : 'Music off · event sounds enabled'; } catch { message.textContent = 'Audio unavailable. The game can still run.'; }
 };
 document.querySelector('#restart').onclick = () => { if (scene) scene.scene.restart(); };
 document.querySelector('#mute').onclick = event => { audio.muted = !audio.muted; audio.update(); event.currentTarget.textContent = audio.muted ? 'Unmute' : 'Mute'; event.currentTarget.setAttribute('aria-pressed', String(audio.muted)); };

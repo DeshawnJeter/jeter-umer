@@ -1,6 +1,6 @@
 import { genreOf } from '../game-types.js';
 import { themeOf } from '../art-catalog.js';
-import { musicStyleOf, composeScore, validateScore } from '../music.js';
+import { musicStyleOf, instrumentOf, composeScore, validateScore } from '../music.js';
 export const ROLES = ['planner', 'gameplay', 'levels', 'ui', 'story', 'audio'];
 export const SPECIALISTS = ROLES.filter(role => role !== 'planner');
 export const defaults = {
@@ -46,5 +46,5 @@ export function validateBrief(brief) {
   if (!object(brief) || !string(brief.prompt, 2000)) throw new Error('Describe the game in 1–2000 characters');
   if (!['', 'beginner', 'experienced'].includes(brief.difficulty ?? '')) throw new Error('Invalid difficulty');
   if (brief.title !== undefined && !string(brief.title, 60)) throw new Error('Title must be 1–60 characters');
-  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), musicStyle: musicStyleOf(brief.musicStyle), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
+  return { prompt: brief.prompt.trim(), title: brief.title?.trim() || 'Star Collector', genre: genreOf(brief.genre), theme: themeOf(brief.theme), musicStyle: musicStyleOf(brief.musicStyle), musicInstrument: instrumentOf(brief.musicInstrument,true), difficulty: brief.difficulty || '', music: brief.music === true, askStory: brief.askStory === true };
 }
