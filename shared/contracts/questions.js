@@ -5,14 +5,17 @@ export function normalizeQuestion(value, role, source = 'worker') {
   if (!/^[a-z][a-z0-9_.-]{0,79}$/.test(value.key || '') || value.key.split('.').some(part => ['constructor', 'prototype', '__proto__'].includes(part))) throw new Error('Invalid question key');
   if (!text(value.text, 400) || !text(value.reason, 600)) throw new Error('Question requires text and reason');
   const options = value.options ?? [];
-  if (!Array.isArray(options) || options.length > 6 || options.some(option => !text(option, 100)) || new Set(options).size !== options.length) throw new Error('Invalid question options');
+  if (!Array.isArray(options) || options.length > 6 || options.some(option => !text(option, 100) || option !== option.trim()) || new Set(options).size !== options.length) throw new Error('Invalid question options');
   const blocking = value.blocking ?? true;
   if (typeof blocking !== 'boolean') throw new Error('Invalid blocking status');
-  const affectedRoles = [...new Set([role, ...(value.affectedRoles ?? [role])])];
+  const affected = value.affectedRoles ?? [role];
+  if (!Array.isArray(affected)) throw new Error('Invalid affected roles');
+  const affectedRoles = [...new Set([role, ...affected])];
   if (affectedRoles.some(affected => !ROLES.includes(affected))) throw new Error('Unknown affected role');
   const maxLength = value.maxLength ?? 500;
   if (!Number.isInteger(maxLength) || maxLength < 1 || maxLength > 1000) throw new Error('Invalid answer length');
-  if (value.recommended && (!text(value.recommended, maxLength) || (options.length && !options.includes(value.recommended)))) throw new Error('Invalid question recommendation');
+  if (options.some(option => option.length > maxLength)) throw new Error('Invalid question options: answer length limit is too short');
+  if (value.recommended !== undefined && value.recommended !== '' && (!text(value.recommended, maxLength) || (options.length && !options.includes(value.recommended)))) throw new Error('Invalid question recommendation');
   return { key: value.key, text: value.text.trim(), reason: value.reason.trim(), options: [...options], recommended: value.recommended || '', blocking, affectedRoles, maxLength, requesters: [{ role, source }] };
 }
 export function validateAnswer(question, answer) {
