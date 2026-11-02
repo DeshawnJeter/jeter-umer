@@ -49,6 +49,8 @@ document.querySelector('#start').onclick = async () => { try { await audio.start
 document.querySelector('#restart').onclick = reset;
 document.querySelector('#mute').onclick = event => { audio.muted = !audio.muted; audio.update(); event.currentTarget.textContent = audio.muted ? 'Unmute' : 'Mute'; event.currentTarget.setAttribute('aria-pressed', String(audio.muted)); };
 document.querySelector('#volume').oninput = event => { audio.volume = Number(event.target.value); audio.update(); };
+// Phaser captures arrow keys globally; let the focused slider use its native keys.
+document.querySelector('#volume').addEventListener('keydown', event => event.stopPropagation());
 window.addEventListener('pagehide', () => audio.dispose(), { once: true });
 // Read-only observability for browser checks. No hidden success or teleport controls.
 window.gameState = () => ({ ...state, errors: [...errors], muted: audio.muted, volume: audio.volume });

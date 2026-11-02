@@ -11,5 +11,5 @@
     "check": "node scripts/check.js"
   },
   "engines": { "node": ">=22" },
-  "dependencies": { "phaser": "3.90.0", "tone": "15.1.22", "fflate": "0.8.2" }
+  "dependencies": { "phaser": "3.90.0", "tone": "15.1.22", "fflate": "0.8.3" }
 }
