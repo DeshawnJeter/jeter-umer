@@ -8,7 +8,7 @@ export function createMode(scene,ctx){
     state.health=snapshot.health;state.maxHealth=snapshot.maxHealth;state.score=snapshot.score;state.progress=String(snapshot.score);state.objective=snapshot.objective;state.codeSnapshot=snapshot;
     if(snapshot.score>lastScore){ctx.emit('pickup',{x:360,y:240});ctx.audio.tone(ctx.config.audio.pickupFrequency);}lastScore=snapshot.score;
     objects.splice(0).forEach(o=>o.destroy());
-    for(const node of snapshot.nodes){objects.push(scene.add.rectangle(node.x,node.y,node.size,node.size,parseInt(node.color.slice(1),16)));objects.push(scene.add.text(node.x,node.y-node.size,node.label,{fontSize:'12px',color:'#ffffff'}).setOrigin(0.5));}
+    for(const node of snapshot.nodes){objects.push(scene.add.rectangle(node.x,node.y,node.size,node.size,parseInt(node.color.slice(1),16)));objects.push(scene.add.text(node.x,node.y-node.size,node.label,{fontSize:'12px',color:'#ffffff',stroke:'#08111d',strokeThickness:2}).setOrigin(0.5));}
     if(state.phase==='playing'&&['won','lost'].includes(snapshot.phase))ctx.end(snapshot.phase);
   }
   const send=(operation,data)=>{busy=true;return client.request(operation,data).then(apply).catch(()=>{if(!disposed){state.codeError='Generated code stopped. Restart to try again.';ctx.note(state.codeError);if(state.phase==='playing')ctx.end('lost');}}).finally(()=>{busy=false;});};

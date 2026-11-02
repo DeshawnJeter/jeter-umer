@@ -49,3 +49,7 @@ test('syntax-breaking and unavailable-capability patches leave parseable source 
  for(const [find,replacement] of [["phase='playing'","phase='playing'("],["time+=dt;","time+=dt;api.musicStart();"]]){const report=await w.patch({path:'generated/rules.js',find,replacement});assert.equal(report.verdict,'fail');assert.ok(report.findings.some(line=>line.includes('not changed')));assert.equal(await w.read(),DEFAULT_SOURCE);}
  const report=await w.patch({path:'generated/rules.js',find:'score>=5',replacement:'score>=4'});assert.equal(report.verdict,'pass');assert.ok((await w.read()).includes('score>=4'));
 });
+
+test('game inputs cannot be used as persistent button-latch storage',()=>{
+ for(const statement of ['input._buildLock=1;','input.attack++;','delete input.attack;']){const source=DEFAULT_SOURCE.replace('time+=dt;','time+=dt;'+statement);assert.match(checkCode({source,scenarios:DEFAULT_SCENARIOS}).findings[0],/Input is read-only/);}
+});

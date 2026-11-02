@@ -1,0 +1,119 @@
+{
+  "planner": {
+    "title": "Moonwood Crystal Guard",
+    "objective": "Protect the crystal at (680,240) with 3 health by building towers to defeat all six invaders before they reduce the crystal's health to zero.",
+    "difficulty": "beginner",
+    "acceptance": [
+      "The game starts at a ready screen and begins immediately upon pressing Start, with calm synthesized pad music starting then.",
+      "Six invaders spawn in pairs at 0, 3, and 6 seconds at (40,240), moving straight at 40 pixels/second along a path with at most 16 markers.",
+      "Pressing J builds a tower at the next available site among (200,190), (360,190), and (520,190) if the player has at least 2 coins; the player starts with 6 coins.",
+      "Each tower automatically defeats one invader within 130 pixels every 0.5 seconds and adds 1 coin per kill.",
+      "The HUD displays crystal health (starts at 3), coins, and defeated invader count out of 6; building all three towers early results in a win, no towers results in a loss within 25s.",
+      "The game freezes on win (6 kills) or loss (crystal health zero); Restart resets the game state; pause, remappable controls, and separate music/SFX volume are supported; music plays"
+    ]
+  },
+  "gameplay": {
+    "speed": 190,
+    "timeLimit": 60
+  },
+  "levels": {
+    "spawn": {
+      "x": 1,
+      "y": 1
+    },
+    "exit": {
+      "x": 13,
+      "y": 8
+    },
+    "stars": [
+      {
+        "x": 3,
+        "y": 2
+      },
+      {
+        "x": 8,
+        "y": 3
+      },
+      {
+        "x": 11,
+        "y": 6
+      }
+    ],
+    "walls": [
+      {
+        "x": 5,
+        "y": 4
+      },
+      {
+        "x": 6,
+        "y": 4
+      },
+      {
+        "x": 7,
+        "y": 4
+      }
+    ]
+  },
+  "ui": {
+    "title": "Moonwood Crystal Guard",
+    "playerColor": "#2e5234",
+    "backgroundColor": "#b6e3bd",
+    "theme": "forest",
+    "hud": {
+      "layout": "cards",
+      "stats": [
+        "health",
+        "progress",
+        "objective"
+      ]
+    }
+  },
+  "story": {
+    "intro": "Protect the crystal at (680,240) from six invaders by building towers at three sites using J. Each tower kills invaders nearby and earns coins.",
+    "victory": "Your towers defended the crystal! All invaders defeated. Well done!",
+    "defeat": "The crystal was destroyed. The invaders got through. Try building towers earlier."
+  },
+  "audio": {
+    "enabled": true,
+    "volume": 0.18,
+    "music": true,
+    "pickupFrequency": 660,
+    "winFrequency": 880,
+    "score": {
+      "style": "calm",
+      "instrument": "pad",
+      "tempo": 75,
+      "waveform": "sine",
+      "melody": [
+        "C4",
+        "D4",
+        "F4",
+        "G4",
+        "A4",
+        "G4",
+        "F4",
+        "E4",
+        "D4",
+        "F4",
+        "G4",
+        "A4",
+        "G4",
+        "F4",
+        "D4",
+        "C4"
+      ],
+      "bass": [
+        "C2",
+        "E2",
+        "G2",
+        "F2"
+      ],
+      "drums": false
+    }
+  },
+  "coding": {
+    "source": "",
+    "scenarios": "[{\"name\":\"tap all three tower sites and defend\",\"expect\":\"won\",\"steps\":[{\"dt\":0.1,\"input\":{\"attack\":true}},{\"dt\":0.1,\"input\":{}},{\"dt\":0.1,\"input\":{\"attack\":true}},{\"dt\":0.1,\"input\":{}},{\"dt\":0.1,\"input\":{\"attack\":true}},{\"dt\":0.1,\"input\":{},\"repeat\":200}]},{\"name\":\"undefended crystal loses within 25 seconds\",\"expect\":\"lost\",\"steps\":[{\"dt\":0.1,\"input\":{},\"repeat\":250}]}]"
+  },
+  "genre": "custom"
+}

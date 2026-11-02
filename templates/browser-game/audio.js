@@ -11,9 +11,9 @@ export class GameAudio {
   }
   async start() {
     if (this.disposed) throw new Error('Audio session disposed');
-    if (this.started) { await this.context?.resume(); return; }
+    if (this.started) { await this.context?.resume(); await this.toneContext?.resume(); return; }
     if (this.starting) return this.starting;
-    this.starting = this.initialize().catch(error => { this.clearMusic(); throw error; }).finally(() => { this.starting = null; });
+    this.starting = this.initialize().catch(error => { this.clearMusic(); this.closeToneContext(); throw error; }).finally(() => { this.starting = null; });
     return this.starting;
   }
   async initialize() {
@@ -23,7 +23,12 @@ export class GameAudio {
     await this.context?.resume();
     if (this.disposed) throw new Error('Audio session disposed');
     if (this.config.music && this.Tone) {
-      const T = this.Tone; await T.start();
+      const T = this.Tone;
+      // Blob workers are blocked in isolated game previews. Use Tone's timer
+      // scheduler without weakening the game's worker/network policy.
+      if(T.Context&&T.setContext){this.toneContext=new T.Context({clockSource:'timeout'});T.setContext(this.toneContext);}
+      else if(T.getContext)T.getContext().clockSource='timeout';
+      await T.start();
       if (this.disposed) throw new Error('Audio session disposed');
       const own = node => { this.nodes.push(node); return node; };
       this.limiter = own(new T.Limiter(-12)).toDestination();
@@ -70,6 +75,7 @@ export class GameAudio {
     oscillator.frequency.value = frequency; envelope.gain.setValueAtTime(0.35, this.context.currentTime);
     envelope.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.16);
     oscillator.connect(envelope); envelope.connect(this.gain); oscillator.start(); oscillator.stop(this.context.currentTime + 0.18);
+    this.scheduledEffects=(this.scheduledEffects||0)+1;
     oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
   }
   clearMusic() {
@@ -77,9 +83,10 @@ export class GameAudio {
     for (const sequence of this.sequences) sequence.dispose(); this.sequences = [];
     for (const node of this.nodes.reverse()) node.dispose(); this.nodes = []; this.musicGain = null; this.transport = null;
   }
+  closeToneContext() { const context=this.toneContext;this.toneContext=null;if(context?.dispose)context.dispose();else context?.close()?.catch(()=>{}); }
   dispose() {
     if (this.disposed) return;
-    this.disposed = true; this.clearMusic(); this.context?.close()?.catch(() => {}); this.started = false;
+    this.disposed = true; this.clearMusic(); this.context?.close()?.catch(() => {}); this.started = false;this.closeToneContext();
   }
-  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, instrument: this.instrument, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes }; }
+  inspect() { return { started: this.started, playing: this.playing, music: !!this.musicGain, style: this.score.style, instrument: this.instrument, tempo: this.score.tempo, scheduledNotes: this.scheduledNotes, scheduledEffects:this.scheduledEffects||0, ownedNodes:this.nodes.length, sequenceCount:this.sequences.length, clockSource:this.toneContext?.clockSource||null, musicContextState:this.toneContext?.state||null, musicGain:this.musicGain?.gain.value??0, sfxGain:this.gain?.gain.value??0, volume:this.volume, musicVolume:this.musicVolume, sfxVolume:this.sfxVolume, muted:this.muted, musicMuted:this.musicMuted, sfxMuted:this.sfxMuted }; }
 }

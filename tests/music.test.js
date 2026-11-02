@@ -119,3 +119,10 @@ test('legacy scores lacking an instrument remain playable as the original synth'
   const GameAudio=await audioClass(),fake=fakeAudio(),audio=new GameAudio({...clone(defaults.audio),score,music:true},fake.dependencies);
   await audio.start();assert.equal(audio.inspect().instrument,'synth');assert.equal(!!audio.lead.fm,false);audio.dispose();
 });
+
+test('isolated previews own a timeout music clock, resume it and close it without duplicate graphs',async()=>{
+ const GameAudio=await audioClass(),fake=fakeAudio();let current,created=0,closed=0,resumed=0,disposed=0;
+ class ToneContext{constructor(options){created++;this.clockSource=options.clockSource;this.state='suspended';}async resume(){resumed++;this.state='running';}async close(){closed++;this.state='closed';}dispose(){disposed++;this.close();return this;}}
+ Object.assign(fake.dependencies.Tone,{Context:ToneContext,setContext:value=>{current=value;},start:async()=>{await current.resume();}});
+ const audio=new GameAudio({...clone(defaults.audio),music:true},fake.dependencies);await audio.start();assert.equal(current.clockSource,'timeout');const count=fake.stats.nodes.length;await audio.start();assert.equal(created,1);assert.equal(fake.stats.nodes.length,count);assert.equal(resumed,2);audio.dispose();assert.equal(closed,1);assert.equal(disposed,1);
+});
